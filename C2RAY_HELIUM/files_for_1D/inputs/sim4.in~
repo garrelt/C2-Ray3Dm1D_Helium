@@ -1,0 +1,15 @@
+0.0 3.5e25 cm ! inner, outer radius (cm)
+4             ! which test?
+1.87e-7       ! initial density (cm^-3)
+5.0           ! clumping factor
+1.0e4         ! initial temperature (K)
+y             ! isothermal (y/n)
+9.	      ! initial redshift
+0.7           ! h
+0.27          ! Omega0	
+30000.        ! Teff (K)
+4             ! 4: input is S_star
+1e54          ! S_star
+5.0e9         ! end time (years)
+100           ! number of time steps
+10              ! timesteps between outputs

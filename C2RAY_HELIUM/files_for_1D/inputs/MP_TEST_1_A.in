@@ -1,0 +1,15 @@
+0.0 15000 pc
+1		! test problem number
+1.08696e-3	! density  in cm^-3  was e-4 1.111e-3
+1.0e0		! clumping factor
+1e4		! initial temperature (K)
+y		! isothermal (y/n)             !
+B		! BB source
+100000.	! Teff/K
+4  		! 4: input is S star   
+5.0e48      ! # photons
+1e10		! end time /years        
+1000		! number of time steps   5000
+1           ! timesteps between outputs
+
+! in doric, the region for A uncommented

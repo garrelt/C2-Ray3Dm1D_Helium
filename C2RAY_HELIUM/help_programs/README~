@@ -1,0 +1,1 @@
+Use the file my_cross_section2.m for receving the fitting paramters for different frequency bins. They are written in the prompt in a formatted way so that they can be copied immediately to the correct places in radiation. The only thing that has to be given are the frequency bin boundaries. The other two files, units and cross_section contain stuff needed by my_cross_section2.m

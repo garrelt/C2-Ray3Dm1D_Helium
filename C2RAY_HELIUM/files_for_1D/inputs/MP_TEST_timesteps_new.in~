@@ -1,0 +1,18 @@
+0.0 15000 pc
+1		! test problem number
+1.08696e-3	! density  in cm^-3  was e-4 1.111e-3
+1.0e0		! clumping factor
+1e4		! initial temperature (K)
+y		! isothermal (y/n)             !
+P
+39.3             ! eddington efficiency parameter 
+2.0               ! power law index 
+13.6 5440       ! min max freq   ! not implemented right now 
+1e8		! end time /years        
+100000		! number of time steps   5000
+100             ! timesteps between outputs
+
+! size.f90, mesh=150,  
+! abundaces.f90, abu_he=0.08
+! in doric, the region for A _not_ uncommented
+! 

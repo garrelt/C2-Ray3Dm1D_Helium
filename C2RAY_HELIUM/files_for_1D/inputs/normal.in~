@@ -1,0 +1,18 @@
+0.0 20.0 kpc
+1		! test problem number
+1.11111111e-3		! density  in cm^-3  was e-4 1.111e-3
+1.0e0		! clumping factor
+1e4		! initial temperature (K)
+y		! isothermal (y/n)             !
+B
+40000.		! Teff/K
+4  		! 4: input is S star   ! to make it 10^38 -->2
+5.0e48            ! to agree with PL_test
+5e10		! end time /years        
+500		! number of time steps   5000
+5            ! timesteps between outputs
+
+! size.f90, mesh=100,  
+! luminosity is above one Ryd, uncomment "regions" in radiation.f90
+! abundaces.f90, abu_he=0.1
+! eigentlich isothermal, 1.0e4 K and 400 steps 

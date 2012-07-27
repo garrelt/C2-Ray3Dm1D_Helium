@@ -1,0 +1,17 @@
+0.0 10 pc
+1		! test problem number
+1.1e2		! density  in cm^-3  was e-4
+1.0e0		! clumping factor
+1.0e4		! initial temperature (K)
+y		! isothermal (y/n)
+100000.		! Teff/K
+3  		! 3: input is S star   ! to make it 10^38 -->2
+5e48            ! to make it 10^38 erg/s = 10^31 J/s= 26137 L_sol
+5e4		! end time /years        
+1000		! number of time steps   5000
+100               ! timesteps between outputs
+
+! size.f90, mesh=100,  
+! luminosity is above one Ryd, uncomment "regions" in radiation.f90
+! abundaces.f90, abu_he=0.1
+! eigentlich isothermal, 1.0e4 K and 400 steps 

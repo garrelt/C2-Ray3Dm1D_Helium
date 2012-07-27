@@ -1,0 +1,14 @@
+0.0 10000 pc !Enter inner and outer radius of grid (specify units): 
+1 !Which test? (1-4): 1
+ 1.1e-3  !Enter density (cm^-3): 
+ 1.0e0  !Enter clumping factor: 1.0e0
+ 1.0e4  !Enter initial temperature (K): 1.0e4
+y !Isothermal? (y/n): y
+
+5e48  !Give S_* (ionizing photons s^-1): 5e48
+5.0e0  !Give frequency in rybberg: 5.0e0
+1e11  !Enter end time of calculation (years): 5e9
+1000 !Enter number of time steps: 10
+1000 !Enter steps between outputs 1
+
+

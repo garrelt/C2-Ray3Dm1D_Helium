@@ -1,0 +1,12 @@
+0.0 10000 pc
+1		! test problem number
+1.0e-3		! density  in cm^-3  was e-4
+1.0e0		! clumping factor
+1.0e4		! initial temperature (K)
+y		! isothermal (y/n)
+100000.		! Teff/K
+4  		! 4: input is S star   !
+6.934e4             !2.6137e4        ! to make it 10^38 erg/s  
+4e9		! end time /years        
+400		! number of time steps   
+400               ! timesteps between outputs

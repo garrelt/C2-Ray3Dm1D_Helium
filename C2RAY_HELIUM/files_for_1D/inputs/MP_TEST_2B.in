@@ -1,0 +1,16 @@
+0.0 15000 pc
+1		! test problem number
+1.08696e-3	! density  in cm^-3  was e-4 1.111e-3
+1.0e0		! clumping factor
+1e2		! initial temperature (K)
+n		! isothermal (y/n)             !
+P           ! PL source
+1           ! want to give # ionizing photons or BH mass
+5e48        ! photons per second
+2.0         ! power law index 
+13.6 5440   ! min max freq   ! not implemented right now 
+1e10		! end time /years        
+10000		! number of time steps   5000
+10             ! timesteps between outputs
+
+ 

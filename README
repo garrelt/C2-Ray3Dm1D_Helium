@@ -1,0 +1,18 @@
+This source tree contains the hydrogen + helium version of C2-Ray,
+the radiative transfer / photo-ionization code.
+It combines the 1D and 3D versions of the code, although they need
+to be build in different ways.
+
+The original C2-Ray was developed by Garrelt Mellema & Ilian Iliev.
+This version was developed by Martina Friedrich.
+
+Different tests of the code and a description of the algorithms can
+be found in
+Radiative transfer of energetic photons: X-rays and helium ionization in C2-Ray
+M. M. Friedrich, G. Mellema, I. T. Iliev, P. R. Shapiro, 2012,
+MNRAS 421, 2232 (arXiv:1201.0602)
+
+The original C2-Ray paper (hydrogen only) is
+C2-Ray: A new method for photon-conserving transport of ionizing radiation
+G. Mellema, I. Iliev, M. Alvarez, P. R. Shapiro, 2006
+New Astronomy 11, 374 (astro-ph/0508416)

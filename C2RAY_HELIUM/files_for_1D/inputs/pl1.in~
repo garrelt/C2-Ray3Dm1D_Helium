@@ -1,0 +1,14 @@
+1e13 1e18 cm       ! 
+1		! test problem number
+1e7		! density  in cm^-3  was e-4
+1.0e0		! clumping factor
+1.0e4		! initial temperature (K)
+y		! isothermal (y/n)
+30000.		! Teff/K
+3  		! 3: input is S star   !
+8.059e54        ! Number of ionizing photons    
+1000            ! cut off energy in eV (not use for now) 
+2               ! power law
+1e10		! end time /years        
+1000		! number of time steps   
+100             ! time between outputs
