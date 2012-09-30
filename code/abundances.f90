@@ -25,6 +25,9 @@ module abundances
   !> Carbon abundance (by number) 
   real(kind=dp),public,parameter :: abu_c=7.1e-7
 
+  ! Hydrogen abundance (by number)
+  real(kind=dp),public,parameter :: abu_h=1.0-abu_he
+
   !> Mean molecular weight 
   real(kind=dp),public,parameter :: mu=(1.0-abu_he)+4.0*abu_he
 
