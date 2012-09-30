@@ -1,16 +1,27 @@
 # MAKROS----------------------------------------------------
 # F90 compiler
 
-F90 = ifort
-
+#F90 = ifort
+F90 = gfortran
 
 # ifort options
+#IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT
+#IFORTFLAGS = -g -C -traceback -fpe0 -DIFORT
+#IFORTFLAGS = -g -C -DIFORT
+#IFORTFLAGS = -pg -g  -O0 -u -fpe0 -check all -traceback -ipo -DIFORT
 
-#OPTIONS = -xW -O3 -vec_report -u -fpe0 -check all \
-#-traceback -ipo -DIFORT
+#F90FLAGS1 = $(IFORTFLAGS) 
+#F90FLAGS1 = -xW $(IFORTFLAGS) 
+#F90FLAGS1 = -xB $(IFORTFLAGS) 
 
-OPTIONS = -pg -g  -O0 -u -fpe0 -check all \
--traceback -ipo -DIFORT
+GFORTFLAGS = -O
+F90FLAGS1 = $(GFORTFLAGS) 
+
+#F90FLAGS = $(F90FLAGS1) -openmp -DMPI
+#F90FLAGS = $(F90FLAGS1) -DMPI
+#F90FLAGS = $(F90FLAGS1)
+#F90FLAGS = $(F90FLAGS1) -openmp
+F90FLAGS = $(F90FLAGS1)
 
 UTILS1=../romberg.o ../string.o ../mrgrnk.o  ../ctrper.o
 

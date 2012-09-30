@@ -98,6 +98,9 @@ Program C2Ray
      write(*,*) zred
   endif
 
+  ! Record initial conditions
+  call output(0,0.0d0,timess(1),end_time)
+
   do  nstep=1,number_timesteps!-1
 
  	time=timess(nstep) 

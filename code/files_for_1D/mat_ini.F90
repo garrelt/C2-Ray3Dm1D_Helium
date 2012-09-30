@@ -1,5 +1,6 @@
 !>
-!! \brief This module contains data and routines for handling the material properties on the grid (1D)
+!! \brief This module contains data and routines for handling 
+!! the material properties on the grid (1D)
 !!
 !! These properties are; density, temperature, clumping, ionization fractions
 !! 
@@ -29,13 +30,14 @@ module material
 
   use precision, only: dp,si
   use cgsconstants, only: bh00,bhe00,bhe10,ini_rec_colion_factors,m_p
+  use cgsconstants, only: brech0,breche0,breche1
   use astroconstants, only: YEAR
   use sizes, only: mesh
-  use file_admin, only: stdinput
+  use file_admin, only: stdinput, file_input
   use my_mpi
   use grid, only: x,vol
   use c2ray_parameters, only: epsilon
-  use abundances, only: mu
+  use abundances, only: abu_h,abu_he,mu
   use cosmology_parameters, only: Omega0, H0
   !use cosmology, only: cosmology_init,H0,t0,zred_t0
 
@@ -53,6 +55,7 @@ module material
   real(kind=dp) :: dens_core !< core density (for problems 2 and 3)
   integer :: testnum !< number of test problem (1 to 4)
   logical :: isothermal !< is the run isothermal?
+  real(kind=dp),dimension(3) :: gamma_uvb !< UV background for HI, HeI, HeII
   ! needed for analytical solution of cosmological Ifront
   real(kind=dp) :: t1 !< parameter for analytical solution of test 4 
   real(kind=dp) :: t0_t !< parameter for analytical solution of test 4 
@@ -61,6 +64,7 @@ module material
   real(kind=dp),public :: n_LLS  ! just because cosmology needs it in the 3D version
   ! b) Model Songaila & Cowie (2010)
   real(kind=dp) :: y_LLS 
+
 
 !*TEST******************************************************
    type ionstates    
@@ -113,6 +117,8 @@ contains
     real(kind=dp) :: alpha
     character(len=1) :: answer
 
+    real(kind=dp),dimension(3) :: xions
+
     ! restart
     restart=0 ! no restart by default
 
@@ -138,28 +144,30 @@ contains
 
     if (rank == 0) then
        if (testnum.eq.1.or.testnum.eq.4) then
-          write(*,'(A,$)') 'Enter density (cm^-3): '
+          if (.not.file_input) write(*,'(A,$)') 'Enter density (cm^-3): '
           read(stdinput,*) dens_val
        elseif (testnum.eq.2.or.testnum.eq.3) then
-          write(*,'(A,$)') 'Enter reference (core) radius (cm): '
+          if (.not.file_input) write(*,'(A,$)') 'Enter reference (core) radius (cm): '
           read(stdinput,*) r_core
-          write(*,'(A,$)') 'Enter density at reference (core)', &
+          if (.not.file_input) write(*,'(A,$)') 'Enter density at reference (core)', &
                ' radius(cm^-3): '
           read(stdinput,*) dens_val
        endif
        
-       write(*,'(A,$)') 'Enter clumping factor: '
+       if (.not.file_input) write(*,'(A,$)') 'Enter clumping factor: '
        read(stdinput,*) clumping
-       write(*,'(A,$)') 'Enter initial temperature (K): '
+       if (.not.file_input) write(*,'(A,$)') 'Enter initial temperature (K): '
        read(stdinput,*) temper_val
-       write(*,'(A,$)') 'Isothermal? (y/n): '
+       if (.not.file_input) write(*,'(A,$)') 'Isothermal? (y/n): '
        read(stdinput,*) answer
        ! Isothermal?
-       if (answer.eq.'y'.or.answer.eq.'Y') then
+       if (answer == 'y'.or.answer == 'Y') then
           isothermal=.true.
        else
           isothermal=.false.
        endif
+       if (.not.file_input) write(*,'(A,$)') 'Ionizing background (HI,HeI,HeII) (s^-1): '
+       read(stdinput,*) gamma_uvb
        call ini_rec_colion_factors(temper_val) !initialize the collisional ion and recomb rates for inital temp
 
     endif
@@ -171,6 +179,7 @@ contains
     call MPI_BCAST(clumping,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
     call MPI_BCAST(temper_val,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
     call MPI_BCAST(isothermal,1,MPI_LOGICAL,0,MPI_COMM_NEW,ierror)
+    call MPI_BCAST(gamma_uvb,3,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
 #endif
 
 !*******       
@@ -245,20 +254,68 @@ contains
        !scale below would be wrong
     end select
     
+    ! Assign ionization fractions 
+    if (gamma_uvb(1) > 0.0) then
+       do i=1,mesh(1)
+          call find_ionfractions_from_uvb(i,ndens(i,1,1), xions)
+          xh(i,0)=xions(1)
+          xh(i,1)=1.0-xh(i,1)
+          xhe(i,0)=xions(2)
+          xhe(i,1)=xions(3)
+          xhe(i,2)=1.0-(xhe(i,0)+xhe(i,1))
+       enddo
+    else
+       do i=1,mesh(1)
+          xh(i,0) =1.0_dp!1.0_dp-epsilon!-1.0e-14
+          xh(i,1) =0.0_dp!epsilon!1.0e-14
+          xhe(i,0)=1.0_dp-2.0_dp*epsilon!1.0_dp-epsilon!1.0_dp-2.0e-14    !1.0_dp-2.4e-9
+          xhe(i,1)=epsilon!1.0e-14    !1.2e-9
+          xhe(i,2)=epsilon!1.0e-14   !1.2e-9            
+       enddo
+    endif
     
-    ! Assign ionization fractions (completely neutral)
-    do i=1,mesh(1)
-       xh(i,0) =1.0_dp!1.0_dp-epsilon!-1.0e-14
-       xh(i,1) =0.0_dp!epsilon!1.0e-14
-       xhe(i,0)=1.0_dp-2.0_dp*epsilon!1.0_dp-epsilon!1.0_dp-2.0e-14    !1.0_dp-2.4e-9
-       xhe(i,1)=epsilon!1.0e-14    !1.2e-9
-       xhe(i,2)=epsilon!1.0e-14   !1.2e-9            
-    enddo
-    
-    write(*,'(A,1pe10.3,A)') 'Recombination time scale: ', &
+    !  Report recombination time scale (in case of screen input)
+    if (.not.file_input) write(*,'(A,1pe10.3,A)') 'Recombination time scale: ', &
          1.0/(dens_val*clumping*bh00*YEAR),' years'
 
     
   end subroutine mat_ini
+
+  subroutine find_ionfractions_from_uvb (ii,nnd,xions)
+
+    real(kind=dp),parameter :: convergence=0.01
+    integer,intent(in) :: ii
+    real(kind=dp),intent(in) :: nnd
+    real(kind=dp),dimension(3),intent(out) :: xions
+
+    real(kind=dp) :: rech2
+    real(kind=dp) :: reche2
+    real(kind=dp) :: reche3
+    real(kind=dp) :: fe
+    real(kind=dp) :: fe_prev
+
+    rech2 = nnd * clumping * brech0
+    reche2 = nnd * clumping* breche0
+    reche3 = nnd * clumping* breche1
+    fe=1.0
+    
+    ! Iterate to find the proper electron density (fe)
+    do 
+       xions(1)=fe*rech2/(gamma_uvb(1)+fe*rech2)
+       xions(2)=fe*reche2/(gamma_uvb(2)*(1.0+gamma_uvb(3)/(fe*reche3)) + &
+            fe*reche2)
+       xions(3)=(1.0-xions(2))/(1.0+gamma_uvb(3)/(fe*reche3))
+       fe_prev=fe
+       fe=abu_h*(1.0-xions(1))+abu_he*(2.0-(2.0*xions(2)+xions(3)))
+       if (ii == 1) then
+          write(*,*) xions
+          write(*,*) gamma_uvb(2:3)
+          write(*,*) reche2,reche3
+          write(*,*) fe_prev,fe
+       endif
+       if (abs(fe-fe_prev)/fe_prev < convergence) exit
+    enddo
+
+  end subroutine find_ionfractions_from_uvb
 
 end module material

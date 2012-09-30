@@ -14,7 +14,7 @@ module evolve
 
   ! This module contains routines having to do with the calculation of
   ! the ionization evolution of the entire grid (1D).
-     
+
   ! Version:
   ! 1D version similar to the 3D version.
 
@@ -32,7 +32,7 @@ module evolve
   !private
 
   public :: evolve1D !> evolve 1D grid
-   
+
   !> H column density at the back end of the cell
   real(kind=dp),dimension(mesh(1)) :: coldensh_out
   !> He0 column density at the back end of the cell
@@ -44,23 +44,23 @@ module evolve
 contains
 
   ! =======================================================================
-  
+
   !> Calculates the evolution of the hydrogen ionization state
   !! and temperature for the whole 1D grid\n
   !! \b Author: Garrelt Mellema\n
   !! \b Date: 21-Aug-2006 (f77/OMP: 13-Jun-2005)\n
   !! \b Version: Simple 1D
-    
+
   subroutine evolve1D (dt)
 
     ! Calculates the evolution of the hydrogen ionization state
-     
+
     ! Author: Garrelt Mellema
-     
+
     ! Date: 21-Aug-2006 (f77/OMP: 13-Jun-2005)
 
     ! Version: Simple 1D
-    
+
     ! History:
     ! 11-Jun-2004 (GM) : grid arrays now passed via common (in grid.h)
     !    and material arrays also (in material.h).
@@ -75,7 +75,7 @@ contains
 
     !> Will contain the integer position of the cell being treated
     integer,dimension(Ndim) :: pos
-      
+
     ! Loop variables
     integer :: i,j,k,l,nx,niter
 
@@ -89,7 +89,7 @@ contains
 
     ! reset photon loss counter
     photon_loss=0.0
-       
+
     ! Put column densities to zero
     coldensh_out(:)=0.0
     coldenshe0_out(:)=0.0
@@ -98,12 +98,12 @@ contains
     ! Loop through grid
     do i=1,mesh(1)
        pos(1)=i
-      ! if (pos(1).ge.7) pause
+       ! if (pos(1).ge.7) pause
        call evolve0D(dt,pos)
-      ! write(*,*) '--'
+       ! write(*,*) '--'
 
     end do
-       !    pause 
+    !    pause 
     ! Calculate photon statistics
     call calculate_photon_statistics (dt)
 
@@ -120,28 +120,28 @@ contains
   !! \b Version: single source
 
   subroutine evolve0D(dt,rtpos)
-    
+
     ! Calculates the evolution of the hydrogen ionization state in a
     ! single cell.
-    
+
     ! Author: Garrelt Mellema, Martina M. Friedrich (helium)
-    
+
     ! Date: 21-Aug-2006 (20-May-2005, 5-Jan-2005, 02 Jun 2004)
-    
+
     ! Version: single sources, fixed temperature
-    
+
     ! Multiple sources
     ! We call this routine for every grid point and for every source (ns).
     ! The photo-ionization rates for each grid point are found and added
     ! to phih_grid, but the ionization fractions are not updated. 
-  
+
     use mathconstants, only: pi
     use tped, only: electrondens
     use doric_module, only: doric, coldens, coldensh_bndry, &
-        coldenshe0_bndry,coldenshe1_bndry
+         coldenshe0_bndry,coldenshe1_bndry
     use radiation, only: photoion, photrates
     use c2ray_parameters, only: epsilon,convergence1,convergence2,convergence_frac,convergence_frac2
-    use material, only: isothermal, ionstates  
+    use material, only: isothermal, ionstates, gamma_uvb  
     use thermalevolution, only: thermal
     use cgsconstants,only : ini_rec_colion_factors,breche1,vfrac
     use cgsphotoconstants, only: s_H_heth, s_H_heLya,s_He_heLya,sighe0, s_He_he2,sighe1,s_He_he2,s_H_he2
@@ -149,7 +149,7 @@ contains
     implicit none
 
     real(kind=dp),parameter :: max_coldensh=2.0e26 !< column density for stopping chemisty
-    
+
     logical :: falsedummy ! always false, for tests
     parameter(falsedummy=.false.)
 
@@ -157,7 +157,7 @@ contains
     real(kind=dp),intent(in) :: dt 
     !> mesh position of cell being done
     integer,dimension(Ndim),intent(in) :: rtpos 
-    
+
     logical :: finalpass
     integer :: nx,nd,nit,it,idim ! loop counters
     integer,dimension(Ndim) :: pos
@@ -189,7 +189,7 @@ contains
     pos(1)=rtpos(1)
     ! Initialize local ionization states to the global ones
     do nx=0,1
-    testpos=max(pos(1),1)
+       testpos=max(pos(1),1)
        ion%h(nx)=xh(testpos,nx)!ion%h(nx)=xh(pos(1),nx)
        ion%h_old(nx)=xh(pos(1),nx)
        ion%h_av(nx)=xh(testpos,nx)!ion%h_av(nx)=xh(pos(1),nx) ! use calculated xh_av
@@ -236,180 +236,188 @@ contains
 
     if (coldensh_in.le.max_coldensh) then
 
-    do 
+       do 
 
-       nit=nit+1
-
-
-       ! Save the value of yh_av found in the previous iteration
-       yh0_av_old=ion%h_av(0)
-       yh1_av_old=ion%h_av(1)
-       yhe0_av_old=ion%he_av(0)
-       yhe1_av_old=ion%he_av(1)
-       yhe2_av_old=ion%he_av(2)
-       temper2=temper1
-
-       !-----------PHOTOION BLOCK-----------------------------------------------
-       coldensh_cell  =coldens(path,ion%h_av(0),ndens_p,(1.0_dp-abu_he))
-       coldenshe0_cell=coldens(path,ion%he_av(0),ndens_p,abu_he)
-       coldenshe1_cell=coldens(path,ion%he_av(1),ndens_p,abu_he)
-       hcolum_out=coldensh_in+coldensh_cell
-       hecolum_in= (/coldenshe0_in,coldenshe1_in/)
-       hecolum_out=(/coldenshe0_in+coldenshe0_cell ,coldenshe1_in+coldenshe1_cell/)       
-       call photoion(phi,coldensh_in,hcolum_out,hecolum_in,hecolum_out,vol_ph,1, &
-                     ion%h_av(1))
-
-        phi%h=phi%h/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0))
-        phi%he(0)=phi%he(0)/(ndens_p*abu_he*ion%he_av(0))
-        phi%he(1)=phi%he(1)/(ndens_p*abu_he*ion%he_av(1)) 
-        
-!   phi%h=phi%h/(ndens_p*abu_he*ion%he_av(1)+ndens_p*abu_he*ion%he_av(0)+ndens_p*(1.0_dp-abu_he)*ion%h_av(0))
-!   phi%he(0)=phi%he(0)/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0)+ndens_p*abu_he*ion%he_av(0))
-!phi%he(1)=phi%he(1)/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0)+ndens_p*abu_he*ion%he_av(0)+ndens_p*abu_he*ion%he_av(1))
-        
-!       phi%h=phi%h/ndens_p
-!       phi%he=phi%he/ndens_p
-	!-----------------------------------------------------------------------
-
-        de=electrondens(ndens_p,ion%h_av,ion%he_av)
-
-       if (.not.isothermal) call ini_rec_colion_factors(avg_temper) !initialize the collisional ion 
-								    !and recomb rates for new T    
-
-       !----------------DORIC BLOCK---------------------------------------------
-       coldensh_cell  =coldens(path,ion%h(0),ndens_p,(1.0_dp-abu_he))   ! average or not average?
-       coldenshe0_cell=coldens(path,ion%he(0),ndens_p,abu_he)           ! average or not average?
-       coldenshe1_cell=coldens(path,ion%he(1),ndens_p,abu_he)           ! average or not average?
-       tau_H_heth  = coldensh_cell*s_H_heth     ! sigh*(frthe0/frth0)**(-sh0) opt depth of H at he0 ion threshold
-       tau_He_heth = coldenshe0_cell*sighe0     ! sighe0                  ! opt depth of He0 at he0 ion threshold
-       tau_H_heLya = coldensh_cell*s_H_heLya    ! sigh*(40.817eV/frth0)**(-sh0)       opt depth of H  at he+Lya 
-       tau_He_heLya= coldenshe0_cell*s_He_heLya      ! sighe0*(40.817eV/frthe0)**(-she0)   opt depth of He at he+Lya  
-       tau_He2_he2th = coldenshe1_cell*sighe1 
-       tau_He_he2th = coldenshe0_cell*    s_He_he2
-       tau_H_he2th = coldensh_cell*s_H_he2
-       yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
-       zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
-       y2afrac= tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
-       y2bfrac= tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
-       call doric(dt,de,ndens_p,ion,phi,yfrac,zfrac,y2afrac,y2bfrac)! calculate de new?  (2)
-       !-----------------------------------------------------------------------
-
-       de=electrondens(ndens_p,ion%h_av,ion%he_av)
-
-       !----------------DORIC BLOCK---------------------------------------------
-       coldensh_cell  =coldens(path,ion%h(0),    ndens_p,(1.0_dp-abu_he))  ! average or not average?
-       coldenshe0_cell=coldens(path,ion%he(0),ndens_p,         abu_he)  ! average or not average?
-       coldenshe1_cell=coldens(path,ion%he_av(1),ndens_p,abu_he)
-       tau_H_heth  = coldensh_cell  *s_H_heth     ! sigh*(frthe0/frth0)**(-sh0) opt depth of H at he0 ion threshold
-       tau_He_heth = coldenshe0_cell*sighe0     ! sighe0                  ! opt depth of He0 at he0 ion threshold
-       tau_H_heLya = coldensh_cell*s_H_heLya    ! sigh*(40.817eV/frth0)**(-sh0)       opt depth of H  at he+Lya 
-       tau_He_heLya= coldenshe0_cell*s_He_heLya      ! sighe0*(40.817eV/frthe0)**(-she0)   opt depth of He at he+Lya 
-       tau_He2_he2th = coldenshe1_cell*sighe1 
-       tau_He_he2th = coldenshe0_cell*    s_He_he2
-       tau_H_he2th = coldensh_cell*s_H_he2
-       yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
-       zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
-       y2afrac= tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
-       y2bfrac= tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
-       ionh0old=ion%h(0)
-       ionh1old=ion%h(1)
-       ionhe0old=ion%he(0)
-       ionhe1old=ion%he(1)
-       ionhe2old=ion%he(2)
-       ionheavold=de 
-       oldhav=ion%h_av(0)
-       oldhe0av=ion%he_av(0)
-       oldhe1av=ion%he_av(1)
-
-       call doric(dt,de,ndens_p,ion,phi, yfrac, zfrac,y2afrac,y2bfrac) 
+          nit=nit+1
 
 
-       ion%h(0)=(ion%h(0)+ionh0old)/2.0_dp
-       ion%h(1)=(ion%h(1)+ionh1old)/2.0_dp
-       ion%he(0)=(ion%he(0)+ionhe0old)/2.0_dp
-       ion%he(1)=(ion%he(1)+ionhe1old)/2.0_dp
-       ion%he(2)=(ion%he(2)+ionhe2old)/2.0_dp
-       ion%h_av(0)=(ion%h_av(0)+oldhav)/2.0_dp
-       ion%he_av(0)=(ion%he_av(0)+oldhe0av)/2.0_dp
-       ion%he_av(1)=(ion%he_av(1)+oldhe1av)/2.0_dp
-       de=electrondens(ndens_p,ion%h_av,ion%he_av)
-      
+          ! Save the value of yh_av found in the previous iteration
+          yh0_av_old=ion%h_av(0)
+          yh1_av_old=ion%h_av(1)
+          yhe0_av_old=ion%he_av(0)
+          yhe1_av_old=ion%he_av(1)
+          yhe2_av_old=ion%he_av(2)
+          temper2=temper1
 
-       temper1=temper0       ! set temper1 to the original temperature
+          !-----------PHOTOION BLOCK-----------------------------------------------
+          coldensh_cell  =coldens(path,ion%h_av(0),ndens_p,(1.0_dp-abu_he))
+          coldenshe0_cell=coldens(path,ion%he_av(0),ndens_p,abu_he)
+          coldenshe1_cell=coldens(path,ion%he_av(1),ndens_p,abu_he)
+          hcolum_out=coldensh_in+coldensh_cell
+          hecolum_in= (/coldenshe0_in,coldenshe1_in/)
+          hecolum_out=(/coldenshe0_in+coldenshe0_cell ,coldenshe1_in+coldenshe1_cell/)       
+          call photoion(phi,coldensh_in,hcolum_out,hecolum_in,hecolum_out,vol_ph,1, &
+               ion%h_av(1))
 
-       if (nit.eq.1.and.abs(ion%h_old(0)-ion%h(0)).gt.0.1 .and.abs(ion%he_old(0)-ion%he(0)).gt.0.1) then
-          continue
-       else
-          if (.not.isothermal) &
-               call thermal(dt,temper1,avg_temper,de,ndens_p, &
-               ion,phi)               
-       endif
-    
-      if(  ( (abs(ion%h_av(0)-yh0_av_old)/ion%h_av(0).lt.convergence) &
-             .or.                       &
-             (ion%h_av(0).lt.convergence_frac)   &
-                                    )   &
-      .and.                             &
-           ( (abs(ion%he_av(1)-yhe1_av_old)/ion%he_av(1).lt.convergence) &
-             .or.                        &
-             (ion%he_av(1).lt.convergence_frac)   &
-                                    )    &
-      .and.                              &
-           ( (abs(ion%he_av(2)-yhe2_av_old)/ion%he_av(2).lt.convergence) &
-             .or.                        &
-             (ion%he_av(2).lt.convergence_frac)   &
-                                    )    &
-      .and.                              &
-           (  (abs(ion%he_av(0)-yhe0_av_old)/ion%he_av(0).lt.convergence) &
-             .or.                        &
-             (ion%he_av(0).lt.convergence_frac)   &
-                                    )    & 
-      .and. &
-            abs(temper1-temper2)/temper1.lt.convergence &
-         ) then 
+          phi%h=phi%h/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0))
+          phi%he(0)=phi%he(0)/(ndens_p*abu_he*ion%he_av(0))
+          phi%he(1)=phi%he(1)/(ndens_p*abu_he*ion%he_av(1)) 
+
+          ! Add the UV background
+          phi%h=phi%h + gamma_uvb(1)
+          phi%he(0)=phi%he(0) + gamma_uvb(2)
+          phi%he(1)=phi%he(1) + gamma_uvb(3)
+
+          !   phi%h=phi%h/(ndens_p*abu_he*ion%he_av(1)+ndens_p*abu_he*ion%he_av(0)+ndens_p*(1.0_dp-abu_he)*ion%h_av(0))
+          !   phi%he(0)=phi%he(0)/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0)+ndens_p*abu_he*ion%he_av(0))
+          !phi%he(1)=phi%he(1)/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0)+ndens_p*abu_he*ion%he_av(0)+ndens_p*abu_he*ion%he_av(1))
+
+          !       phi%h=phi%h/ndens_p
+          !       phi%he=phi%he/ndens_p
+          !-----------------------------------------------------------------------
+
+          de=electrondens(ndens_p,ion%h_av,ion%he_av)
+
+          if (.not.isothermal) call ini_rec_colion_factors(avg_temper) !initialize the collisional ion 
+          !and recomb rates for new T    
+
+          !----------------DORIC BLOCK---------------------------------------------
+          coldensh_cell  =coldens(path,ion%h(0),ndens_p,(1.0_dp-abu_he))   ! average or not average?
+          coldenshe0_cell=coldens(path,ion%he(0),ndens_p,abu_he)           ! average or not average?
+          coldenshe1_cell=coldens(path,ion%he(1),ndens_p,abu_he)           ! average or not average?
+          tau_H_heth  = coldensh_cell*s_H_heth     ! sigh*(frthe0/frth0)**(-sh0) opt depth of H at he0 ion threshold
+          tau_He_heth = coldenshe0_cell*sighe0     ! sighe0                  ! opt depth of He0 at he0 ion threshold
+          tau_H_heLya = coldensh_cell*s_H_heLya    ! sigh*(40.817eV/frth0)**(-sh0)       opt depth of H  at he+Lya 
+          tau_He_heLya= coldenshe0_cell*s_He_heLya      ! sighe0*(40.817eV/frthe0)**(-she0)   opt depth of He at he+Lya  
+          tau_He2_he2th = coldenshe1_cell*sighe1 
+          tau_He_he2th = coldenshe0_cell*    s_He_he2
+          tau_H_he2th = coldensh_cell*s_H_he2
+          yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
+          zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
+          y2afrac= tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+          y2bfrac= tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+          call doric(dt,de,ndens_p,ion,phi,yfrac,zfrac,y2afrac,y2bfrac)! calculate de new?  (2)
+          !-----------------------------------------------------------------------
+
+          de=electrondens(ndens_p,ion%h_av,ion%he_av)
+
+          !----------------DORIC BLOCK---------------------------------------------
+          coldensh_cell  =coldens(path,ion%h(0),    ndens_p,(1.0_dp-abu_he))  ! average or not average?
+          coldenshe0_cell=coldens(path,ion%he(0),ndens_p,         abu_he)  ! average or not average?
+          coldenshe1_cell=coldens(path,ion%he_av(1),ndens_p,abu_he)
+          tau_H_heth  = coldensh_cell  *s_H_heth     ! sigh*(frthe0/frth0)**(-sh0) opt depth of H at he0 ion threshold
+          tau_He_heth = coldenshe0_cell*sighe0     ! sighe0                  ! opt depth of He0 at he0 ion threshold
+          tau_H_heLya = coldensh_cell*s_H_heLya    ! sigh*(40.817eV/frth0)**(-sh0)       opt depth of H  at he+Lya 
+          tau_He_heLya= coldenshe0_cell*s_He_heLya      ! sighe0*(40.817eV/frthe0)**(-she0)   opt depth of He at he+Lya 
+          tau_He2_he2th = coldenshe1_cell*sighe1 
+          tau_He_he2th = coldenshe0_cell*    s_He_he2
+          tau_H_he2th = coldensh_cell*s_H_he2
+          yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
+          zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
+          y2afrac= tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+          y2bfrac= tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+          ionh0old=ion%h(0)
+          ionh1old=ion%h(1)
+          ionhe0old=ion%he(0)
+          ionhe1old=ion%he(1)
+          ionhe2old=ion%he(2)
+          ionheavold=de 
+          oldhav=ion%h_av(0)
+          oldhe0av=ion%he_av(0)
+          oldhe1av=ion%he_av(1)
+
+          call doric(dt,de,ndens_p,ion,phi, yfrac, zfrac,y2afrac,y2bfrac) 
+
+
+          ion%h(0)=0.5*(ion%h(0)+ionh0old)
+          ion%h(1)=0.5*(ion%h(1)+ionh1old)
+          ion%he(0)=0.5*(ion%he(0)+ionhe0old)
+          ion%he(1)=0.5*(ion%he(1)+ionhe1old)
+          ion%he(2)=0.5*(ion%he(2)+ionhe2old)
+          ion%h_av(0)=0.5*(ion%h_av(0)+oldhav)
+          ion%he_av(0)=0.5*(ion%he_av(0)+oldhe0av)
+          ion%he_av(1)=0.5*(ion%he_av(1)+oldhe1av)
+          de=electrondens(ndens_p,ion%h_av,ion%he_av)
+
+
+          temper1=temper0       ! set temper1 to the original temperature
+
+          if (nit.eq.1.and.abs(ion%h_old(0)-ion%h(0)).gt.0.1 .and. &
+               abs(ion%he_old(0)-ion%he(0)).gt.0.1) then
+             continue
+          else
+             if (.not.isothermal) &
+                  call thermal(dt,temper1,avg_temper,de,ndens_p, &
+                  ion,phi)               
+          endif
+
+          if(  ( (abs(ion%h_av(0)-yh0_av_old)/ion%h_av(0).lt.convergence) &
+               .or.                       &
+               (ion%h_av(0).lt.convergence_frac)   &
+               )   &
+               .and.                             &
+               ( (abs(ion%he_av(1)-yhe1_av_old)/ion%he_av(1).lt.convergence) &
+               .or.                        &
+               (ion%he_av(1).lt.convergence_frac)   &
+               )    &
+               .and.                              &
+               ( (abs(ion%he_av(2)-yhe2_av_old)/ion%he_av(2).lt.convergence) &
+               .or.                        &
+               (ion%he_av(2).lt.convergence_frac)   &
+               )    &
+               .and.                              &
+               (  (abs(ion%he_av(0)-yhe0_av_old)/ion%he_av(0).lt.convergence) &
+               .or.                        &
+               (ion%he_av(0).lt.convergence_frac)   &
+               )    & 
+               .and. &
+               abs(temper1-temper2)/temper1.lt.convergence &
+               ) then 
              exit
-       else
+          else
 
-       ! Warn about non-convergence
-       if (nit.gt.4000) then
-          write(logf,*) 'Convergence failing'
-          write(logf,*) 'nit=',nit
-          write(logf,*) 'xh: ',ion%h_av(0),yh0_av_old!, ion%h(0)
-          write(logf,*) 'xhe0: ',ion%he_av(0), yhe0_av_old!, ion%he(0)
-          write(logf,*) 'xhe0: ',ion%he(0) 
-          write(logf,*) 'xhe1: ',ion%he_av(1), yhe1_av_old!, ion%he(1)
-          write(logf,*) 'xhe2: ',ion%he_av(2), yhe2_av_old!, ion%he(2)
-          write(logf,*) 'temper: ',temper1,temper2
-          write(logf,*) 'pos(1):', pos(1)
-          write(logf,*) 'convcrits',abs(ion%h_av(0)-yh0_av_old)/ion%h_av(0), abs(ion%he_av(1)-yhe1_av_old)/ion%he_av(1)
-          write(logf,*) 'convcrits',abs(ion%he_av(2)-yhe2_av_old)/ion%he_av(2),abs(ion%he_av(0)-yhe0_av_old)/ion%he_av(0)
-        !  pause
-          exit
-       endif
-       endif   !if convergence exit loop      
-    
-    enddo ! end of iteration
+             ! Warn about non-convergence
+             if (nit.gt.4000) then
+                write(logf,*) 'Convergence failing'
+                write(logf,*) 'nit=',nit
+                write(logf,*) 'xh: ',ion%h_av(0),yh0_av_old!, ion%h(0)
+                write(logf,*) 'xhe0: ',ion%he_av(0), yhe0_av_old!, ion%he(0)
+                write(logf,*) 'xhe0: ',ion%he(0) 
+                write(logf,*) 'xhe1: ',ion%he_av(1), yhe1_av_old!, ion%he(1)
+                write(logf,*) 'xhe2: ',ion%he_av(2), yhe2_av_old!, ion%he(2)
+                write(logf,*) 'temper: ',temper1,temper2
+                write(logf,*) 'pos(1):', pos(1)
+                write(logf,*) 'convcrits',abs(ion%h_av(0)-yh0_av_old)/ion%h_av(0), &
+                     abs(ion%he_av(1)-yhe1_av_old)/ion%he_av(1)
+                write(logf,*) 'convcrits',abs(ion%he_av(2)-yhe2_av_old)/ion%he_av(2), &
+                     abs(ion%he_av(0)-yhe0_av_old)/ion%he_av(0)
+                !  pause
+                exit
+             endif
+          endif   !if convergence exit loop      
+
+       enddo ! end of iteration
     else 
-    phi%h=0.0_dp
-    phi%h_out=0.0_dp
-    phi%he(0)=0.0_dp
-    phi%he(1)=0.0_dp
-    phi%he_out(0)=0.0_dp
-    phi%he_out(1)=0.0_dp
-    phi%int_out(:)=0.0_dp
+       phi%h=0.0_dp
+       phi%h_out=0.0_dp
+       phi%he(0)=0.0_dp
+       phi%he(1)=0.0_dp
+       phi%he_out(0)=0.0_dp
+       phi%he_out(1)=0.0_dp
+       phi%int_out(:)=0.0_dp
     endif
 
 
-       write(48,*) nit
+    write(48,*) nit
 
     ! Copy ionic abundances back
 
     xh(pos(1),:)=ion%h(:)
     xhe(pos(1),:)=ion%he(:)
-  
+
     ! Copy temperature back
     temper(pos(1))=temper1
-  
+
     ! Add the (time averaged) column density of this cell
     ! to the total column density (for this source)
     coldensh_out(pos(1))=coldensh_in+ &
@@ -421,8 +429,8 @@ contains
     ! Photon statistics: register number of photons leaving the grid
     if (pos(1).eq.mesh(1)) &
          photon_loss=0.0_dp!photon_loss+ &
-         !(phi%int1_out+phi%int2_out+phi%int3_out)*vol(pos(1))/vol_ph
-         !(sum(phi%int_out(:)))*vol(pos(1))/vol_ph
+    !(phi%int1_out+phi%int2_out+phi%int3_out)*vol(pos(1))/vol_ph
+    !(sum(phi%int_out(:)))*vol(pos(1))/vol_ph
   end subroutine evolve0D
 
 end module evolve
