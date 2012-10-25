@@ -59,7 +59,7 @@ module radiation
   implicit none
 
   integer,parameter :: NumFreq=512!> Number of integration points in each of the frequency bins.
-  integer,parameter :: NumTau=500  !< Number of table points for the optical depth
+  integer,parameter :: NumTau=2000  !< Number of table points for the optical depth
   integer,parameter :: NumBndin2=26 !< Number of frequency sub-bins in interval 2
   integer,parameter :: NumBndin3=20 !< Number of frequency sub-bins in interval 3
   integer,parameter :: NumFreqBnd=NumBndin2+NumBndin3+1 !< Total number of frequency bins
