@@ -23,8 +23,8 @@ module sizes
   !> Number of spatial dimensions
   integer,parameter,public :: Ndim=1
 
-  !> Size of the mesh for spatial coordinate.
-  integer,parameter,public :: mesh(1)=1000
+  !Size of the mesh for spatial coordinate.
+  integer,parameter,public :: mesh(1)=10000
 
 end module sizes
 

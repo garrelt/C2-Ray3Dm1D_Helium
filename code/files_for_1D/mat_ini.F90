@@ -97,7 +97,7 @@ contains
   !! - Initially completely neutral\n
 
   subroutine mat_ini (restart)
-  type(ionstates) :: ion
+
     ! Initializes material properties on grid
 
     ! Author: Garrelt Mellema
@@ -119,13 +119,18 @@ contains
 
     real(kind=dp),dimension(3) :: xions
 
+    type(ionstates) :: ion
+
     ! restart
     restart=0 ! no restart by default
 
     ! Ask for input
     if (rank == 0) then
-       write(*,'(A,$)') 'Which test? (1-4): '
+       if (.not.file_input) then
+          write(*,'(A,$)') 'Which test? (1-4): '
+       endif
        read(stdinput,*) testnum
+
 #ifdef MPI
        ! Distribute the input parameters to the other nodes
        call MPI_BCAST(testnum,1,MPI_INTEGER,0,MPI_COMM_NEW,ierror)
@@ -143,10 +148,10 @@ contains
     end select
 
     if (rank == 0) then
-       if (testnum.eq.1.or.testnum.eq.4) then
+       if (testnum == 1 .or. testnum == 4) then
           if (.not.file_input) write(*,'(A,$)') 'Enter density (cm^-3): '
           read(stdinput,*) dens_val
-       elseif (testnum.eq.2.or.testnum.eq.3) then
+       elseif (testnum == 2 .or. testnum == 3) then
           if (.not.file_input) write(*,'(A,$)') 'Enter reference (core) radius (cm): '
           read(stdinput,*) r_core
           if (.not.file_input) write(*,'(A,$)') 'Enter density at reference (core)', &
@@ -161,7 +166,7 @@ contains
        if (.not.file_input) write(*,'(A,$)') 'Isothermal? (y/n): '
        read(stdinput,*) answer
        ! Isothermal?
-       if (answer == 'y'.or.answer == 'Y') then
+       if (answer == 'y' .or. answer == 'Y') then
           isothermal=.true.
        else
           isothermal=.false.
@@ -174,7 +179,7 @@ contains
 #ifdef MPI
     ! Distribute the input parameters to the other nodes
     call MPI_BCAST(dens_val,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
-    if (testnum.eq.2.or.testnum.eq.3) &
+    if (testnum == 2.or.testnum == 3) &
          call MPI_BCAST(r_core,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
     call MPI_BCAST(clumping,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
     call MPI_BCAST(temper_val,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
@@ -182,9 +187,8 @@ contains
     call MPI_BCAST(gamma_uvb,3,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,ierror)
 #endif
 
-!*******       
     ! For test problem 4: cosmological parameters
-    if (testnum.eq.4) then
+    if (testnum == 4) then
        ! Ask for cosmological parameters
        if (rank == 0) then
           write(*,'(A,$)') 'Initial redshift?'
@@ -200,7 +204,6 @@ contains
 !    else
 !       call cosmology_init (.false.)
     endif
-!******
 
     ! Assign density and temperature to grid
     
@@ -225,7 +228,7 @@ contains
           
           !     This is just a straight sampling of the density distribution
           !     using the value at the cell centre.
-          if (testnum.eq.3.and.x(i).le.r_core) then
+          if (testnum == 3.and.x(i) <= r_core) then
              ! Flat core for test 3
              ndens(i,1,1)=dens_val
           else
@@ -254,12 +257,13 @@ contains
        !scale below would be wrong
     end select
     
-    ! Assign ionization fractions 
+    ! Assign ionization fractions
+    ! Use Gamma_UVB_H for this if it is not zero
     if (gamma_uvb(1) > 0.0) then
        do i=1,mesh(1)
           call find_ionfractions_from_uvb(i,ndens(i,1,1), xions)
           xh(i,0)=xions(1)
-          xh(i,1)=1.0-xh(i,1)
+          xh(i,1)=1.0-xh(i,0)
           xhe(i,0)=xions(2)
           xhe(i,1)=xions(3)
           xhe(i,2)=1.0-(xhe(i,0)+xhe(i,1))
@@ -274,7 +278,7 @@ contains
        enddo
     endif
     
-    !  Report recombination time scale (in case of screen input)
+    ! Report recombination time scale (in case of screen input)
     if (.not.file_input) write(*,'(A,1pe10.3,A)') 'Recombination time scale: ', &
          1.0/(dens_val*clumping*bh00*YEAR),' years'
 

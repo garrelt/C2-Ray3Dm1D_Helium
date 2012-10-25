@@ -1,29 +1,37 @@
 # MAKROS----------------------------------------------------
 # F90 compiler
 
-#F90 = ifort
-F90 = gfortran
+F90 = ifort
+#F90 = gfortran
 
 # ifort options
-#IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT
+IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT
 #IFORTFLAGS = -g -C -traceback -fpe0 -DIFORT
 #IFORTFLAGS = -g -C -DIFORT
 #IFORTFLAGS = -pg -g  -O0 -u -fpe0 -check all -traceback -ipo -DIFORT
 
 #F90FLAGS1 = $(IFORTFLAGS) 
-#F90FLAGS1 = -xW $(IFORTFLAGS) 
-#F90FLAGS1 = -xB $(IFORTFLAGS) 
+#F90FLAGS1 = -axW $(IFORTFLAGS) 
+F90FLAGS1 = -axO $(IFORTFLAGS) 
 
-GFORTFLAGS = -O
-F90FLAGS1 = $(GFORTFLAGS) 
+#GFORTFLAGS = -O
+#F90FLAGS1 = $(GFORTFLAGS) 
 
 #F90FLAGS = $(F90FLAGS1) -openmp -DMPI
 #F90FLAGS = $(F90FLAGS1) -DMPI
 #F90FLAGS = $(F90FLAGS1)
 #F90FLAGS = $(F90FLAGS1) -openmp
+
 F90FLAGS = $(F90FLAGS1)
 
-UTILS1=../romberg.o ../string.o ../mrgrnk.o  ../ctrper.o
+#LDR     = $(F90)
+
+OPTIONS = $(F90FLAGS)
+
+#LDFLAGS = $(OPTIONS) -L/afs/astro.su.se/pkg/intel/Compiler/11.1/056/lib/intel64/
+#LIBS = -lirc
+
+UTILS1=../romberg.o ../string.o ../mrgrnk.o  ../ctrper.o 
 
 UTILS2= romberg.o string.o mrgrnk.o  ctrper.o
 
@@ -58,13 +66,13 @@ RADIATION2= radiation_including_pls_new.o
 # Building C2Ray_1D: 
 # $@ means: name of the file to be made 
 C2Ray_1D_test: ../precision.o sizes.o $(CONSTANTS1) $(UTILS1) ../file_admin.o \
- ../no_mpi.o   ../file_admin.o grid.o ../tped.o  sourceprops_test_one_source.o  mat_ini.o ../cosmology.o\
+ ../no_mpi.o   ../file_admin.o ../clocks.o grid.o ../tped.o  sourceprops_test_one_source.o  mat_ini.o ../cosmology.o\
 ../cooling_h.o $(RADIATION) ../thermal.o ../time.o $(DORIC) \
 photonstatistics.o evolve_new.o output.o C2Ray.o
 
 
 	$(F90) $(OPTIONS) -o $@ precision.o $(CONSTANTS2) $(UTILS2) \
-	file_admin.o sizes.o no_mpi.o   grid.o \
+	file_admin.o clocks.o sizes.o no_mpi.o   grid.o \
 	tped.o  sourceprops_test_one_source.o  cosmology.o  mat_ini.o cooling_h.o \
 	$(RADIATION2) thermal.o time.o $(DORIC2) photonstatistics.o \
 	evolve_new.o output.o C2Ray.o
