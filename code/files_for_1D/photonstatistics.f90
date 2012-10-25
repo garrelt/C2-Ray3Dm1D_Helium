@@ -1,71 +1,90 @@
+!>
+!! \brief This module contains data and routines for calculating the photon statistics
+!!
+!! Module for C2-Ray
+!!
+!! \b Author: Garrelt Mellema
+!!
+!! \b Date: 05-Mar-2010
+!!
+!! \b Version: 1D
 
-MODULE photonstatistics
-
+module photonstatistics
   
-  ! This module handles the calculation of the photon statistics
-  ! For: C2-Ray
-
-  ! Author: Garrelt Mellema
-
-  ! Date: 26-Sep-2006
-
   ! Photon statistics
   ! photon_loss is a sum over all sources, summing is done in evolve0d.
   ! For parallelization consider a reduction, or may also be dropped
   ! entirely.
   ! Photon_losst contains the threaded values
 
-  USE PRECISION, ONLY: dp
-  USE cgsconstants, ONLY: albpow,bh00,colh0,temph0
-  USE cgsconstants, ONLY: alcpow,bhe00,bhe10,colhe,temphe
-  USE sizes, ONLY: mesh
-  USE grid, ONLY: vol
-  USE abundances, ONLY: abu_he
-  USE material, ONLY: ndens, xh, xhe, temper, clumping
-  USE tped, ONLY: electrondens
-  !use subgrid_clumping, only: clumping
+  use precision, only: dp
+  use my_mpi, only: rank
+  use file_admin, only: logf
+  use cgsconstants, only: albpow,bh00,colh0,temph0
+  use cgsconstants, only: alcpow,bhe00,bhe10,colhe,temphe
+  use sizes, only: mesh
+  use grid, only: vol
+  use abundances, only: abu_he
+  use material, only: ndens, xh, xhe, temper, clumping
+  use tped, only: electrondens
+  use radiation, only: S_star, NumFreqBnd
 
-  LOGICAL,PARAMETER :: do_photonstatistics=.TRUE.
-  REAL(kind=dp) :: totrec
-  REAL(kind=dp) :: totcollisions
-  REAL(kind=dp) :: dh0,dhe0,dhe1,dhe2, dh1
-  REAL(kind=dp) :: total_ion
-  REAL(kind=dp) :: grtotal_ion
-  REAL(kind=dp) :: photon_loss
+  implicit none
 
-  REAL(kind=dp),PRIVATE :: h0_before,h0_after,h1_before,h1_after 
-  REAL(kind=dp),PRIVATE :: he0_before,he0_after,he1_before,he1_after
-  REAL(kind=dp),PRIVATE :: he2_before,he2_after
-  INTEGER,PRIVATE :: i,j,k
+  !> true if checking photonstatistics
+  logical,parameter :: do_photonstatistics=.true.
+  !> Total number of recombinations
+  real(kind=dp) :: totrec
+  !> Total number of collisional ionizations
+  real(kind=dp) :: totcollisions
+  !> Change in number of neutral H, He atoms
+  real(kind=dp) :: dh0,dhe0,dhe1,dhe2, dh1
+  !> Total number of ionizing photons used
+  real(kind=dp) :: total_ion
+  !> Grand total number of ionizing photons used
+  real(kind=dp) :: grtotal_ion
+  !> Number of photons leaving the grid
+  real(kind=dp) :: photon_loss
 
+  real(kind=dp),private :: h0_before !< number of H atoms at start of time step
+  real(kind=dp),private :: h0_after !< number of H atoms at end of time step
+  real(kind=dp),private :: h1_before !< number of H ions at start of time step
+  real(kind=dp),private :: h1_after !< number of H ions at end of time step
+  real(kind=dp),private :: he0_before,he0_after,he1_before,he1_after
+  real(kind=dp),private :: he2_before,he2_after
+  integer,private :: i,j,k !< mesh loop index
 
+contains
 
-CONTAINS
-  SUBROUTINE initialize_photonstatistics ()
+  !----------------------------------------------------------------------------
+
+  !> Initialize the photon statistics
+  subroutine initialize_photonstatistics ()
 
     ! set total number of ionizing photons used to zero
     grtotal_ion=0.0
 
-  END SUBROUTINE initialize_photonstatistics
+  end subroutine initialize_photonstatistics
 
+  !----------------------------------------------------------------------------
 
-  SUBROUTINE calculate_photon_statistics (dt)
+  !> Call the individual routines needed for photon statistics calculation
+  subroutine calculate_photon_statistics (dt)
 
-
-
-    REAL(kind=dp),INTENT(in) :: dt
-
+    real(kind=dp),intent(in) :: dt !< time step
 
     ! Call the individual routines needed for this calculation
 
-    CALL state_after () ! number of neutrals after integration
-    CALL total_rates (dt) ! total photons used in balancing recombinations etc.
-    CALL total_ionizations () ! final statistics
+    call state_after () ! number of neutrals after integration
+    call total_rates (dt) ! total photons used in balancing recombinations etc.
+    call total_ionizations () ! final statistics
     
-  END SUBROUTINE calculate_photon_statistics
+  end subroutine calculate_photon_statistics
 
-  SUBROUTINE state_before ()
+  !----------------------------------------------------------------------------
 
+  !> Calculates the number of neutrals and ions at the start of the time step
+  subroutine state_before ()
 
     ! Photon statistics: calculate the number of neutrals before integration
     h0_before=0.0
@@ -73,40 +92,42 @@ CONTAINS
     he0_before=0.0
     he1_before=0.0
     he2_before=0.0
-    DO i=1,mesh(1)
+    do i=1,mesh(1)
        h0_before=h0_before+vol(i)*ndens(i,1,1)*xh(i,0)*(1.0_dp-abu_he)
        h1_before=h1_before+vol(i)*ndens(i,1,1)*xh(i,1)*(1.0_dp-abu_he)
        he0_before=he0_before+vol(i)*ndens(i,1,1)*xhe(i,0)*abu_he
        he1_before=he1_before+vol(i)*ndens(i,1,1)*xhe(i,1)*abu_he
        he2_before=he2_before+vol(i)*ndens(i,1,1)*xhe(i,2)*abu_he
 
-    ENDDO
+    enddo
     
-  END SUBROUTINE state_before
+  end subroutine state_before
+
+  !----------------------------------------------------------------------------
+
+  !> Calculates total number of recombinations and collisions
+  subroutine total_rates(dt)
+
+    real(kind=dp),intent(in) :: dt !< time step
 
 
-  SUBROUTINE total_rates(dt)
+    real(kind=dp),dimension(0:1) :: yh
+    real(kind=dp),dimension(0:2) :: yhe
+    real(kind=dp) :: ndens_p ! needed because ndens may be single precision
 
-
-
-    REAL(kind=dp),INTENT(in) :: dt
-
-
-    REAL(kind=dp),DIMENSION(0:1) :: yh
-    REAL(kind=dp),DIMENSION(0:2) :: yhe
- 
     ! Photon statistics: Determine total number of recombinations/collisions
     ! Should match the code in doric_module
 
     totrec=0.0
     totcollisions=0.0
-    DO i=1,mesh(1)
+    do i=1,mesh(1)
        yh(0)=xh(i,0)
        yh(1)=xh(i,1)
        yhe(0)=xhe(i,0)
        yhe(1)=xhe(i,1)
        yhe(2)=xhe(i,2)
-       totrec=totrec+vol(i)*ndens(i,1,1)* electrondens(ndens(i,1,1),yh,yhe)*clumping* &
+       ndens_p=ndens(i,1,1)
+       totrec=totrec+vol(i)*ndens_p* electrondens(ndens_p,yh,yhe)*clumping* &
           (xh(i,1)*(1.0_dp-abu_he)*  & 
           1.0_dp/(1.0_dp/(bh00*(temper(i)/1e4)**albpow)+1.0_dp/(bh00*5.0_dp*(temper(i)/1e4)**(1.95_dp*albpow))) +&
 	  xhe(i,1)*abu_he*  &
@@ -115,26 +136,27 @@ CONTAINS
           1.0_dp/(1.0_dp/(bhe10*(temper(i)/1e4)**(0.95_dp*albpow))+1.0_dp/(bhe10*11.0_dp*(temper(i)/1e4)**(albpow*1.95_dp))))
 
 
-       totcollisions=totcollisions+vol(i)*ndens(i,1,1)*(1.0_dp-abu_he)* &
-            xh(i,0)*electrondens(ndens(i,1,1),yh,yhe)* &
-            colh0*SQRT(temper(i))*EXP(-temph0/temper(i))+ &
-	    vol(i)*ndens(i,1,1)*abu_he*   &
-            xhe(i,0)*electrondens(ndens(i,1,1),yh,yhe)* &
-            colhe(0)*SQRT(temper(i))*EXP(-temphe(0)/temper(i))+ &
-	    vol(i)*ndens(i,1,1)*abu_he*   &
-            xhe(i,1)*electrondens(ndens(i,1,1),yh,yhe)* &
-            colhe(1)*SQRT(temper(i))*EXP(-temphe(1)/temper(i))
-    ENDDO
+       totcollisions=totcollisions+vol(i)*ndens_p*(1.0_dp-abu_he)* &
+            xh(i,0)*electrondens(ndens_p,yh,yhe)* &
+            colh0*sqrt(temper(i))*exp(-temph0/temper(i))+ &
+	    vol(i)*ndens_p*abu_he*   &
+            xhe(i,0)*electrondens(ndens_p,yh,yhe)* &
+            colhe(0)*sqrt(temper(i))*exp(-temphe(0)/temper(i))+ &
+	    vol(i)*ndens_p*abu_he*   &
+            xhe(i,1)*electrondens(ndens_p,yh,yhe)* &
+            colhe(1)*sqrt(temper(i))*exp(-temphe(1)/temper(i))
+    enddo
 
     totrec=totrec*dt
     totcollisions=totcollisions*dt
 
-  END SUBROUTINE total_rates
+  end subroutine total_rates
   
+  !----------------------------------------------------------------------------
 
-  SUBROUTINE state_after()
+  !> Calculates the number of neutrals and ions at the end of the time step
+  subroutine state_after()
 
-    
     ! Photon statistics: Calculate the number of neutrals after the integration
     h0_after=0.0
     h1_after=0.0
@@ -142,20 +164,21 @@ CONTAINS
     he1_after=0.0
     he2_after=0.0
 
-    DO i=1,mesh(1)
+    do i=1,mesh(1)
        h0_after=h0_after+vol(i)*ndens(i,1,1)*xh(i,0)*(1.0_dp-abu_he)
        h1_after=h1_after+vol(i)*ndens(i,1,1)*xh(i,1)*(1.0_dp-abu_he)
        he0_after=he0_after+vol(i)*ndens(i,1,1)*xhe(i,0)*abu_he
        he1_after=he1_after+vol(i)*ndens(i,1,1)*xhe(i,1)*abu_he
        he2_after=he2_after+vol(i)*ndens(i,1,1)*xhe(i,2)*abu_he
-    ENDDO
+    enddo
     
-  END SUBROUTINE state_after
+  end subroutine state_after
   
+  !----------------------------------------------------------------------------
 
-  SUBROUTINE total_ionizations ()
+  !> Calculate the total number of ionizing photons used
+  subroutine total_ionizations ()
 
-    
     ! Photon statistics: Total number of new ionizations
     dh0=(h0_before-h0_after)
     dh1=(h1_before-h1_after)
@@ -164,6 +187,32 @@ CONTAINS
     dhe2=(he2_before-he2_after)
     total_ion=totrec+dh0+dhe0+dhe1
     
-  END SUBROUTINE total_ionizations
+  end subroutine total_ionizations
 
-END MODULE photonstatistics
+  !----------------------------------------------------------------------------
+
+  !> Calculate the total number of ionizing photons used
+  subroutine report_photonstatistics (dt)
+
+    real(kind=dp),intent(in) :: dt
+
+    real(kind=dp) :: totalsrc,photcons,total_photon_loss
+
+    !total_photon_loss=sum(photon_loss)*dt* &
+    total_photon_loss=photon_loss*dt* &
+         real(mesh(1))
+    totalsrc=s_star*dt
+    photcons=(total_ion-totcollisions)/totalsrc
+    if (rank == 0) then
+       write(logf,"(7(1pe10.3))") &
+            total_ion, totalsrc, &
+            photcons, &
+            dh0/total_ion, &
+            totrec/total_ion, &
+            total_photon_loss/totalsrc, &
+            totcollisions/total_ion
+    endif
+    
+  end subroutine report_photonstatistics
+
+end module photonstatistics
