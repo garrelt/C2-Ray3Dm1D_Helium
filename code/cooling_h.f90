@@ -22,26 +22,30 @@ module radiative_cooling
   
   implicit none
 
-
-  integer,parameter,private :: temppoints=801
-  real(kind=dp),dimension(temppoints),private :: h0_cool,h1_cool
-  real(kind=dp),dimension(temppoints),private :: he0_cool,he1_cool,he2_cool
-  real(kind=dp),private :: mintemp, dtemp,dumi
-
+  integer,parameter,private :: temppoints=801 !< number of points in cooling tables
+  real(kind=dp),dimension(temppoints),private :: h0_cool !< H0 cooling table
+  real(kind=dp),dimension(temppoints),private :: h1_cool !< H+ cooling table
+  real(kind=dp),dimension(temppoints),private :: he0_cool !< He0 cooling table 
+  real(kind=dp),dimension(temppoints),private :: he1_cool !< He1 cooling table 
+  real(kind=dp),dimension(temppoints),private :: he2_cool !< He2 cooling table 
+  real(kind=dp),private :: mintemp !< lowest log10(temperature) in table
+  real(kind=dp),private :: dtemp !< steps in log10(temperature) in table
+  real(kind=dp),private :: dumi
 
 contains
   
   !===========================================================================
 
-
+  !> Calculate the cooling rate
   function coolin(nucldens,eldens,xh, xhe, temp0)
-
     
     real(kind=dp) :: coolin
 
-    real(kind=dp),intent(in) :: nucldens,eldens,xh(0:1),temp0
-    real(kind=dp),intent(in) :: xhe(0:2)
-
+    real(kind=dp),intent(in) :: nucldens !< number density
+    real(kind=dp),intent(in) :: eldens !< electron density
+    real(kind=dp),dimension(0:1),intent(in) :: xh !< H ionization fractions
+    real(kind=dp),dimension(0:2),intent(in) :: xhe !< He ionization fractions
+    real(kind=dp),intent(in) :: temp0 !< temperature
 
     real(kind=dp) :: tpos, dtpos
     integer :: itpos,itpos1
@@ -64,8 +68,6 @@ contains
          xhe(2)*(he2_cool(itpos)+ &
          (he2_cool(itpos1)-he2_cool(itpos))*dtpos))*abu_he)
 
-    
-    return
   end function coolin
 
   !===========================================================================
@@ -91,7 +93,6 @@ contains
     close(22)
     
     mintemp=temp(1)
-
     dtemp=temp(2)-temp(1)
     ! not needed: maxtemp=temp(temppoints)
     
@@ -167,7 +168,6 @@ contains
        he2_cool(itemp)=10.0d0**he2_cool(itemp)
     enddo
 
-    return
   end subroutine setup_cool
   
 end module radiative_cooling
