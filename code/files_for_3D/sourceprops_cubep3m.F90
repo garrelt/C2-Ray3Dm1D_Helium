@@ -325,7 +325,7 @@ contains
        open(unit=49,file=sourcelistfilesuppress,status='unknown')
        write(49,*) NumSrc
        do ns0=1,NumSrc
-          write(49,"(i,i,i,f,f)") srcpos(1,ns0),srcpos(2,ns0),srcpos(3,ns0), &
+          write(49,"(3i4,2f10.3)") srcpos(1,ns0),srcpos(2,ns0),srcpos(3,ns0), &
                SrcMass(ns0,0),SrcMass(ns0,3)
        enddo
        close(49)

@@ -10,7 +10,7 @@
 module output_module
   
   ! This file contains routines having to do with the output
-  ! of the C2-Ray program
+  ! of the C2-Ray program.
   
   ! setup_out : open files
   ! close_down : close files
@@ -23,9 +23,15 @@ module output_module
 
   implicit none
   
-  integer,parameter :: max_input_streams=5 !< maximum number of output streams
-  integer,dimension(max_input_streams) :: streams !< flags for output streams
-  
+  private
+
+  ! To controle what kind of output is produced we use an array of flags.
+  ! There can be at most max_output_streams types of output.
+  integer,parameter :: max_output_streams=5 !< maximum number of output streams
+  integer,dimension(max_output_streams) :: streams !< flag array for output streams
+
+  public :: setup_output, output, close_down
+
 contains
   !----------------------------------------------------------------------------
 
@@ -57,9 +63,13 @@ contains
 
     if (rank == 0) then
        ! Open files
-       if (do_photonstatistics) open(unit=90, &
-            file=trim(adjustl(results_dir))//'PhotonCounts.out', &
-            form='formatted',status='unknown')
+       if (do_photonstatistics) then
+          open(unit=90,file=trim(adjustl(results_dir))//"PhotonCounts.out", &
+               form="formatted",status="unknown",position="append")
+          ! Write header with description of what is in the file
+          write(90,*) "Columns: Rate of change for H0, H+, He0, He+, He2+, " &
+               "total photon losses, rate of ionizations + recombinations".
+
        !GM/121013: Commented out as it is not used
        !open(unit=91,file=trim(adjustl(results_dir))//'Analytical.out', &
        !     form='formatted',status='unknown')
@@ -88,17 +98,18 @@ contains
     ! Closes down
     
     if (rank == 0) then
-       close(90)
-       !close(91)
-       close(48)
-       close(50)
-       close(52)
+       close(unit=90)
+       !close(unit=91)
+       close(unit=48)
+       close(unit=50)
+       close(unit=52)
     endif
 
   end subroutine close_down
   
   !----------------------------------------------------------------------------
 
+  !> Produce output for a time frame
   subroutine output (step,time,dt,end_time) !* (step time dt end_time)
 
     ! Simple output routine.

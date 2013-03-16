@@ -78,6 +78,10 @@ contains
     integer :: nstep,nstepmax
 
     ! Photo-ionization heating
+    ! GM/121115: This is the total heating rate including H, He0, He1 and
+    ! secondary heating. See radiation module,  subroutine  lookuptable
+    ! where the total heating variable fheat is defined and then put into
+    ! phi%hv_h. We should probably change this, or the variable names.
     eplush=phi%hv_h
 
     !eplushe0=phi%hv_he(0)
