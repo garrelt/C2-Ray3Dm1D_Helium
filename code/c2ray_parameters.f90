@@ -30,13 +30,16 @@ module c2ray_parameters
   real(kind=dp),parameter :: epsilon=1.0e-20_dp
 
   !> Convergence criterion for per source calculation (evolve0d)
-  real(kind=dp),parameter :: convergence1=1.0e-3
+  !real(kind=dp),parameter :: minimum_fractional_change = 1.0e-3
+  real(kind=dp),parameter :: minimum_fractional_change = 1.0e-2
 
   !> Convergence criterion for global calculation (evolve0d)
-  real(kind=dp),parameter :: convergence2=1.0e-2
+  real(kind=dp),parameter :: convergence2 = 1.0e-2
+  real(kind=dp),parameter :: LTE_fractional_change = 1.0e-0
+  real(kind=dp),parameter :: minium_fraction_of_photons = 1.0e-3
 
   !> Convergence criterion for neutral fraction (evolve4_periodic)
-  real(kind=dp),parameter :: convergence_frac=1.0e-8
+  real(kind=dp),parameter :: minimum_fraction_of_atoms=1.0e-8
   real(kind=dp),parameter :: convergence_frac2=1.0e-6
 
   !> Size increase of subboxes around sources (evolve4_periodic)
@@ -56,18 +59,18 @@ module c2ray_parameters
   !> Parameters for nominal SED (BB)
   !> Effective temperature (K); if set to zero, the code will ask
   !! for SED parameters
-  real(kind=dp),parameter :: teff_nominal=5.0e4
+  real(kind=dp),parameter :: T_eff_nominal=5.0e4
   !> Number of ionizing photons / second
-  real(kind=dp),parameter :: s_star_nominal=1e48_dp 
+  real(kind=dp),parameter :: S_star_nominal=1e48_dp
 
   !> nominal Eddington efficiency
-  real(kind=dp),parameter :: EddLeff_nom=1.0_dp 
+  real(kind=dp),parameter :: EddLeff_nominal=1.0_dp
   !> nominal power law index (for photon number)
-  real(kind=dp),parameter :: plindex_nom=2.5_dp
+  real(kind=dp),parameter :: pl_index_nominal=2.5_dp
   !> nominal black hole mass for Eddington luminosity (M0)
-  real(kind=dp),parameter :: mass_nom=1.0e6_dp
-  !> Eddington luminosity per mass_nom solar mass (erg/s)
-  real(kind=dp),parameter :: EddLum=1.38e38*mass_nom 
+  real(kind=dp),parameter :: mass_nominal=1.0e6_dp
+  !> Eddington luminosity per mass_nominal solar mass (erg/s)
+  real(kind=dp),parameter :: EddLum=1.38e38*mass_nominal 
 
   !> Subgrid clumping\n
   !! 1: constant clumping (with clumping_factor)\n

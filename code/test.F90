@@ -44,7 +44,7 @@ module nbody
 
   character(len=10),parameter :: nbody_type="test" !< ID of Nbody type
 
-  real(kind=dp),parameter :: boxsize=100.0!0.021!0.0105  !< Box size in Mpc/h comoving
+  real(kind=dp),parameter :: boxsize=100.0 !0.021!0.0105  !< Box size in Mpc/h comoving
 
   ! redshift sequence information
   integer, public :: NumZred               !< number of redshifts
@@ -106,13 +106,6 @@ contains
           zred_array(nz)=-1+(1.+zred_array(1))* &
                (t0/(t0+real(nz-1)*timestep))**(2./3.)
        enddo
-
-       ! Report
-       write(logf,*) "Running problem: ",nbody_type
-       write(logf,*) "Problem parameters: "
-       write(logf,*) "  initial redshift: ",zred_array(1)
-       write(logf,*) "  time step: ",timestep/YEAR," years"
-       write(logf,*) "  number of time steps: ",NumZred
     endif
        dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))
 #ifdef MPI

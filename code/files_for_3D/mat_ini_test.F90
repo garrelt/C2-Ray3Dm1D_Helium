@@ -12,7 +12,7 @@ module material
   use my_mpi
   use grid, only: dr,vol,sim_volume
   use cgsconstants, only: m_p,ini_rec_colion_factors, c
-  use cgsphotoconstants, only: sigh
+  use cgsphotoconstants, only: sigma_HI_at_ion_freq
   use astroconstants, only: M_solar, Mpc
   use cosmology_parameters, only: Omega_B, Omega0, rho_crit_0, h, H0
   use nbody, only: nbody_type, NumZred, Zred_array
@@ -37,7 +37,7 @@ module material
     public :: set_clumping, clumping_point
   ! LLS data
   real(kind=dp),parameter :: opdepth_LL = 2.0 !< typical optical depth of LLS
-  real(kind=dp),parameter :: N_1 = opdepth_LL / sigh !< typical column density of LLS
+  real(kind=dp),parameter :: N_1 = opdepth_LL /  sigma_HI_at_ion_freq !< typical column density of LLS
   real(kind=dp),public :: n_LLS
   real(kind=dp),public :: coldensh_LLS = 0.0_dp ! Column density of LLSs per cell
   real(kind=dp),public :: mfp_LLS_pMpc
@@ -606,7 +606,7 @@ contains
 
     if (rank == 0) then
        write(logf,*) "Average optical depth per cell due to LLSs: ", &
-            coldensh_LLS*sigh,"(type ", type_of_LLS,")"
+            coldensh_LLS*sigma_HI_at_ion_freq,"(type ", type_of_LLS,")"
        write(logf,*) "Mean free path (pMpc): ", mfp_LLS_pMpc
     endif
     

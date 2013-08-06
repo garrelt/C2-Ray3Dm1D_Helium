@@ -50,9 +50,8 @@ contains
     use cgsconstants, only: bh00,bhe00, bhe10, albpow,alcpow, &
 	colh0,colhe, temphe,temph0,ev2fr,brech0,areche0,breche0, &
         oreche0,breche1,treche1,n_el_crit, &
-        acolh0,acolhe0,acolhe1, ini_rec_colion_factors,arech0,areche1,vfrac
-    use cgsphotoconstants, only: sigh, sighe0,frth0,frthe0,s_H_heth, &
-         s_H_heLya,s_He_heLya  
+        colli_HI,colli_HeI,colli_HeII, ini_rec_colion_factors,arech0,areche1,v
+    use cgsphotoconstants, only: sigma_HI_at_ion_freq, sigma_HeI_at_ion_freq
     !use subgrid_clumping, only: clumping
     use file_admin, only: stdinput
     use material, only: clumping, ionstates
@@ -108,9 +107,9 @@ contains
     alpha_he2_2 = clumping* treche1
     alpha_he2_1 =  alpha_he2_A - alpha_he2_B
 
-    aih0=max(phi%h+rhe*acolh0,1.0e-200_dp)       ! acolh0 and co are calculated in a routine 
-    aihe0=max(phi%he(0)+rhe*acolhe0,1.0e-200_dp) ! inside cgsconstants. ini_rec_colion_factors   
-    aihe1=max(phi%he(1)+rhe*acolhe1,1.0e-200_dp) ! that should be called every time temp0 is updated
+    aih0=max(phi%photo_cell_HI+rhe*colli_HI,1.0e-200_dp)       ! colli_HI and co are calculated in a routine 
+    aihe0=max(phi%photo_cell_HeI+rhe*colli_HeI,1.0e-200_dp) ! inside cgsconstants. ini_rec_colion_factors   
+    aihe1=max(phi%photo_cell_HeII+rhe*colli_HeII,1.0e-200_dp) ! that should be called every time temp0 is updated
     
 
 !***********************************************************  
@@ -125,12 +124,12 @@ contains
   
  Lmat= -(aih0+rhe*alpha_h_B)
  Mmat=  ( yfrac*rhe*alpha_he_1  + pfrac*rhe*alpha_he_B )*heliumfraction
- Nmat=  ((ffrac*zfrac*(1.0_dp-vfrac) +vfrac*wfrac)*alpha_he2_B +alpha_he2_2 &
+ Nmat=  ((ffrac*zfrac*(1.0_dp-v) +v*wfrac)*alpha_he2_B +alpha_he2_2 &
       +(1.0_dp-y2afrac-y2bfrac)*alpha_he2_1)*heliumfraction*rhe  
  Pmat=    - aihe0-aihe1-rhe*(alpha_he_A-(1.0_dp-yfrac)*alpha_he_1)
  Emat=  -rhe*(alpha_he2_A-y2afrac*alpha_he2_1)            
- Qmat=  -aihe0+rhe*alpha_he2_B*(ffrac*(1.0_dp-zfrac)*(1.0_dp-vfrac)+ &
-      vfrac*(1.425_dp-wfrac))-Emat+alpha_he2_1*y2bfrac*rhe
+ Qmat=  -aihe0+rhe*alpha_he2_B*(ffrac*(1.0_dp-zfrac)*(1.0_dp-v)+ &
+      v*(1.425_dp-wfrac))-Emat+alpha_he2_1*y2bfrac*rhe
       
 !! Hmat=  aihe1  !write aihe1 everywhere instead of Hmat 
 !! Amat=  aih0   !write aih0 everywhere instead of Amat
@@ -338,34 +337,34 @@ contains
   !=======================================================================
 
   !> Sets the boundary condition for the hydrogen column density
-  function coldensh_bndry()
+  function coldens_bndry_HI()
     
     ! Sets the boundary condition for the hydrogen column density
     
-    use cgsphotoconstants, only: sigh,sighe0,sighe1
-    use radiation, only: tauHI
+    use cgsphotoconstants, only: sigma_HI_at_ion_freq,sigma_HeI_at_ion_freq,sigma_HeII_at_ion_freq
+    use radiation, only: boundary_tauHI
     
-    real(kind=dp):: coldensh_bndry
+    real(kind=dp):: coldens_bndry_HI
     
     ! Column density at the left of the first cell
-    coldensh_bndry=tauHI/sigh
+    coldens_bndry_HI=boundary_tauHI/sigma_HI_at_ion_freq
     
-  end function coldensh_bndry
+  end function coldens_bndry_HI
 
 
-  function coldenshe0_bndry()
-    use cgsphotoconstants, only: sighe0
-    use radiation, only: tauHeI
-    real(kind=dp):: coldenshe0_bndry  
-    coldenshe0_bndry=tauHeI/sighe0
-  end function coldenshe0_bndry
+  function coldens_bndry_HeI()
+    use cgsphotoconstants, only: sigma_HeI_at_ion_freq
+    use radiation, only: boundary_tauHeI
+    real(kind=dp):: coldens_bndry_HeI  
+    coldens_bndry_HeI=boundary_tauHeI/sigma_HeI_at_ion_freq
+  end function coldens_bndry_HeI
 
-  function coldenshe1_bndry()
-    use cgsphotoconstants, only: sighe1
-    use radiation, only: tauHeII
-    real(kind=dp):: coldenshe1_bndry  
-    coldenshe1_bndry=tauHeII/sighe1
-  end function coldenshe1_bndry
+  function coldens_bndry_HeII()
+    use cgsphotoconstants, only: sigma_HeII_at_ion_freq
+    use radiation, only: boundary_tauHeII
+    real(kind=dp):: coldens_bndry_HeII  
+    coldens_bndry_HeII=boundary_tauHeII/sigma_HeII_at_ion_freq
+  end function coldens_bndry_HeII
 
   
 end module doric_module

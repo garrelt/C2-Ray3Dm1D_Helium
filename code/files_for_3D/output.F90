@@ -29,7 +29,7 @@ module output_module
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
   use photonstatistics, only: photon_loss, grtotal_src
   use photonstatistics, only: initialize_photonstatistics
-  use radiation, only: teff,rstar,lstar,S_star
+  use radiation, only: T_eff,R_star,L_star,S_star
 
 
   implicit none
@@ -500,8 +500,8 @@ contains
           write(95,"(f6.3,8(1pe10.3))") zred_now,totions,grtotal_src, &
                volfrac,massfrac
 
-          photcons_flag=0
 !*** for the moment, I turn that off, until I checked, how I calculate those quantities.
+          photcons_flag=0
           !if (abs(1.0-photcons) > 0.15) then
              !if ((1.0-photcons) > 0.15 .and. &
               !    total_photon_loss/totalsrc < (1.0-photcons) ) then

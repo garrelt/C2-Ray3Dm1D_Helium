@@ -27,9 +27,9 @@ module cgsconstants
   !> Planck constant
   real(kind=dp), parameter :: hplanck=6.6260755e-27_dp
   !> Stefan-Boltzmann constant
-  real(kind=dp), parameter :: sigmasb=5.670e-5_dp
+  real(kind=dp), parameter :: sigma_SB=5.670e-5_dp
   !> Boltzmann constant
-  real(kind=dp), parameter :: kb=1.381e-16_dp
+  real(kind=dp), parameter :: k_B=1.381e-16_dp
   !> Gravitational constant
   real(kind=dp), parameter :: G_grav=6.6732e-8_dp
 
@@ -56,9 +56,7 @@ module cgsconstants
   !> Planck constant scaled
   real(kind=dp),parameter  :: hscl=hplanck!*sclfre 
   !> tpic2  - 2*pi/c^2 times scaling factors needed for the integral cores
-  real(kind=dp),parameter :: tpic2=2.0*pi/(c*c)
-  !> two_pi_c2  - 2*pi/c^2 times scaling factors needed for the integral cores
-  real(kind=dp),parameter :: two_pi_c2=2.0*pi/(c*c)!*sclfre**3
+  real(kind=dp),parameter :: two_pi_over_c_square=2.0*pi/(c*c)
 
   !> Hydrogen recombination parameter (power law index)
   real(kind=dp),parameter :: albpow=-0.7_dp  !in the old code -0.79
@@ -124,13 +122,13 @@ module cgsconstants
 
 
    !> H0 collisional ionization parameter at T=temp0
-   real(kind=dp) :: acolh0
+   real(kind=dp) :: colli_HI
    !> He0 collisional ionization parameter at T=temp0
-   real(kind=dp) :: acolhe0
+   real(kind=dp) :: colli_HeI
    !> He1 collisional ionization parameter at T=temp0
-   real(kind=dp) :: acolhe1
+   real(kind=dp) :: colli_HeII
    !> Fraction fo He++ -> He+ recombination photons that goes into 2photon decay
-   real(kind=dp) :: vfrac
+   real(kind=dp) :: v
 
  contains
 !> This subroutine contains all temperature dependent recombination and 
@@ -204,9 +202,9 @@ module cgsconstants
     ! temperature
     ! that is: C_H etc
     sqrtt0 =sqrt(temp0)
-    acolh0 =colh0*sqrtt0*exp(-temph0/temp0)
-    acolhe0=colhe(0)*sqrtt0*exp(-temphe(0)/temp0)
-    acolhe1=colhe(1)*sqrtt0*exp(-temphe(1)/temp0)
+    colli_HI =colh0*sqrtt0*exp(-temph0/temp0)
+    colli_HeI=colhe(0)*sqrtt0*exp(-temphe(0)/temp0)
+    colli_HeII=colhe(1)*sqrtt0*exp(-temphe(1)/temp0)
     ! I might consider using the Hui&Gnedin fits instead, however, the difference is not so big
     !sqrtt0 = temp0**(-1.5_dp)*exp(-temph0/temp0)
     !acolh0 =21.11_dp*sqrtt0*exp(-temph0/temp0)* &
@@ -218,7 +216,7 @@ module cgsconstants
 
 
     !fraction of He++ recombination photons that go into two-photon decay.
-    vfrac=0.285_dp*(temp0/1.0e4_dp)**0.119_dp ! fit to Hummer and Seaton, 1964 table five
+    v=0.285_dp*(temp0/1.0e4_dp)**0.119_dp ! fit to Hummer and Seaton, 1964 table five
                                                
 ! SET THEM HERE EXPLIXITLY FOR T=10 000 K TO THE ONES FROM GABRIEL
 !    acolh0  = 8.96396e-16_dp  ! H collisional ionization coefficient

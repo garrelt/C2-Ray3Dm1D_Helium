@@ -12,7 +12,7 @@ module material
   use my_mpi
   use grid, only: dr,vol,sim_volume
   use cgsconstants, only: m_p,ini_rec_colion_factors, c
-  use cgsphotoconstants, only: sigh
+  use cgsphotoconstants, only: sigma_HI_at_ion_freq
   use astroconstants, only: M_solar, Mpc
   use cosmology_parameters, only: Omega_B, Omega0, rho_crit_0, h, H0
   use nbody, only: nbody_type, M_grid, M_particle, id_str, dir_dens, NumZred, Zred_array, dir_clump, dir_LLS
@@ -48,7 +48,7 @@ module material
   public :: set_clumping, clumping_point
   ! LLS data
   real(kind=dp),parameter :: opdepth_LL = 2.0 !< typical optical depth of LLS
-  real(kind=dp),parameter :: N_1 = opdepth_LL / sigh !< typical column density of LLS
+  real(kind=dp),parameter :: N_1 = opdepth_LL / sigma_HI_at_ion_freq !< typical column density of LLS
   real(kind=dp),public :: n_LLS
   real(kind=dp),public :: coldensh_LLS = 0.0_dp ! Column density of LLSs per cell
   real(kind=dp),public :: mfp_LLS_pMpc
@@ -133,17 +133,16 @@ contains
           read(stdinput,*) temper_val
           
           if (.not.file_input) &
-              write(*,"(A,$)") "isothermal? y/n: "
-              
+               write(*,"(A,$)") "isothermal? y/n: "
           read(stdinput,*) isothermal_answer
           if (isothermal_answer.eq.'n')then
-                  isothermal=.false.
+             isothermal=.false.
           elseif (isothermal_answer.eq.'y') then
-                  isothermal=.true.
+             isothermal=.true.
           else 
-                  write(*,"(A,$)") "mistake you should write y or n" 
-                  write(*,"(A,$)") ' '
-                  call exit(0)                
+             write(*,"(A,$)") "mistake you should write y or n" 
+             write(*,"(A,$)") ' '
+             call exit(0)                
           endif
                     
           if (.not.file_input) write(*,"(A,$)") "Restart (y/n)? : "
@@ -486,7 +485,7 @@ contains
           
           write(unit=logf,fmt="(2A)") "Reading temperature from ", &
                trim(temper_file)
-          ! Open ionization fractions file
+          ! Open temperature file
           open(unit=20,file=temper_file,form="unformatted",status="old")
           
           ! Read in data
@@ -809,7 +808,7 @@ contains
 
     if (rank == 0) then
        write(logf,*) "Average optical depth per cell due to LLSs: ", &
-            coldensh_LLS*sigh,"(type ", type_of_LLS,")"
+            coldensh_LLS*sigma_HI_at_ion_freq,"(type ", type_of_LLS,")"
        write(logf,*) "Mean free path (pMpc): ", mfp_LLS_pMpc
     endif
     

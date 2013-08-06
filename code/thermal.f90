@@ -82,7 +82,7 @@ contains
     ! secondary heating. See radiation module,  subroutine  lookuptable
     ! where the total heating variable fheat is defined and then put into
     ! phi%hv_h. We should probably change this, or the variable names.
-    eplush=phi%hv_h
+    eplush=phi%heat
 
     !eplushe0=phi%hv_he(0)
     !eplushe1=phi%hv_he(1)
