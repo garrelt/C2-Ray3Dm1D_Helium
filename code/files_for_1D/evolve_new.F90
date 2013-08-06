@@ -404,7 +404,8 @@ contains
        phi%he(1)=0.0_dp
        phi%he_out(0)=0.0_dp
        phi%he_out(1)=0.0_dp
-       phi%int_out(:)=0.0_dp
+       !GM/130801: not sure what this is useful for
+       !phi%int_out(:)=0.0_dp
     endif
 
 
