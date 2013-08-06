@@ -50,7 +50,7 @@ module evolve
   public :: evolve3D, phih_grid, evolve_ini, phihe_grid
 
   !> Periodic boundary conditions, has to be true for this version
-  logical,parameter :: periodic_bc = .false.
+  logical,parameter :: periodic_bc = .true.
 
   !> Minimum number of MPI processes for using the master-slave setup 
   integer, parameter ::  min_numproc_master_slave=10 !10
@@ -93,7 +93,9 @@ module evolve
   integer :: sum_nbox !< sum of all nboxes (on one processor)
   integer :: sum_nbox_all !< sum of all nboxes (on all processors)
 
-  integer :: tn !< thread number
+  ! GM/121127: This variable should always be set. If not running OpenMP
+  ! it should be equal to 1. We initialize it to 1 here.
+  integer :: tn=1 !< thread number
   
 contains
 
@@ -203,7 +205,7 @@ contains
     do
        ! Update xh if converged and exit
 !       write(*,*) 'start of do'
-       if (conv_flag <= conv_criterion) then
+       if (conv_flag < conv_criterion) then
           xh(:,:,:,:)=xh_intermed(:,:,:,:)
           xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
           call set_final_temperature_point
@@ -1767,7 +1769,8 @@ contains
           phi%he(1)=0.0_dp
           phi%he_out(0)=0.0_dp
           phi%he_out(1)=0.0_dp
-          phi%int_out(:)=0.0_dp
+          !GM/130801: not sure what this is useful for
+          !phi%int_out(:)=0.0_dp
        endif
        
       
