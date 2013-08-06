@@ -221,6 +221,11 @@ Program C2Ray
      endif
      ! Reset restart flag now that everything has been dealt with
      restart=0 
+
+     ! If start of simulation output
+     if (NumSrc > 0 .and. sim_time == 0.0) call output(time2zred(sim_time),sim_time,dt, &
+          photcons_flag)
+
      ! Loop until end time is reached
      do
         ! Make sure you produce output at the correct time
