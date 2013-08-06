@@ -367,22 +367,17 @@ contains
     
     ! Turn masses into luminosities
     select case (UV_Model)
+
     case ("Iliev et al")
        do ns=1,NumSrc
-          !note that now photons/atom are included in SrcMass
-          NormFlux(ns)=SrcMass(ns,0)*M_grid*  &
-               Omega_B/(Omega0*m_p)/S_star_nominal
-          !NormFlux(ns)=NormFlux(ns)/lifetime
-          NormFlux(ns)=NormFlux(ns)/lifetime2
-          NormFluxPL(ns)=0.0_dp
-       if (SrcMass(ns,3).ne.0.0) then
-         ! first calculate only mass in baryons, then into units of solar masses, then into luminosity
-         ! EddLum is not included, because it is included in radiation.
-          NormFluxPL(ns)=SrcMass(ns,3)*M_grid*  &
-               Omega_B/(Omega0)/(mass_nom*M_SOLAR)*EddLeff_nom
+          ! Calculate normalized luminosity of stellar sources
+          ! note that escaping photons/atom are included in SrcMass
+          NormFlux(ns)=Luminosity_from_mass(SrcMass(ns,0))/lifetime2
 
-       endif
+          ! Calculate normalized luminosity of power law source
+          NormFluxPL(ns)=PL_Luminosity_from_mass(SrcMass(ns,3))
        enddo
+
     case ("Fixed N_gamma")
        if (nz <= NumZred_uv) then
           cumfrac=min(cumfrac_max,cumulative_uv/uv_array(nz))
@@ -394,34 +389,31 @@ contains
           total_SrcMass=sum(SrcMass(:,0))
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
-             NormFlux(ns)=(1.0+cumfrac)*uv_array(nz)/lifetime2*SrcMass(ns,0)/total_SrcMass/S_star_nominal
-             NormFluxPL(ns)=0.0_dp
-             if (SrcMass(ns,3).ne.0.0) then
-                ! first calculate only mass in baryons, then into units of solar masses, then into luminosity
-               NormFluxPL(ns)=SrcMass(ns,3)*M_grid*  &
-               Omega_B/(Omega0)/M_SOLAR/mass_nom*EddLeff_nom
-             endif
-             !NormFlux(ns)=(cumulative_uv+uv_array(nz))/lifetime2*SrcMass(ns,0)/total_SrcMass/S_star_nominal
+             NormFlux(ns)=(1.0+cumfrac)*uv_array(nz)/lifetime2*SrcMass(ns,0)/ &
+                  (total_SrcMass*S_star_nominal)
+             ! Calculate normalized luminosity of power law source
+             NormFluxPL(ns)=PL_Luminosity_from_mass(SrcMass(ns,3))
           enddo
           ! Subtract extra photons from cumulated photons
           cumulative_uv=max(0.0_dp,cumulative_uv-cumfrac*uv_array(nz))
           !write(logf,*) uv_array(nz),SrcMass(:,0),uv_array(nz)/lifetime2
        else
+          ! For high redshifts there may not be a uv model.
+          ! Set fluxes to zero.
           NormFlux(:)=0.0
-          if (rank == 0) write(logf,*) "No UV model available, setting fluxes to zero."
+          if (rank == 0) write(logf,*) &
+               "No UV model available, setting fluxes to zero."
        endif
+
     case ("Fixed Ndot_gamma")
        if (nz <= NumZred_uv) then
           total_SrcMass=sum(SrcMass(:,0))
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
-             NormFlux(ns)=uv_array(nz)*SrcMass(ns,0)/total_SrcMass/S_star_nominal
-             NormFluxPL(ns)=0.0_dp
-             if (SrcMass(ns,3).ne.0.0) then
-                ! first calculate only mass in baryons, then into units of solar masses, then into luminosity
-               NormFluxPL(ns)=SrcMass(ns,3)*M_grid*  &
-               Omega_B/(Omega0)/M_SOLAR/mass_nom*EddLeff_nom
-             endif
+             NormFlux(ns)=uv_array(nz)*SrcMass(ns,0)/ &
+                  (total_SrcMass*S_star_nominal)
+             ! Calculate normalized luminosity of power law source
+             NormFluxPL(ns)=PL_Luminosity_from_mass(SrcMass(ns,3))
           enddo
        else
           NormFlux(:)=0.0
@@ -438,6 +430,49 @@ contains
     
   end subroutine assign_uv_luminosities
   
+  ! =======================================================================
+  
+  function Luminosity_from_mass (Mass)
+
+    ! The normalized flux (luminosity) for normal sources is expressed
+    ! in terms of a standard ionizing photon rate, called S_star_nominal.
+    ! In radiation the tables have been calculated for a spectrum
+    ! with an ionizing photon rate of S_star_nominal.
+
+    ! Mass is supposed to be total mass of the source MULTIPLIED with
+    ! the efficiency factor (f) which is the product of the star formation
+    ! fraction, the escape fraction and the number of photons produced
+    ! per baryon. Because of the latter factor we need to convert the
+    ! mass to number of baryons by dividing my the proton mass m_p.
+    ! NOTE: number of baryons is the total number of nucleons, which
+    ! is why we divide my m_p and NOT by mu*m_p (where mu is mean mass
+    ! of atoms/ions).
+
+    real(kind=dp) :: Mass !< mass in units of grid masses
+    real(kind=dp) :: Luminosity_from_mass
+
+    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/S_star_nominal
+
+  end function Luminosity_from_mass
+
+  ! =======================================================================
+  
+  function PL_Luminosity_from_mass (Mass)
+
+    ! The normalized flux (luminosity) for power law sources is expressed
+    ! in terms of a normalized baryonic mass, namely mass_nom (in M0). 
+    ! We also multiply with the nominal Eddington efficiency (EddLeff_nom).
+    ! In radiation the tables have been calculated for an
+    ! Eddington luminosity of a mass_nom solar mass black hole.
+
+    real(kind=dp) :: Mass !< mass in units of grid masses
+    real(kind=dp) :: PL_Luminosity_from_mass
+
+    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/Omega0/ &
+         (mass_nom*M_SOLAR)*EddLeff_nom
+
+  end function PL_Luminosity_from_mass
+
   ! =======================================================================
 
   !> Initialization routine: determine the source model and optionally read 
