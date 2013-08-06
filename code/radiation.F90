@@ -1301,46 +1301,21 @@ contains
     tau_pos_in = set_tau_table_positions(tau_in_all)
     tau_pos_out = set_tau_table_positions(tau_out_all)
 
-    !do i_subband=1,NumFreqBnd  
-    !  tau_pos_in%tau(i_subband) = log10(max(1.0e-20_dp,tau_in_all(i_subband)))
-    !  tau_pos_in%odpos(i_subband) = min(real(NumTau,dp),max(0.0_dp,1.0+ &
-    !                                  (tau_pos_in%tau(i_subband)-minlogtau)/dlogtau))
-    !  tau_pos_in%ipos(i_subband) = int(tau_pos_in%odpos(i_subband))
-    !  tau_pos_in%residual(i_subband) = tau_pos_in%odpos(i_subband)-real(tau_pos_in%ipos(i_subband),dp)
-    !  tau_pos_in%ipos_p1(i_subband) = min(NumTau,tau_pos_in%ipos(i_subband)+1)
-    !enddo
-
-    ! find the table positions for the optical depth (outgoing)
-    !do i_subband=1,NumFreqBnd  
-    !  tau_pos_out%tau(i_subband) = log10(max(1.0e-20_dp,tau_out_all(i_subband))!)
-    !  tau_pos_out%odpos(i_subband) = min(real(NumTau,dp),max(0.0_dp,1.0+ &
-    !                                 (tau_pos_out%tau(i_subband)-minlogtau)/dlogtau))
-    !  tau_pos_out%ipos(i_subband) = int(tau_pos_out%odpos(i_subband))
-    !  tau_pos_out%residual(i_subband) = tau_pos_out%odpos(i_subband)-real(tau_pos_out%ipos(i_subband),dp)
-    !  tau_pos_out%ipos_p1(i_subband) = min(NumTau,tau_pos_out%ipos(i_subband)+1)
-    !enddo 
-
-!    if (NormFluxPL(nsrc) .le. 1.0e-100_dp) then  
-!      NFlux=NormFlux(nsrc) 
-!      sourcetype='B'
-!    else
-!      NFlux=NormFluxPL(nsrc)
-!      sourcetype='P'
-!    endif
-
     ! Find the photo-ionization rates by looking up the values in
     ! the (appropriate) photo-ionization tables
     if (NormFlux(nsrc) > 0.0) &  
-         call photo_lookuptable(tau_pos_in,tau_pos_out,phi,tau_in_all,tau_out_all, &
+         call photo_lookuptable(tau_pos_in,tau_pos_out,phi, &
+         tau_in_all,tau_out_all, &
          NormFlux(nsrc),"B",vol, &
          colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
     
     if (NormFluxPL(nsrc) > 0.0) &  
-         call photo_lookuptable(tau_pos_in,tau_pos_out,phi,tau_in_all,tau_out_all, &
+         call photo_lookuptable(tau_pos_in,tau_pos_out,phi, &
+         tau_in_all,tau_out_all, &
          NormFluxPL(nsrc),"P",vol, &
          colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
     
-     ! Find the heating rates rates by looking up the values in
+    ! Find the heating rates rates by looking up the values in
     ! the (appropriate) photo-ionization tables and using the
     ! secondary ionization
     if(.not.isothermal) then
@@ -1353,11 +1328,13 @@ contains
           tau_cell_HeII(i_subband) = colum_cell_HeII*sigma_HeII(i_subband)
        enddo
               
-       call heat_lookuptable(tau_pos_in,tau_pos_out,phi,tau_in_all,tau_out_all, &
+       call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
+            tau_in_all,tau_out_all, &
             tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,sourcetype, &
             vol,i_state,colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
        
-       call heat_lookuptable(tau_pos_in,tau_pos_out,phi,tau_in_all,tau_out_all, &
+       call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
+            tau_in_all,tau_out_all, &
             tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,sourcetype, &
             vol,i_state,colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
        
@@ -1439,9 +1416,10 @@ contains
     real(kind=dp), dimension(1:NumheatBin) :: scaling
     real(kind=dp) :: tau_photo_limit = 1.0e-7 
     integer :: Maximum_FreqBnd
-    
-    
-    ! pointers point to some variables
+        
+    ! pointers point to the correct tables to use, BB or PL source
+    ! Set the maximum frequency band to consider (and limit the
+    ! loop over the subbands below)
     if (sourcetype.eq.'B') then 
        photo_thick_table => bb_photo_thick_table
        photo_thin_table => bb_photo_thin_table
@@ -1452,72 +1430,87 @@ contains
        Maximum_FreqBnd=NumFreqBnd
     endif
     
-    ! loop through all frequency band
+    ! loop through the relevant frequency bands
     do i_subband=1, Maximum_FreqBnd
        
-       ! Incoming, outcoming, current cell total photoionization rate
-       phi_photo_in_all = NFlux*read_table(photo_thick_table,NumFreqBnd,tau_pos_in, &
+       ! Incoming total photoionization rate
+       phi_photo_in_all = NFlux* &
+            read_table(photo_thick_table,NumFreqBnd,tau_pos_in, &
             i_subband,i_subband)
-       !(photo_thick_table(tau_pos_in%ipos(i_subband),i_subband)+ &
-       !                  (photo_thick_table(tau_pos_in%ipos_p1(i_subband),i_subband)- &
-       !                  photo_thick_table(tau_pos_in%ipos(i_subband),i_subband))* &
-       !                  tau_pos_in%residual(i_subband))*NFlux
        phi%photo_in = phi%photo_in+phi_photo_in_all
 
-       ! When current cell is optically thick
-       if (abs(tau_out_all(i_subband)-tau_in_all(i_subband)) .gt. tau_photo_limit) then
-          phi_photo_out_all = NFlux*read_table(photo_thick_table,NumFreqBnd, &
+       ! Total cell photo-ionization rate, calculated differently
+       ! for optically thick and thin cells
+       if (abs(tau_out_all(i_subband)-tau_in_all(i_subband)) > &
+            tau_photo_limit) then
+          
+          ! When current cell is optically thick
+          phi_photo_out_all = NFlux* &
+               read_table(photo_thick_table,NumFreqBnd, &
                tau_pos_out,i_subband,i_subband)
-          !(photo_thick_table(tau_pos_out%ipos(i_subband),i_subband)+ &
-          !                  (photo_thick_table(tau_pos_out%ipos_p1(i_subband),i_subband)- &
-          !                  photo_thick_table(tau_pos_out%ipos(i_subband),i_subband))* &
-           !                 tau_pos_out%residual(i_subband))*NFlux 
           phi_photo_all = phi_photo_in_all-phi_photo_out_all
-
-          ! When current cell is optically thin
+          
        else
+          
+          ! When current cell is optically thin
           phi_photo_all = NFlux* &
                (tau_out_all(i_subband)-tau_in_all(i_subband))* &
                read_table(photo_thin_table,NumFreqBnd, &
                tau_pos_in,i_subband,i_subband)
-          !((photo_thin_table(tau_pos_in%ipos(i_subband),i_subband)+ &
-          !              (photo_thin_table(tau_pos_in%ipos_p1(i_subband),i_subband)- &
-           !             photo_thin_table(tau_pos_in%ipos_p1(i_subband),i_subband))* &
-           !             tau_pos_in%residual(i_subband))* &
-           !             (tau_out_all(i_subband)-tau_in_all(i_subband)))*NFlux
           phi_photo_out_all = phi_photo_in_all-phi_photo_all
-      endif
+
+       endif
 
       ! Current cell individual photoionization rate of HI, HeI, HeII
       select case (i_subband) 
 
       ! band 1
       case (NumBndin1) 
-    
-        phi%photo_cell_HI = phi_photo_all/vol
-
-      ! band 2
+     
+         ! Add to the HI photo-ionization rate
+         phi%photo_cell_HI = phi%photo_cell_HI + phi_photo_all/vol
+         
+         ! band 2
       case (NumBndin1+1:NumBndin1+NumBndin2)
-        
-        call scale_int2(scaling_HI(i_subband),scaling_HeI(i_subband),colum_cell_HI,colum_cell_HeI, i_subband)
-
-        phi%photo_cell_HI = phi%photo_cell_HI+scaling_HI(i_subband)*phi_photo_all/vol 
-        phi%photo_cell_HeI = phi%photo_cell_HeI+scaling_HeI(i_subband)*phi_photo_all/vol
-
-      ! band 3
+         
+         ! Set the scaling factors to distribute the photo-ionization
+         ! over HI and HeI
+         call scale_int2(scaling_HI(i_subband),scaling_HeI(i_subband), &
+              colum_cell_HI,colum_cell_HeI, i_subband)
+         
+         ! Add to the HI photo-ionization rate
+         phi%photo_cell_HI = phi%photo_cell_HI+ &
+              scaling_HI(i_subband)*phi_photo_all/vol 
+         ! Add to the HeI photo-ionization rate
+         phi%photo_cell_HeI = phi%photo_cell_HeI+ &
+              scaling_HeI(i_subband)*phi_photo_all/vol
+         
+         ! band 3
       case (NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+NumBndin3)
+         
+         ! Set the scaling factors to distribute the photo-ionization
+         ! over HI, HeI and HeII
+         call scale_int3(scaling_HI(i_subband),scaling_HeI(i_subband), &
+              scaling_HeII(i_subband), &
+              colum_cell_HI,colum_cell_HeI,colum_cell_HeII,i_subband)
 
-        call scale_int3(scaling_HI(i_subband),scaling_HeI(i_subband),scaling_HeII(i_subband), &
-                        colum_cell_HI,colum_cell_HeI,colum_cell_HeII,i_subband)
-        phi%photo_cell_HI = phi%photo_cell_HI+scaling_HI(i_subband)*phi_photo_all/vol
-        phi%photo_cell_HeI = phi%photo_cell_HeI+scaling_HeI(i_subband)*phi_photo_all/vol
-        phi%photo_cell_HeII = phi%photo_cell_HeII+scaling_HeII(i_subband)*phi_photo_all/vol
+         ! Add to the HI photo-ionization rate
+         phi%photo_cell_HI = phi%photo_cell_HI+ &
+              scaling_HI(i_subband)*phi_photo_all/vol
+
+         ! Add to the HeI photo-ionization rate
+         phi%photo_cell_HeI = phi%photo_cell_HeI+ &
+              scaling_HeI(i_subband)*phi_photo_all/vol
+
+         ! Add to the HeII photo-ionization rate
+         phi%photo_cell_HeII = phi%photo_cell_HeII+ &
+              scaling_HeII(i_subband)*phi_photo_all/vol
 
       end select
-     
-    enddo
-
-  end subroutine photo_lookuptable
+      
+   enddo
+   
+ end subroutine photo_lookuptable
 
 !---------------------------------------------------------------------------
 
@@ -1551,7 +1544,9 @@ contains
     real(kind=dp) :: tau_heat_limit = 1.0e-4
     integer :: Maximum_FreqBnd
 
-    ! pointers point to some variables
+    ! pointers point to the correct tables to use, BB or PL source
+    ! Set the maximum frequency band to consider (and limit the
+    ! loop over the subbands below)
     if (sourcetype.eq.'B') then 
        heat_thick_table => bb_heat_thick_table
        heat_thin_table => bb_heat_thin_table
@@ -1562,7 +1557,7 @@ contains
        Maximum_FreqBnd=NumFreqBnd
     endif
 
-    ! initialization of local cumulative variables
+    ! initialization to zero of local cumulative variables
     phi_heat_HI = 0.0_dp
     phi_heat_HeI = 0.0_dp
     phi_heat_HeII = 0.0_dp
@@ -1578,7 +1573,7 @@ contains
     enddo
 
     ! Current cell individual heating rates of HI, HeI, HeII
-    ! loop through all frequency band
+    ! loop through the frequency bands
     do i_subband=1,Maximum_FreqBnd
        
        phi_heat_HI = 0.0_dp
@@ -1587,20 +1582,17 @@ contains
        
        select case (i_subband)
           
-          ! Incoming, outcoming, current cell HI heating rate at band 1
+          ! band 1
        case (NumBndin1)
           
+          ! Incoming current cell HI heating rate at band 1
           phi%heat_in_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_in,i_subband,i_subband)
-          !(heat_thick_table(tau_pos_in%ipos(1),1)+(heat_thick_table(tau_pos_in%ipos_p1(1),1)- &
-          !     heat_thick_table(tau_pos_in%ipos(1),1))*tau_pos_in%residual(1))*NFlux 
           
           ! When current cell is HI optically thick     
           if (tau_cell_HI(i_subband) > tau_heat_limit) then
              phi%heat_out_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
                   tau_pos_out,i_subband,i_subband)
-             !(heat_thick_table(tau_pos_out%ipos(1),1)+(heat_thick_table(tau_pos_out%ipos_p1(1),1)- &
-             !     heat_thick_table(tau_pos_out%ipos(1),1))*tau_pos_out%residual(1))*NFlux 
              phi_heat_HI = (phi%heat_in_HI-phi%heat_out_HI)/vol
              
              ! When current cell is HI optically thin
@@ -1608,41 +1600,27 @@ contains
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,i_subband)
-             !(heat_thin_table(tau_pos_in%ipos(1),1)+(heat_thin_table(tau_pos_in%ipos_p1(1),1)- &
-             !     heat_thin_table(tau_pos_in%ipos(1),1))*tau_pos_in%residual(1))* &   
-             !     (tau_out_all(1)-tau_in_all(1))*NFlux 
              phi%heat_out_HI = phi%heat_in_HI+phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
           endif
           
+          ! Save the heating in f_heat variable
           f_heat = phi_heat_HI
           
-          ! Incoming, outcoming, current cell HI, HeI heating rate at band 2      
+          ! band 2
        case (NumBndin1+1:NumBndin1+NumBndin2)
           
           phi%heat_in_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_in,i_subband,2*i_subband-2)
-          !(heat_thick_table(tau_pos_in%ipos(i_subband),2*i_subband-2)+ &
-          !     (heat_thick_table(tau_pos_in%ipos_p1(i_subband),2*i_subband-2)- &
-          ! heat_thick_table(tau_pos_in%ipos(i_subband),2*i_subband-2))* &
-          !     tau_pos_in%residual(i_subband))*NFlux
           
           phi%heat_in_HeI = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_in,i_subband,2*i_subband-1)
-          !(heat_thick_table(tau_pos_in%ipos(i_subband),2*i_subband-1)+ &
-          !     (heat_thick_table(tau_pos_in%ipos_p1(i_subband),2*i_subband-1)- &
-          !     heat_thick_table(tau_pos_in%ipos(i_subband),2*i_subband-1))* &
-          !     tau_pos_in%residual(i_subband))*NFlux
           
           ! When current cell is HI optically thick  
           if (tau_cell_HI(i_subband) > tau_heat_limit) then
              phi%heat_out_HI = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
                   tau_pos_out,i_subband,2*i_subband-2)
-             !(heat_thick_table(tau_pos_out%ipos(i_subband),2*i_subband-2)+ &
-             !     (heat_thick_table(tau_pos_out%ipos_p1(i_subband),2*i_subband-2)- &
-             !    heat_thick_table(tau_pos_out%ipos(i_subband),2*i_subband-2))* &
-             !     tau_pos_out%residual(i_subband))*NFlux
              phi_heat_HI = scaling_HI(i_subband)*(phi%heat_in_HI-phi%heat_out_HI)/vol 
              
              ! When current cell is HI optically thin
@@ -1650,11 +1628,6 @@ contains
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,2*i_subband-2)
-             !scaling_HI(i_subband)* &
-             !(((heat_thin_table(tau_pos_in%ipos(i_subband),2*i_subband-2)+ &
-             !     (heat_thin_table(tau_pos_in%ipos_p1(i_subband),2*i_subband-2)- &
-             !     heat_thin_table(tau_pos_in%ipos_p1(i_subband),2*i_subband-2))* &
-              !    tau_pos_in%residual(i_subband))*(tau_out_all(i_subband)-tau_in_all(i_subband))))*NFlux
              phi%heat_out_HI = phi%heat_in_HI+phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
           endif
@@ -1664,10 +1637,6 @@ contains
              phi%heat_out_HeI = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
                   tau_pos_out,i_subband,2*i_subband-1)
-             !(heat_thick_table(tau_pos_out%ipos(i_subband),2*i_subband-1)+ &
-             !     (heat_thick_table(tau_pos_out%ipos_p1(i_subband),2*i_subband-1)- &
-             !     heat_thick_table(tau_pos_out%ipos(i_subband),2*i_subband-1))* &
-             !     tau_pos_out%residual(i_subband))*NFlux
              phi_heat_HeI = scaling_HeI(i_subband)*(phi%heat_in_HeI-phi%heat_out_HeI)/vol
              
              ! When current cell is HeI optically thin
@@ -1675,88 +1644,68 @@ contains
              phi_heat_HeI = NFlux * tau_cell_HeI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,2*i_subband-1)
-             !scaling_HeI(i_subband)* &((heat_thin_table(tau_pos_in%ipos(i_subband),2*i_subband-1)+&
-             !     (heat_thin_table(tau_pos_in%ipos_p1(i_subband),2*i_subband-1)- &
-              !    heat_thin_table(tau_pos_in%ipos_p1(i_subband),2*i_subband-1))* &
-              !    tau_pos_in%residual(i_subband))*(tau_out_all(i_subband)-tau_in_all(i_subband)))*NFlux
              phi%heat_out_HeI=phi%heat_in_HeI+phi_heat_HeI
              phi_heat_HeI = phi_heat_HeI/vol
           endif
           
-          fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+f1ion_HeI(i_subband)*phi_heat_HeI
-          fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+f2ion_HeI(i_subband)*phi_heat_HeI
-          fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+f1heat_HeI(i_subband)*phi_heat_HeI
-          fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+f2heat_HeI(i_subband)*phi_heat_HeI
+          fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+ &
+               f1ion_HeI(i_subband)*phi_heat_HeI
+          fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+ &
+               f2ion_HeI(i_subband)*phi_heat_HeI
+          fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+ &
+               f1heat_HeI(i_subband)*phi_heat_HeI
+          fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+ &
+               f2heat_HeI(i_subband)*phi_heat_HeI
           
           ! These are all cumulative
           f_ion_HeI = f_ion_HeI+y1R(2)*fra_sum1-y2R(2)*fra_sum2  
           f_ion_HI = f_ion_HI+y1R(1)*fra_sum1-y2R(1)*fra_sum2
-          f_heat = f_heat+phi_heat_HI+phi_heat_HeI-y1R(3)*fra_sum3+y2R(3)*fra_sum4 
+          f_heat = f_heat+phi_heat_HI+phi_heat_HeI-y1R(3)*fra_sum3+ &
+               y2R(3)*fra_sum4 
           
-          ! Incoming, outcoming, current cell HI, HeI, HeII heating rate at band 3   
+          ! band 3   
        case (NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+NumBndin3)
+
           phi%heat_in_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_in,i_subband,3*i_subband-NumBndin2-4)
-          !(heat_thick_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-4)+ &
-          !     (heat_thick_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-4)- &
-          !     heat_thick_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-4))* &
-          !     tau_pos_in%residual(i_subband))*NFlux 
+
           phi%heat_in_HeI = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_in,i_subband,3*i_subband-NumBndin2-3)
-          !(heat_thick_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-3)+ &
-          !(heat_thick_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-3)- &
-          !     heat_thick_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-3))* &
-          !     tau_pos_in%residual(i_subband))*NFlux
+
           phi%heat_in_HeII = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_in,i_subband,3*i_subband-NumBndin2-2)
-          !(heat_thick_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-2)+ &
-          !     (heat_thick_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-2)- &
-          !     heat_thick_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-2))* &
-          !     tau_pos_in%residual(i_subband))*NFlux
           
           ! When current cell is HI optically thick 
           if (tau_cell_HI(i_subband) > tau_heat_limit) then
+
              phi%heat_out_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
                tau_pos_out,i_subband,3*i_subband-NumBndin2-4)
-             !(heat_thick_table(tau_pos_out%ipos(i_subband),3*i_subband-NumBndin2-4)+ &
-             !     (heat_thick_table(tau_pos_out%ipos_p1(i_subband),3*i_subband-NumBndin2-4)- &
-             !     heat_thick_table(tau_pos_out%ipos(i_subband),3*i_subband-NumBndin2-4))* &
-             !     tau_pos_out%residual(i_subband))*NFlux
-             phi_heat_HI = scaling_HI(i_subband)*(phi%heat_in_HI-phi%heat_out_HI)/vol
+             phi_heat_HI = scaling_HI(i_subband)* &
+                  (phi%heat_in_HI-phi%heat_out_HI)/vol
              
              ! When current cell is HI optically thin
           else
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,3*i_subband-NumBndin2-4)
-             !scaling_HI(i_subband) *((heat_thin_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-4)+ &
-             !     (heat_thin_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-4)- &
-             !     heat_thin_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-4))* &
-             !     tau_pos_in%residual(i_subband))*(tau_out_all(i_subband)-tau_in_all(i_subband)))*NFlux
              phi%heat_out_HI = phi%heat_in_HI+phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
           endif
           
           ! When current cell is HeI optically thick   
           if (tau_cell_HeI(i_subband) > tau_heat_limit) then 
+
              phi%heat_out_HeI = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
                   tau_pos_out,i_subband,3*i_subband-NumBndin2-3)
-             !(heat_thick_table(tau_pos_out%ipos(i_subband),3*i_subband-NumBndin2-3)+ &
-             !     (heat_thick_table(tau_pos_out%ipos_p1(i_subband),3*i_subband-NumBndin2-3)- &
-             !     heat_thick_table(tau_pos_out%ipos(i_subband),3*i_subband-NumBndin2-3))* &
-             !     tau_pos_out%residual(i_subband))*NFlux
-             phi_heat_HeI = scaling_HeI(i_subband)*(phi%heat_in_HeI-phi%heat_out_HeI)/vol
+             phi_heat_HeI = scaling_HeI(i_subband)* &
+                  (phi%heat_in_HeI-phi%heat_out_HeI)/vol
              
              ! When current cell is HeI optically thin
           else
              phi_heat_HeI = NFlux * tau_cell_HeI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,3*i_subband-NumBndin2-3)
-             !scaling_HeI(i_subband)* &((heat_thin_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-3)+ &
-             !     (heat_thin_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-3)- &
-             !     heat_thin_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-3))* &
-             !     tau_pos_in%residual(i_subband))*(tau_out_all(i_subband)-tau_in_all(i_subband)))*NFlux
              phi%heat_out_HeI = phi%heat_in_HeI+phi_heat_HeI
              phi_heat_HeI = phi_heat_HeI/vol
           endif
@@ -1766,34 +1715,36 @@ contains
              phi%heat_out_HeII = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
                   tau_pos_out,i_subband,3*i_subband-NumBndin2-2)
-             !(heat_thick_table(tau_pos_out%ipos(i_subband),3*i_subband-NumBndin2-2)+ &
-             !     (heat_thick_table(tau_pos_out%ipos_p1(i_subband),3*i_subband-NumBndin2-2)- &
-             !     heat_thick_table(tau_pos_out%ipos(i_subband),3*i_subband-NumBndin2-2))* &
-             !     tau_pos_out%residual(i_subband))*NFlux
-             phi_heat_HeII = scaling_HeII(i_subband)*(phi%heat_in_HeII-phi%heat_out_HeII)/vol
+             phi_heat_HeII = scaling_HeII(i_subband)* &
+                  (phi%heat_in_HeII-phi%heat_out_HeII)/vol
              
              ! When current cell is HeII optically thin
           else 
              phi_heat_HeII = NFlux * tau_cell_HeII(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,3*i_subband-NumBndin2-2)
-             !scaling_HeII(i_subband)* &((heat_thin_table(tau_pos_in%ipos(i_subband),3*i_subband-NumBndin2-2)+ &
-             !     (heat_thin_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-2)- &
-             !     heat_thin_table(tau_pos_in%ipos_p1(i_subband),3*i_subband-NumBndin2-2))* &
-             !     tau_pos_in%residual(i_subband))*(tau_out_all(i_subband)- tau_in_all(i_subband)))*NFlux
              phi%heat_out_HeII = phi%heat_in_HeII+phi_heat_HeII
              phi_heat_HeII = phi_heat_HeII/vol
           endif
           
-          fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+f1ion_HeI(i_subband)*phi_heat_HeI+f1ion_HeII(i_subband)*phi_heat_HeII
-          fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+f2ion_HeI(i_subband)*phi_heat_HeI+f2ion_HeII(i_subband)*phi_heat_HeII
-          fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+f1heat_HeI(i_subband)*phi_heat_HeI+f1heat_HeII(i_subband)*phi_heat_HeII
-          fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+f2heat_HeI(i_subband)*phi_heat_HeI+f2heat_HeII(i_subband)*phi_heat_HeII
+          fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+ &
+               f1ion_HeI(i_subband)*phi_heat_HeI+ &
+               f1ion_HeII(i_subband)*phi_heat_HeII
+          fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+ &
+               f2ion_HeI(i_subband)*phi_heat_HeI+ &
+               f2ion_HeII(i_subband)*phi_heat_HeII
+          fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+ &
+               f1heat_HeI(i_subband)*phi_heat_HeI+ &
+               f1heat_HeII(i_subband)*phi_heat_HeII
+          fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+ &
+               f2heat_HeI(i_subband)*phi_heat_HeI+ &
+               f2heat_HeII(i_subband)*phi_heat_HeII
           
           ! These are all cumulative
           f_ion_HeI = f_ion_HeI+y1R(2)*fra_sum1-y2R(2)*fra_sum2
           f_ion_HI = f_ion_HI+y1R(1)*fra_sum1-y2R(1)*fra_sum2
-          f_heat = f_heat+phi_heat_HI+phi_heat_HeI+phi_heat_HeII-y1R(3)*fra_sum3+y2R(3)*fra_sum4   
+          f_heat = f_heat+phi_heat_HI+phi_heat_HeI+phi_heat_HeII- &
+               y1R(3)*fra_sum3+y2R(3)*fra_sum4   
           
        end select
        
@@ -1814,14 +1765,16 @@ contains
   ! heating to species for the second frequency bin (He0 ionizing photons).
   ! The scaling is the optical depth of a species over the total optical depth
   ! by all species. This factor is frequency dependent.
-  subroutine scale_int2(scaling_HI,scaling_HeI,colum_cell_HI,colum_cell_HeI,i_subband)
+  subroutine scale_int2(scaling_HI,scaling_HeI, &
+       colum_cell_HI,colum_cell_HeI,i_subband)
 
     real(kind=dp),intent(in) :: colum_cell_HI, colum_cell_HeI
     integer,intent(in) :: i_subband
     real(kind=dp),intent(out):: scaling_HI, scaling_HeI
     real(kind=dp) :: forscaleing
 
-    forscaleing = 1.0_dp/(sigma_HI(i_subband)*colum_cell_HI+sigma_HeI(i_subband)*colum_cell_HeI)
+    forscaleing = 1.0_dp/(sigma_HI(i_subband)*colum_cell_HI+ &
+         sigma_HeI(i_subband)*colum_cell_HeI)
     scaling_HI = sigma_HI(i_subband)*colum_cell_HI*forscaleing
     scaling_HeI = sigma_HeI(i_subband)*colum_cell_HeI*forscaleing
 
@@ -1833,15 +1786,17 @@ contains
   ! heating to species for the third frequency bin (He+ ionizing photons)
   ! The scaling is the optical depth of a species over the total optical depth
   ! by all species. This factor is frequency dependent.
-  subroutine scale_int3(scaling_HI, scaling_HeI, scaling_HeII, colum_cell_HI, colum_cell_HeI, colum_cell_HeII, i_subband)
+  subroutine scale_int3(scaling_HI, scaling_HeI, scaling_HeII, &
+       colum_cell_HI, colum_cell_HeI, colum_cell_HeII, i_subband)
 
     real(kind=dp),intent(in) :: colum_cell_HI ,colum_cell_HeI, colum_cell_HeII
     integer,intent(in) :: i_subband
     real(kind=dp),intent(out):: scaling_HI, scaling_HeI, scaling_HeII
     real(kind=dp) :: forscaleing
 
-    forscaleing = 1.0_dp/(sigma_HI(i_subband)*colum_cell_HI+sigma_HeI(i_subband)*colum_cell_HeI+ &
-                  sigma_HeII(i_subband)*colum_cell_HeII) 
+    forscaleing = 1.0_dp/(sigma_HI(i_subband)*colum_cell_HI+ &
+         sigma_HeI(i_subband)*colum_cell_HeI+ &
+         sigma_HeII(i_subband)*colum_cell_HeII) 
     scaling_HI = colum_cell_HI*sigma_HI(i_subband) *forscaleing
     scaling_HeI = colum_cell_HeI*sigma_HeI(i_subband)*forscaleing
     scaling_HeII = colum_cell_HeII*sigma_HeII(i_subband)*forscaleing 
