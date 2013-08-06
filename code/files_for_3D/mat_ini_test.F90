@@ -18,16 +18,17 @@ module material
   use nbody, only: nbody_type, NumZred, Zred_array
   use nbody, only: LLSformat, LLSaccess, LLSheader, dir_LLS  
   use abundances, only: mu
-  use c2ray_parameters, only: type_of_clumping, clumping_factor, epsilon, type_of_LLS
+  use c2ray_parameters, only: type_of_clumping, clumping_factor, epsilon
+  use c2ray_parameters, only: type_of_LLS
 
   implicit none
 
+  ! ndens - number density (cm^-3) of a cell
+  real(kind=dp),dimension(:,:,:),allocatable :: ndens
+  ! temper - temperature (K) of a cell
   real(kind=dp) :: temper_val
   real(kind=si),dimension(:,:,:,:),allocatable :: temperature_grid
-  ! ndens - number density (cm^-3) of a cell
-  ! temper - temperature (K) of a cell
-  ! xh - ionization fractions for one cell
-  real(kind=dp),dimension(:,:,:),allocatable :: ndens
+  ! xh, xhe - ionization fractions for one cell
   real(kind=dp),dimension(:,:,:,:),allocatable :: xh
   real(kind=dp),dimension(:,:,:,:),allocatable :: xhe !< ionization fraction He for one cell
   logical isothermal
@@ -46,6 +47,7 @@ module material
   !real(kind=dp),parameter :: C_LLS = 1.9
   !real(kind=dp),parameter :: z_x = 3.7
   !real(kind=dp),parameter,public :: y_LLS = 5.1
+  !real(kind=dp),parameter :: beta=1.28 ! not clear what to use here.
   ! b) Model Songaila & Cowie (2010)
   real(kind=dp),parameter :: C_LLS = 2.84
   real(kind=dp),parameter :: z_x = 3.5
@@ -122,18 +124,17 @@ contains
                write(*,"(A,$)") "Enter initial temperature (K): "
           read(stdinput,*) temper_val
 
-          if (.not.file_input) then
-              write(*,"(A,$)") "isothermal? y/n: "
-              read(stdinput,*) isothermal_answer
-              if (isothermal_answer.eq.'n')then
-                  isothermal=.false.
-              elseif (isothermal_answer.eq.'y') then
-                  isothermal=.true.
-              else 
-                  write(*,"(A,$)") "mistake you should write y or n" 
-                  write(*,"(A,$)") ' '
-                  call exit(0)                
-              endif
+          ! Establish whether we are running isothermal or not
+          if (.not.file_input) write(*,"(A,$)") "isothermal? y/n: "
+          read(stdinput,*) isothermal_answer
+          if (isothermal_answer == "n" .or. isothermal_answer == "N") then
+             isothermal=.false.
+          elseif (isothermal_answer == "y" .or. isothermal_answer == "Y") then
+             isothermal=.true.
+          else 
+             write(*,"(A,$)") "Mistake: you should write y or n" 
+             write(*,"(A,$)") ' '
+             call exit(0)                
           endif
 
           if (.not.file_input) write(*,"(A,$)") "Restart (y/n)? : "
@@ -156,6 +157,7 @@ contains
        endif
 #ifdef MPI       
        ! Distribute the input parameters to the other nodes
+       call MPI_BCAST(isothermal,1,MPI_LOGICAL, 0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(temper_val,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(restart,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(nz0,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
@@ -164,18 +166,29 @@ contains
        !*** initialize the collisional ion and recomb rates for inital temp
        call ini_rec_colion_factors(temper_val) 
 
-       ! Scalar version for constant temperature
-       
-       
-      
-       allocate(temperature_grid(mesh(1),mesh(2),mesh(3),0:2))
-       temperature_grid(:,:,:,:)=real(temper_val)
        ! Allocate density array
        allocate(ndens(mesh(1),mesh(2),mesh(3)))
        ! Assign dummy density to the grid
        ! This should be overwritten later (in dens_ini)
        ndens(:,:,:)=1.0
-       
+
+       ! Allocate temperature array and initialize if the run is not
+       ! isothermal
+       if (.not.isothermal) then
+          allocate(temperature_grid(mesh(1),mesh(2),mesh(3),0:2))
+          temperature_grid(:,:,:,:)=real(temper_val)
+       endif
+
+       ! Report on temperature situation
+       if (rank == 0) then
+          if (isothermal) then
+             write(logf,"(A)") "Thermal conditions: isothermal"
+          else
+             write(logf,"(A)") &
+                  "Thermal conditions: applying heating and cooling"
+          endif
+       endif
+
        ! Allocate ionization fraction arrays
        allocate(xh(mesh(1),mesh(2),mesh(3),0:1))
        allocate(xhe(mesh(1),mesh(2),mesh(3),0:2))
@@ -222,7 +235,7 @@ contains
     integer :: m1,m2,m3
 
     ! Assign density to the grid (average density at this redshift)
-    avg_dens= 1.08696e-3!2.0e-7 ! rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3
+    avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3
     do k=1,mesh(3)
        do j=1,mesh(2)
           do i=1,mesh(1)
@@ -347,7 +360,6 @@ contains
     
   end subroutine xfrac_ini
 
-  ! ===========================================================================
   ! ===========================================================================
 
   subroutine temper_ini (zred_now)
@@ -526,6 +538,9 @@ contains
          allocate(clumping_grid(mesh(1),mesh(2),mesh(3)))
 
   end subroutine clumping_init
+
+  ! ===========================================================================
+
   subroutine LLS_init ()
     
 #ifdef IFORT
