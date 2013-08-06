@@ -53,16 +53,21 @@ module c2ray_parameters
   !> Add photon losses back into volume or not
   logical,parameter :: add_photon_losses=.false. !.true.
 
-  !> Parameters for nominal SED
-  real(kind=dp),parameter :: teff_nominal=0.0_dp!50000.0_dp! 50000.0
-  real(kind=dp),parameter :: s_star_nominal=1e48_dp
-  !real(kind=dp),parameter :: s_star_nominal=1e50_dp
+  !> Parameters for nominal SED (BB)
+  !> Effective temperature (K); if set to zero, the code will ask
+  !! for SED parameters
+  real(kind=dp),parameter :: teff_nominal=5.0e4
+  !> Number of ionizing photons / second
+  real(kind=dp),parameter :: s_star_nominal=1e48_dp 
 
-
-  real(kind=dp),parameter :: EddLeff_nom=1.0_dp
+  !> nominal Eddington efficiency
+  real(kind=dp),parameter :: EddLeff_nom=1.0_dp 
+  !> nominal power law index (for photon number)
   real(kind=dp),parameter :: plindex_nom=2.5_dp
+  !> nominal black hole mass for Eddington luminosity (M0)
   real(kind=dp),parameter :: mass_nom=1.0e6_dp
-  real(kind=dp),parameter :: EddLum=1.38e38*mass_nom !< Eddington luminosity per 1e6 solar mass in erg/s
+  !> Eddington luminosity per mass_nom solar mass (erg/s)
+  real(kind=dp),parameter :: EddLum=1.38e38*mass_nom 
 
   !> Subgrid clumping\n
   !! 1: constant clumping (with clumping_factor)\n
@@ -87,7 +92,7 @@ module c2ray_parameters
   logical,parameter :: stop_on_photon_violation = .false.
 
   !> Cosmology (in C2Ray.F90 and mat_ini) and Cosmological cooling (in cosmology)
-  logical,parameter :: cosmological=.false. 
+  logical,parameter :: cosmological=.true. 
 
   !> Thermal: minimum temperature
   real(kind=dp),parameter :: minitemp=1.0 ! minimum temperature
