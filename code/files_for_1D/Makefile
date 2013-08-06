@@ -77,11 +77,25 @@ photonstatistics.o evolve_new.o output.o C2Ray.o
 	$(RADIATION2) thermal.o time.o $(DORIC2) photonstatistics.o \
 	evolve_new.o output.o C2Ray.o
 
+TableWrite: ../precision.o sizes.o $(CONSTANTS1) $(UTILS1) ../file_admin.o \
+ ../no_mpi.o   ../file_admin.o ../clocks.o grid.o ../tped.o  sourceprops_test_one_source.o  mat_ini.o ../cosmology.o\
+../cooling_h.o $(RADIATION) ../thermal.o ../time.o $(DORIC) \
+photonstatistics.o TableWrite.o
+
+
+	$(F90) $(OPTIONS) -o $@ precision.o $(CONSTANTS2) $(UTILS2) \
+	file_admin.o clocks.o sizes.o no_mpi.o   grid.o \
+	tped.o  sourceprops_test_one_source.o  cosmology.o  mat_ini.o cooling_h.o \
+	$(RADIATION2) thermal.o time.o $(DORIC2) photonstatistics.o \
+	TableWrite.o
+
 clean : 
 	rm -f *.o *.mod 
 
 # Building object files: 
 # $< means: name of related file that caused the action
+
+%.o: %.mod
 
 .f90.o:
 	$(F90) -c $(OPTIONS) $<
@@ -89,6 +103,5 @@ clean :
 	$(F90) -c $(OPTIONS) $<
 f.mod:
 	$(F90) -c $(OPTIONS) $<
-
 # Suffix rules: List of significant suffixes
 .SUFFIXES: .f90 .F90 .mod .o
