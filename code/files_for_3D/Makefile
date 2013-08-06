@@ -36,14 +36,14 @@
 #-------------------------------------------------------
 
 # Compiler
-FC = gfortran # GNU compiler
+#FC = gfortran # GNU compiler
 #MPIFC = mpif90.openmpi # MPI compiler
 
 # F90 options (ifort)
 #GFORTFLAGS = -O0 -g -DGFORT 
-GFORTFLAGS = -O3 -DGFORT
+#GFORTFLAGS = -O3 -DGFORT
 # Processor dependent optimization
-F90FLAGS1 = $(GFORTFLAGS) 
+#F90FLAGS1 = $(GFORTFLAGS) 
 
 # These flags should be added to the F90FLAGS1 depending on the executable
 # made. Specify this below on a per executable basis.
@@ -55,17 +55,17 @@ F90FLAGS1 = $(GFORTFLAGS)
 #-------------------------------------------------------
 # Compiler
 # Intel: best tested
-#FC = ifort # Intel compiler
-#MPIFC = mpif90 # MPI compiler
+FC = ifort # Intel compiler
+MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
-IFORTFLAGS = -O0 -g -DIFORT -u -fpe0 -shared-intel -check all -traceback -fpp  #!<
-#IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
+#IFORTFLAGS = -O0 -g -DIFORT -u -fpe0 -p #-check all -traceback -fpp  #!<
+IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -p #-check all -traceback
 #IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
-#F90FLAGS1 = $(IFORTFLAGS)  #!<
+F90FLAGS1 = $(IFORTFLAGS)  #!<
 #F90FLAGS1 = -xW $(IFORTFLAGS) 
-#F90FLAGS1 = -xO $(IFORTFLAGS) 
+F90FLAGS1 = -xO $(IFORTFLAGS) 
 #F90FLAGS1 = -xT $(IFORTFLAGS) # Laptop 
 #F90FLAGS1 = -xB $(IFORTFLAGS)
 
@@ -147,9 +147,13 @@ GENERAL1=../cosmology.o  ../cooling_h.o ../radiation_including_pls_new.o   ../th
 
 GENERAL2=cosmology.o  cooling_h.o radiation_including_pls_new.o   thermal.o time_ini.o doric.o photonstatistics.o evolve8.o output.o
 
-TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test2.o
+TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test.o
 
-TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test2.o
+TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test.o
+
+#TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test2.o
+
+#TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test2.o
 
 TEST4_1= ../clocks.o  ../test4.o grid.o ../tped.o mat_ini_test4.o sourceprops_test4.o
 
