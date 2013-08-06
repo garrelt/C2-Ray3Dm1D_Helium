@@ -46,7 +46,7 @@ module radiation
   use my_mpi
   use file_admin, only: logf
   use mathconstants, only: pi
-  use cgsconstants, only: sigmasb, hplanck, kb, tpic2
+  use cgsconstants, only: sigmasb, hplanck, kb, tpic2, ev2fr
   use cgsphotoconstants, only: frth0,frthe0, frthe1, &!, frtop1, frtop2, &
       betah0, betahe, sigh, sighe0, sighe1, ini_He_factors
   use astroconstants, only: R_SOLAR, L_SOLAR
@@ -122,6 +122,14 @@ module radiation
   real(kind=dp), dimension(:),allocatable :: f2heat_h, f2heat_he0, f2heat_he1
   real(kind=dp), dimension(:),allocatable :: f1heat_h, f1heat_he0, f1heat_he1
   
+  ! Scaling factors array; set in photo_lookuptable, used there and
+  ! in heat_lookuptable
+  real(kind=dp),dimension(NumheatBin) :: scaling
+
+  ! The highest frequency subband used for the black body source
+  integer :: bb_FreqBnd_UpperLimit=NumFreqBnd
+  ! This is h/kT (unit 1/Hz, or sec)
+  real(kind=dp) :: rfr
 
   ! Photo-ionization integral cores
   ! third dimension is: 1=int1    2=int2aH    3=int2aHe0  4=int2bH 5=int2bHe0
@@ -183,7 +191,8 @@ module radiation
   type photrates    
      real(kind=dp) :: h          !< total H ionizing rate           
      real(kind=dp) :: he(0:1)    !< total He0 and He1 ionizing rates  
-     real(kind=dp),dimension(0:NumFreqBnd-1) :: int_out  !< ionizing rate in Int1:Int3d out !should this be allocatable?
+     !GM/130801: not sure what this is useful for
+     !real(kind=dp),dimension(0:NumFreqBnd-1) :: int_out  !< ionizing rate in Int1:Int3d out !should this be allocatable?
      real(kind=dp) :: hv_h       !< total H heating rate      
      real(kind=dp) :: hv_he(0:1)     !< total He0 and He1 heating rates          
      real(kind=dp) :: h_in       !< H ionizing in-rate       
@@ -433,9 +442,11 @@ contains
     ! (19 Feb 2004)
     
     integer :: i
-    real(kind=dp) :: rfr,frmax,stepfl,flux,fluxpl,fluxpl_wanted
+    real(kind=dp) :: frmax,stepfl,flux,fluxpl,fluxpl_wanted
     real(kind=dp) :: fr(0:NumFreq),weight(0:NumFreq),bb(0:NumFreq),pl(0:NumFreq)
-    real(kind=dp) :: S_star_unscaled,S_scaling,S_starH,S_starHe0,S_starHe1
+    real(kind=dp) :: S_star_unscaled,S_scaling
+    real(kind=dp) :: S_star_bb_Bnd1, S_star_bb_Bnd2, S_star_bb_Bnd3
+    real(kind=dp) :: S_star_pl_Bnd1, S_star_pl_Bnd2, S_star_pl_Bnd3
    
     frtop1=700.0*teff*kb/hplanck 
     frtop2=5.88e-05*teff*1e15  *10000.0_dp    ! to take effectively frtop1 
@@ -471,29 +482,33 @@ contains
     endif
     ! Now we know rstar and lstar, so we can continue as usual.
 
-    ! Find the ionizing flux 
-
+    ! Find the ionizing flux for both BB and PL sources
+    ! We integrate over the entire frequency range for this.
     do i=0,NumFreq
        if (fr(i)*rfr.le.709.0_dp)then
-       bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0_dp)  ! this is in number of photons
+          bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0_dp)  ! this is in number of photons
        else
-       bb(i)=tpic2*fr(i)*fr(i)/(exp((fr(i)*rfr)/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
+       !bb(i)=0.0
+          bb(i)=tpic2*fr(i)*fr(i)/(exp((fr(i)*rfr)/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
        endif
        pl(i)=fr(i)**(-plindex)*hplanck*fr(i)       ! this is in energy
     enddo
     flux=  scalar_romberg(bb,weight,NumFreq,NumFreq,0) ! Find flux by integrating
     fluxpl=scalar_romberg(pl,weight,NumFreq,NumFreq,0)
 
+    ! Find the scaling factor needed to obtain the Eddington luminosity for the PL source
+    ! If the PL source has a different luminosity, this will be fixed below.
     fluxpl_wanted=EddLum*EddLEfficiency
     pl_scaling=fluxpl_wanted/fluxpl
-    write(*,*) 'flux wanted,flux,pl_scaling',fluxpl_wanted,fluxpl,pl_scaling
-    write(*,*) 'EddLum, EddEff',EddLum,EddLEfficiency
-!    write(*,*) 'flux',flux
-    ! Find out what is the S_star for the radius 
-    ! supplied.
+
+    !write(*,*) 'flux wanted,flux,pl_scaling',fluxpl_wanted,fluxpl,pl_scaling
+    !write(*,*) 'EddLum, EddEff',EddLum,EddLEfficiency
+
+
+    ! Find the scaling factor needed for the BB source 
     S_star_unscaled=4.0*pi*rstar*rstar*flux 
 !    write(*,*) 'S_star_unscaled',S_star_unscaled
-    ! If S_star is zero, it is set here.
+    ! If S_star is zero, rstar must already be ok. We can set S_star here.
     if (S_star == 0.0) then
        S_star=S_star_unscaled
     else
@@ -507,59 +522,60 @@ contains
 !       write(*,*) 'lstar', lstar/l_solar
     endif
 
+    ! Number of Band 1 ionizing photons
     do i=0,NumFreq
-    	fr(i)=frth0+steph0(1)*real(i)
-    	weight(i)=steph0(1)
-    	  bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0)
-        pl(i)=fr(i)**(-plindex)!*hplanck
+       fr(i)=frth0+steph0(1)*real(i)
+       weight(i)=steph0(1)
+       bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0)
+       pl(i)=fr(i)**(-plindex)!*hplanck
     enddo
 
     flux=scalar_romberg(bb,weight,NumFreq,NumFreq,0)
 !    write(*,*) 'flux',S_star_unscaled
     fluxpl=scalar_romberg(pl,weight,NumFreq,NumFreq,0)
-    S_star_unscaled=4.0*pi*rstar*rstar*flux
-    S_starH=fluxpl*pl_scaling
-    if (sourcetype=='B')     S_starH=S_star_unscaled
+    S_star_bb_Bnd1=4.0*pi*rstar*rstar*flux
+    S_star_pl_Bnd1=fluxpl*pl_scaling
+    !if (sourcetype=='B')     S_starH=S_star_unscaled
 
-
-
-    ! Number of He+ ionizing photons
+    ! Number of Band 2 ionizing photons
     frmax=frthe1
     stepfl=(freqmax(NumBndin2+1)-freqmin(2))/real(NumFreq)
     do i=0,NumFreq
-    	fr(i)=frthe0+stepfl*real(i)
-    	weight(i)=stepfl
-     	bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0)
+       fr(i)=frthe0+stepfl*real(i)
+       weight(i)=stepfl
+       bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0)
        pl(i)=fr(i)**(-plindex)
     enddo
     flux=scalar_romberg(bb,weight,NumFreq,NumFreq,0)
     fluxpl=scalar_romberg(pl,weight,NumFreq,NumFreq,0)
-    S_star_unscaled=4.0*pi*rstar*rstar*flux
-    S_starHe0=fluxpl*pl_scaling
-    if (sourcetype=='B')  S_starHe0=S_star_unscaled
+    S_star_bb_Bnd2=4.0*pi*rstar*rstar*flux
+    S_star_pl_Bnd2=fluxpl*pl_scaling
+    !if (sourcetype=='B')  S_starHe0=S_star_unscaled
     
 
+    ! Number of Band 3 ionizing photons
     stepfl=(freqmax(NumFreqBnd)-freqmin(NumBndin2+2))/real(NumFreq)
     do i=0,NumFreq
-    	fr(i)=frthe1+stepfl*real(i)
-    	weight(i)=stepfl
+       fr(i)=frthe1+stepfl*real(i)
+       weight(i)=stepfl
        if (fr(i)*rfr.le.709.0_dp)then
-       bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0)  ! this is in number of photons
+          bb(i)=tpic2*fr(i)*fr(i)/(exp(fr(i)*rfr)-1.0)  ! this is in number of photons
        else
-       bb(i)=tpic2*fr(i)*fr(i)/(exp((fr(i)*rfr)/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
+          !bb(i)=0.0
+          bb(i)=tpic2*fr(i)*fr(i)/(exp((fr(i)*rfr)/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
        endif
-        pl(i)=fr(i)**(-plindex)!*hplanck
+       pl(i)=fr(i)**(-plindex)!*hplanck
     enddo
     flux=scalar_romberg(bb,weight,NumFreq,NumFreq,0)
     fluxpl=scalar_romberg(pl,weight,NumFreq,NumFreq,0)
-    S_star_unscaled=4.0*pi*rstar*rstar*flux
-    S_starHe1=fluxpl*pl_scaling
-    if (sourcetype=='B')    S_starHe1=S_star_unscaled
+    S_star_bb_Bnd3=4.0*pi*rstar*rstar*flux
+    S_star_pl_Bnd3=fluxpl*pl_scaling
+    !if (sourcetype=='B')    S_starHe1=S_star_unscaled
 
-
-
+    ! If the PL source has a specified number of ionizing photons, adjust the
+    ! scaling here. This change is not reflected in the output below.
     if (rank == 0 .and. pl_flux_totphot .gt. 0.0 .and. teff_nominal == 0.0) then
-       pl_scaling=pl_scaling/(S_starH+S_starHe0+S_starHe1)*pl_flux_totphot
+       pl_scaling=pl_scaling/(S_star_pl_Bnd1+S_star_pl_Bnd2+S_star_pl_Bnd3)*pl_flux_totphot
        write(*,*) 'new pl_scaling', pl_scaling
        write(*,*) 'This corresponds to', pl_flux_totphot, 'number of ionizing photons' 
     endif
@@ -573,21 +589,30 @@ contains
             ' R_solar'
        write(logf,'(a,1pe10.3,a)')   ' Luminosity= ',lstar/l_solar, &
             ' L_solar'
-       write(logf,*) 'scaling',S_star,S_star_unscaled!,S_scaling,
+       !write(logf,*) 'scaling',S_star,S_star_unscaled!,S_scaling,
     !   else
+       write(logf,'(A,(1PE12.5),A//)') ' Number of H ionizing photons (Band 1): ', &
+            S_star_bb_Bnd1, ' s^-1'
+       write(logf,'(A,(1PE12.5),A//)') ' Number of He0 ionizing photons (Band 2): ', &
+            S_star_bb_Bnd2, ' s^-1'
+       write(logf,'(A,(1PE12.5),A//)') ' Number of He+ ionizing photons (Band 3): ', &
+            S_star_bb_Bnd3, ' s^-1'
+       write(logf,'(A,(1PE12.5),A//)') ' Total number of ionizing photons: ', &
+            S_star_bb_Bnd3+S_star_bb_Bnd2+S_star_bb_Bnd1, ' s^-1'            
+
        write(logf,'(/a)')           'Using a power law source with'
        write(logf,'(a,1pe10.3)')   ' power law index= ',plindex
        write(logf,'(a,1pe10.3)')   ' efficiency parameter= ',EddLEfficiency
        endif
  
-       write(logf,'(A,(1PE12.5),A//)') ' Number of H ionizing photons: ', &
-            S_starH, ' s^-1'
-       write(logf,'(A,(1PE12.5),A//)') ' Number of He0 ionizing photons: ', &
-            S_starHe0, ' s^-1'
-       write(logf,'(A,(1PE12.5),A//)') ' Number of He+ ionizing photons: ', &
-            S_starHe1, ' s^-1'
+       write(logf,'(A,(1PE12.5),A//)') ' Number of H ionizing photons (Band 1): ', &
+            S_star_pl_Bnd1, ' s^-1'
+       write(logf,'(A,(1PE12.5),A//)') ' Number of He0 ionizing photons (Band 2): ', &
+            S_star_pl_Bnd2, ' s^-1'
+       write(logf,'(A,(1PE12.5),A//)') ' Number of He+ ionizing photons (Band 3): ', &
+            S_star_pl_Bnd3, ' s^-1'
        write(logf,'(A,(1PE12.5),A//)') ' Total number of ionizing photons: ', &
-            S_starHe1+S_starHe0+S_starH, ' s^-1'            
+            S_star_pl_Bnd3+S_star_pl_Bnd2+S_star_pl_Bnd1, ' s^-1'            
    ! endif
 
   end subroutine spec_diag
@@ -656,6 +681,20 @@ contains
 
     ! Warn about grey opacities:
     if (grey .and. rank == 0) write(logf,*) 'WARNING: Using grey opacities'
+
+    ! Find out how far to follow the BB SED (used in lookuptable routines)
+    do intval=1,NumFreqBnd
+       if (freqmin(intval)*rfr > 25.) then
+          bb_FreqBnd_UpperLimit=intval-1
+          exit
+       endif
+    enddo
+    if (rank == 0) then
+       write(logf,"(A,I3)") "Using BB up to frequency band ", &
+            bb_FreqBnd_UpperLimit
+       write(logf,"(A,F10.2,A)") "  this is energy ", &
+            freqmin(bb_FreqBnd_UpperLimit)/ev2fr," eV"
+    endif
 
 ! frequency band 1
 !-----------------------------------------------------------
@@ -950,9 +989,11 @@ do intval=NumBndin2+2,NumFreqBnd
        if (fr(i)*rfr.le.709.0_dp)then
        func1(i,n)=coreint(i,n,intval)/(exp(fr(i)*rfr)-1.0)  ! this is in number of photons
        else
-       write(*,*) 'something strange going on here'
-       pause  
+
+       !write(*,*) 'something strange going on here'
+       !pause  
        func1(i,n)=coreint(i,n,intval)/(exp((fr(i)*rfr)/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
+       func1(i,n)=0.0
        endif
           if (.not.isothermal) then
 
@@ -961,6 +1002,9 @@ do intval=NumBndin2+2,NumFreqBnd
           func3(i,n)=hcoreint(i,n,intval*3-NumBndin2-3)/(exp(fr(i)*rfr)-1.0)
           func4(i,n)=hcoreint(i,n,intval*3-NumBndin2-2)/(exp(fr(i)*rfr)-1.0)
        else
+          !func2(i,n)=0.0
+          !func3(i,n)=0.0
+          !func4(i,n)=0.0
           func2(i,n)=hcoreint(i,n,intval*3-NumBndin2-4)/(exp(fr(i)*rfr/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
           func3(i,n)=hcoreint(i,n,intval*3-NumBndin2-3)/(exp(fr(i)*rfr/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
           func4(i,n)=hcoreint(i,n,intval*3-NumBndin2-2)/(exp(fr(i)*rfr/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
@@ -998,6 +1042,7 @@ do intval=NumBndin2+2,NumFreqBnd
        if (fr(i)*rfr.le.709.0_dp)then
        func1(i,n)=coreintthin(i,n,intval)/(exp(fr(i)*rfr)-1.0)  ! this is in number of photons
        else
+       !func1(i,n)=0.0
        func1(i,n)=coreintthin(i,n,intval)/(exp((fr(i)*rfr)/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
        endif
           if (.not.isothermal) then
@@ -1006,6 +1051,9 @@ do intval=NumBndin2+2,NumFreqBnd
           func3(i,n)=hcoreintthin(i,n,intval*3-NumBndin2-3)/(exp(fr(i)*rfr)-1.0)
           func4(i,n)=hcoreintthin(i,n,intval*3-NumBndin2-2)/(exp(fr(i)*rfr)-1.0)
        else
+          !func2(i,n)=0.0
+          !func3(i,n)=0.0
+          !func4(i,n)=0.0
           func2(i,n)=hcoreintthin(i,n,intval*3-NumBndin2-4)       &
           /(exp(fr(i)*rfr/2.0_dp))/ (exp((fr(i)*rfr)/2.0_dp))
           func3(i,n)=hcoreintthin(i,n,intval*3-NumBndin2-3)       & 
@@ -1077,12 +1125,18 @@ enddo    !(sub intervals)
     	deallocate(pl_hcoreintthin)
     endif
 
+    ! report a table value
+    write(logf,*) "photint: ",photint(0,1),sum(photint(0,:))
+    write(logf,*) "photintthin: ",photintthin(0,1),sum(photintthin(0,:))
+    write(logf,*) "pl_hphotint: ",pl_photint(0,1),sum(pl_photint(0,:))
+    write(logf,*) "pl_hphotintthin: ",pl_photintthin(0,1),sum(pl_hphotintthin(0,:))
+
   end subroutine spec_integr
 
   ! =======================================================================
 
   subroutine photoion (phi,hcolum_in,hcolum_out,hecolum_in,hecolum_out,&
-	       	      vol,nsrc,i_state)
+       vol,nsrc,i_state)
     ! Calculates photo-ionization rates
     
     ! Author: Garrelt Mellema
@@ -1092,15 +1146,15 @@ enddo    !(sub intervals)
     ! Simplified version derived from Coral version, for testing
     ! photon conservation. Only hydrogen is dealt with, and
     ! one frequency band is used.
-
-    use sourceprops, only: NormFlux,srcMass,NormFluxPL
+    
+    use sourceprops, only: NormFlux,NormFluxPL
     use cgsphotoconstants
     type(photrates),intent(out) :: phi
     real(kind=dp),intent(in) :: hcolum_in,  hcolum_out,  vol,i_state
     real(kind=dp),dimension(0:1),intent(in) :: hecolum_in, hecolum_out 
     integer,intent(in) :: nsrc !< number of the source
-
-
+    
+    
     real(kind=dp) ::  hcolum_cell
     real(kind=dp), dimension(0:1):: hecolum_cell
     type(tablepos) :: tauin, tauout
@@ -1108,197 +1162,308 @@ enddo    !(sub intervals)
     integer       ::  n, i
     real(kind=dp), dimension(NumFreqBnd) :: delta_tau_out
     real(kind=dp), dimension(NumFreqBnd) :: delta_tau_in
-    real(kind=dp), dimension(NumheatBin) :: delt_tau_o
+    !real(kind=dp), dimension(NumheatBin) :: delt_tau_o
     real(kind=dp) :: NFlux
-    real(kind=dp) :: N_H, N_He0, N_He1
-	hcolum_cell=hcolum_out-hcolum_in
-	hecolum_cell(:)=hecolum_out(:)-hecolum_in(:)
+    real(kind=dp) :: volweight
 
-        N_H=hcolum_cell
-        N_He0=  hecolum_cell(0)
-        N_He1=hecolum_cell(1)                     
+    ! Initialize to zero
+    ! GM/130731: this needs to be done here in order to accommodate
+    ! two types of sources
+    phi%h=0.0_dp
+    phi%he(:)=0.0_dp
+    phi%hv_h=0.0_dp
+    phi%hv_he(:)=0.0_dp
 
-    ! find the optical depths (in and outgoing) at the corresponding bin-minima
+    ! Calculate the weighting by volume factor
+    volweight=1.0/vol
+
+    ! Calculate the cell column densities (difference between outgoing 
+    ! and incoming column densities
+    hcolum_cell=hcolum_out-hcolum_in
+    hecolum_cell(:)=hecolum_out(:)-hecolum_in(:)
     
-    tauh_in   =sigh  *hcolum_in
-    tauh_out  =sigh  *hcolum_out  
-    tauhe0_in =sighe0*hecolum_in(0)
-    tauhe0_out=sighe0*hecolum_out(0)
-    tauhe1_in =sighe1*hecolum_in(1)
-    tauhe1_out=sighe1*hecolum_out(1)   
- 
-   
+    ! find the optical depths (in and outgoing) at the corresponding bin-minima
+    ! GM/130731: these are not needed as we only use tau/sig further on. 
+    !tauh_in   =sigh  *hcolum_in
+    !tauh_out  =sigh  *hcolum_out  
+    !tauhe0_in =sighe0*hecolum_in(0)
+    !tauhe0_out=sighe0*hecolum_out(0)
+    !tauhe1_in =sighe1*hecolum_in(1)
+    !tauhe1_out=sighe1*hecolum_out(1)   
+    
+    ! Find the properly weighted total optical depth (ingoing)
+    ! GM/130806: This statement can be factorized
     do i=1,NumFreqBnd
-       delta_tau_in(i)=tauhe0_in/sighe0*intm2(i)+tauh_in/sigh*intm1(i)+tauhe1_in/sighe1*intm3(i)
+       !delta_tau_in(i)=tauhe0_in/sighe0*intm2(i)+tauh_in/sigh*intm1(i)+tauhe1_in/sighe1*intm3(i)
+       delta_tau_in(i)=hcolum_in*intm1(i)+hecolum_in(0)*intm2(i)+ &
+            hecolum_in(1)*intm3(i)
     enddo
-  
-  ! find the table positions for the optical depth (ingoing)
+    
+    ! find the table positions for the optical depth (ingoing)
+    ! GM/130806: This statement can be factorized
     do n=1,NumFreqBnd  
-        tauin%tau(n)      =log10(max(1.0e-20_dp,delta_tau_in(n)))
-    	tauin%odpos(n)    =min(real(NumTau,dp),max(0.0_dp,1.0+(tauin%tau(n)-minlogtau)/dlogtau))
-    	tauin%ipos(n)     =int(tauin%odpos(n))
-    	tauin%residual(n) =tauin%odpos(n)-real(tauin%ipos(n),dp)
-    	tauin%ipos_p1(n)  =min(NumTau,tauin%ipos(n)+1)
+       tauin%tau(n)      =log10(max(1.0e-20_dp,delta_tau_in(n)))
+       tauin%odpos(n)    =min(real(NumTau,dp),max(0.0_dp,1.0+(tauin%tau(n)-minlogtau)/dlogtau))
+       tauin%ipos(n)     =int(tauin%odpos(n))
+       tauin%residual(n) =tauin%odpos(n)-real(tauin%ipos(n),dp)
+       tauin%ipos_p1(n)  =min(NumTau,tauin%ipos(n)+1)
     enddo
-   
+    
+    ! Find the properly weighted total optical depth (outgoing)
+    ! GM/130806: This statement can be factorized
+    do i=1,NumFreqBnd
+       !  delta_tau_out(i)=tauhe0_out/sighe0*intm2(i)+ &
+       !           tauh_out/sigh  *intm1(i)+ &
+       !          tauhe1_out/sighe1*intm3(i)
+       delta_tau_out(i)=hcolum_out*intm1(i)+hecolum_out(0)*intm2(i)+ &
+            hecolum_out(1)*intm3(i)
+    enddo
+    
     ! find the table positions for the optical depth (outgoing)
-    do i=1,NumFreqBnd
-       delta_tau_out(i)=tauhe0_out/sighe0*intm2(i)+ &
-                        tauh_out/sigh  *intm1(i)+ &
-                        tauhe1_out/sighe1*intm3(i)
-    enddo
-
+    ! GM/130806: This statement can be factorized
     do n=1,NumFreqBnd  
-        tauout%tau(n)      =log10(max(1.0e-20_dp,delta_tau_out(n)))
-    	tauout%odpos(n) &
-        =min(real(NumTau,dp),max(0.0_dp,1.0+ &
-        (tauout%tau(n)-minlogtau)/dlogtau))
-    	tauout%ipos(n)     =int(tauout%odpos(n))
-    	tauout%residual(n) =tauout%odpos(n)-real(tauout%ipos(n),dp)
-    	tauout%ipos_p1(n)  =min(NumTau,tauout%ipos(n)+1)
-    enddo 
+       tauout%tau(n)      =log10(max(1.0e-20_dp,delta_tau_out(n)))
+       tauout%odpos(n) &
+            =min(real(NumTau,dp),max(0.0_dp,1.0+ &
+            (tauout%tau(n)-minlogtau)/dlogtau))
+       tauout%ipos(n)     =int(tauout%odpos(n))
+       tauout%residual(n) =tauout%odpos(n)-real(tauout%ipos(n),dp)
+       tauout%ipos_p1(n)  =min(NumTau,tauout%ipos(n)+1)
+    enddo
+    
+    ! Set source type (for passing to lookup table routines)
+    ! A source can be both BB and PL so this is not entirely
+    ! correct. Here any PL source quenches its BB photons
+    ! GM/130731
+    !if (NormFluxPL(nsrc).le.1.0e-100_dp) then  
+    !   NFlux=NormFlux(nsrc) 
+    !   sourcetype='B'
+    !else
+    !   NFlux=NormFluxPL(nsrc)
+    !   sourcetype='P'
+    !endif
+    
+    !   write(*,*) 'NormFlux', NormFluxPL(nsrc), NormFlux(nsrc)
+    
+    ! Find the photo-ionization rates by looking up the values in
+    ! the (appropriate) photo-ionization tables
+    if (NormFlux(nsrc) > 0.0) &  
+       call photo_lookuptable(tauin,tauout,phi,delta_tau_in,delta_tau_out, &
+         NormFlux(nsrc),"B",volweight, &
+         hcolum_cell,hecolum_cell(0),hecolum_cell(1))
 
-! This stuff is for deciding if opt thin/thick if not isothermal
+    if (NormFluxPL(nsrc) > 0.0) &  
+       call photo_lookuptable(tauin,tauout,phi,delta_tau_in,delta_tau_out, &
+         NormFluxPL(nsrc),"P",volweight, &
+         hcolum_cell,hecolum_cell(0),hecolum_cell(1))
+
+    ! Find the heating rates rates by looking up the values in
+    ! the (appropriate) photo-ionization tables and using the
+    ! secondary ionization
     if(.not.isothermal) then
-    do i=2,NumBndin2
-    delt_tau_o(i*2-2)=  tauhe0_in/sighe0*intm2(i)+ &
-                        tauh_out/sigh  *intm1(i)
-    enddo
 
-    do i=2,NumBndin2
-    delt_tau_o(i*2-1)=  tauhe0_out/sighe0*intm2(i)+ &
-                        tauh_in/sigh  *intm1(i)
-    enddo
+       do i=1,NumFreqBnd
+          tau_cell_HI(i)=hcolum_cell*intm1(i)
+          tau_cell_HeI(i_subband) = hecolum_cell(0)*intm2(i)
+          tau_cell_HeII(i_subband) = hecolum_cell(1)*intm3(i)
+       enddo
+       
+       ! This stuff is for deciding if opt thin/thick if not isothermal
+       !do i=2,NumBndin2
+       !   delt_tau_o(i*2-2)= hcolum_out*intm1(i) + hecolum_in(0)*intm2(i)
+       !   !delt_tau_o(i*2-2)=  tauhe0_in/sighe0*intm2(i)+ &
+       !   !     tauh_out/sigh  *intm1(i)
+       !enddo
+       
+       !do i=2,NumBndin2
+       !   delt_tau_o(i*2-1)= hcolum_in*intm1(i) + hecolum_out(0)*intm2(i)
+          !delt_tau_o(i*2-1)=  tauhe0_out/sighe0*intm2(i)+ &
+          !     tauh_in/sigh  *intm1(i)
+       !enddo
+       
+       !do i=NumBndin2+2,NumFreqBnd
+       !   delt_tau_o(i*3-NumBndin2-4)= hcolum_out*intm1(i) + &
+       !        hecolum_in(0)*intm2(i)+ &
+       !        hecolum_in(1)*intm3(i)
+          !delt_tau_o(i*3-NumBndin2-4)=  tauhe0_in/sighe0*intm2(i)+ &
+          !     tauh_out/sigh  *intm1(i)+ &
+          !     tauhe1_in/sighe1*intm3(i)
+       !enddo
+       
+       !do i=NumBndin2+2,NumFreqBnd
+       !   delt_tau_o(i*3-NumBndin2-3)= hcolum_in*intm1(i) + &
+       !        hecolum_out(0)*intm2(i)+ &
+       !        hecolum_in(1)*intm3(i)
+          !delt_tau_o(i*3-NumBndin2-3)=  tauhe0_out/sighe0*intm2(i)+ &
+          !     tauh_in/sigh  *intm1(i)+ &
+          !     tauhe1_in/sighe1*intm3(i)
+       !enddo
+       
+       !do i=NumBndin2+2,NumFreqBnd
+       !   delt_tau_o(i*3-NumBndin2-2)= hcolum_in*intm1(i) + &
+       !        hecolum_in(0)*intm2(i) + &
+       !        hecolum_out(1)*intm3(i)
+          !delt_tau_o(i*3-NumBndin2-2)=    tauhe0_in/sighe0*intm2(i)+ &
+          !     tauh_in/sigh  *intm1(i)+ &
+          !     tauhe1_out/sighe1*intm3(i)
+       !enddo
+    
+       if (NormFlux(nsrc) > 0.0) &  
+            call heat_lookuptable(tauin,tauout,phi, &
+            delta_tau_in,delta_tau_out, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII, &
+            NormFlux(nsrc),"B",volweight,i_state, &
+            hcolum_cell,hecolum_cell(0),hecolum_cell(1))
 
-    do i=NumBndin2+2,NumFreqBnd
-    delt_tau_o(i*3-NumBndin2-4)=  tauhe0_in/sighe0*intm2(i)+ &
-                        tauh_out/sigh  *intm1(i)+ &
-                        tauhe1_in/sighe1*intm3(i)
-    enddo
+       if (NormFluxPL(nsrc) > 0.0) &  
+            call heat_lookuptable(tauin,tauout,phi, &
+            delta_tau_in,delta_tau_out, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII, &
+            NormFluxPL(nsrc),"P",volweight,i_state, &
+            hcolum_cell,hecolum_cell(0),hecolum_cell(1))
 
-    do i=NumBndin2+2,NumFreqBnd
-    delt_tau_o(i*3-NumBndin2-3)=  tauhe0_out/sighe0*intm2(i)+ &
-                        tauh_in/sigh  *intm1(i)+ &
-                        tauhe1_in/sighe1*intm3(i)
-    enddo
-
-    do i=NumBndin2+2,NumFreqBnd
-    delt_tau_o(i*3-NumBndin2-2)=    tauhe0_in/sighe0*intm2(i)+ &
-                        tauh_in/sigh  *intm1(i)+ &
-                        tauhe1_out/sighe1*intm3(i)
-    enddo
+       
     endif
+
+  end subroutine photoion
   
-
-    if (NormFluxPL(nsrc).le.1.0e-100_dp) then  
-    NFlux=NormFlux(nsrc) 
-    sourcetype='B'
-    else
-    NFlux=NormFluxPL(nsrc)
-    sourcetype='P'
-    endif
-
-!   write(*,*) 'NormFlux', NormFluxPL(nsrc), NormFlux(nsrc)
-
- call lookuptable(tauin,tauout,phi,delta_tau_in,delta_tau_out, &
- delt_tau_o,NFlux,sourcetype,vol,i_state,N_H,N_He0,N_He1)
-!  write(*,*) 'phi',phi
-!  pause
-end subroutine photoion
- 
-!-------------------------------------------------------------------------------
-
-  subroutine  lookuptable(in_t,out_t,phi,delta_tau_in,delta_tau_out, &
-  delt_tau_o,NFlux,source_typ,vol,i_state,N_H,N_He0,N_He1)
-
+  !----------------------------------------------------------------------------
+  
+  subroutine photo_lookuptable(in_t,out_t,phi,delta_tau_in,delta_tau_out, &
+       NFlux,source_typ,volweight,N_H,N_He0,N_He1)
+    
     use cgsphotoconstants
+
     type(photrates),intent(out) :: phi
     type(tablepos),intent(in) :: in_t ,out_t
-    real(kind=dp),intent(in) :: NFlux,vol,i_state
+    real(kind=dp),intent(in) :: NFlux,volweight
+    character,intent(in) :: source_typ
     real(kind=dp),intent(in) :: N_H, N_He0, N_He1
     real(kind=dp),dimension(NumFreqBnd),intent(in) :: delta_tau_in,delta_tau_out
-    real(kind=dp),pointer,dimension(:,:):: phottable, phottable_thin, heattable, heattable_thin
-    real(kind=dp) :: phi_hv_h, phi_hv_he0, phi_hv_he1, f_heat, f_ion_h, f_ion_he0
-    integer       ::  n, i
-    real(kind=dp) ::  phi_in,   phi_out, phi_tot  , fra_sum1 ,fra_sum2,fra_sum3,fra_sum4
-    real(kind=dp),dimension(NumheatBin) :: scaling=0.0_dp
-    character,intent(in) :: source_typ
-    real(kind=dp), dimension(NumheatBin),intent(in) :: delt_tau_o
-    real(kind=dp) :: test1, test2, limit=1.0e-7, limit2=1.0e-4
 
+    real(kind=dp),pointer,dimension(:,:):: phottable, phottable_thin
+    integer       ::  n, i
+    real(kind=dp) ::  phi_in,   phi_out, phi_tot
+    real(kind=dp) :: limit=1.0e-7
+    integer :: Maximum_FreqBnd
     
+    ! Pick the correct table for this type of source
     if (source_typ.eq.'B') then 
        phottable => photint
        phottable_thin => photintthin
-       heattable => hphotint
-       heattable_thin => hphotintthin
-
+       Maximum_FreqBnd=bb_FreqBnd_UpperLimit
+         
     elseif (source_typ.eq.'P') then
        phottable =>      pl_photint
        phottable_thin => pl_photintthin
+       Maximum_FreqBnd=NumFreqBnd
+    endif
+    
+    do i=1,Maximum_FreqBnd
+       
+       ! The ingoing rate
+       phi_in= (phottable(in_t%ipos(i),i)+ &
+            (phottable(in_t%ipos_p1(i),i)-phottable(in_t%ipos(i),i))* &
+            in_t%residual(i))*NFlux
+       
+       if (abs(delta_tau_out(i)-delta_tau_in(i)) > limit) then
+          ! The outgoing and total rate (Optically thick)
+          phi_out=(phottable(out_t%ipos(i),i) +(phottable(out_t%ipos_p1(i),i) & 
+               -phottable(out_t%ipos(i),i)) *out_t%residual(i))*NFlux 
+          phi_tot=phi_in-phi_out
+       else
+          ! The outgoing and total rate (Optically thin)
+          phi_tot=((phottable_thin(in_t%ipos(i),i)+ &
+               (phottable_thin(in_t%ipos_p1(i),i)  & 
+               -phottable_thin(in_t%ipos_p1(i),i))*in_t%residual(i))&
+               *(delta_tau_out(i)-delta_tau_in(i)))*NFlux
+          phi_out=phi_in-phi_tot
+       endif
+       
+       ! Distribute the total rates over H, He0 and He1
+       select case (i) 
+          ! H only photons (Band 1)
+       case (1) 
+          phi%h=phi%h+phi_tot*volweight
+          !GM/130801: not sure what this is useful for
+          !phi%int_out(0)=phi_out
+           
+          ! H + He0 photons (Band 2)
+       case (2:NumBndin2+1)
+          ! Set scaling factors; save these in scaling array
+          ! as they are used also in heat_lookuptable
+          call scale_int2(scaling(i*2-2),scaling(i*2-1),N_H,N_He0, i)
+          !phi_tot=phi_tot !GM/130731: what is this??
+          phi%h=phi%h+scaling(i*2-2)*phi_tot*volweight
+          phi%he(0)=phi%he(0)+scaling(i*2-1)*phi_tot*volweight
+          !GM/130801: not sure what this is useful for
+          !phi%int_out(i-1)=phi_out
+
+          ! H + He0 + He+ photons (Band 3)
+       case (NumBndin2+2:NumFreqBnd)
+          ! Set scaling factors; save these in scaling array
+          ! as they are used also in heat_lookuptable
+          call scale_int3(scaling(i*3-NumBndin2-4),scaling(i*3-NumBndin2-3) & 
+               ,scaling(i*3-NumBndin2-2), N_H,N_He0,N_He1,i)
+          !phi_tot=phi_tot  !GM/130731: what is this??
+          phi%h=phi%h+scaling(3*i-NumBndin2-4)*phi_tot*volweight
+          phi%he(0)=phi%he(0)+scaling(3*i-NumBndin2-3)*phi_tot*volweight
+          phi%he(1)=phi%he(1)+scaling(3*i-NumBndin2-2)*phi_tot*volweight
+          !GM/130801: not sure what this is useful for
+          !phi%int_out(i-1)=phi_out
+       end select
+       
+    enddo
+    
+  end subroutine photo_lookuptable
+
+  !----------------------------------------------------------------------------
+   
+  subroutine heat_lookuptable(in_t,out_t,phi,delta_tau_in,delta_tau_out, &
+       tau_cell_HI,tau_cell_HeI,tau_cell_HeII, &
+       NFlux,source_typ,volweight,i_state,N_H,N_He0,N_He1)
+
+    use cgsphotoconstants
+
+    type(photrates),intent(out) :: phi
+    type(tablepos),intent(in) :: in_t ,out_t
+    real(kind=dp),intent(in) :: NFlux,volweight,i_state
+    real(kind=dp),intent(in) :: N_H, N_He0, N_He1
+    real(kind=dp),dimension(NumFreqBnd),intent(in) :: delta_tau_in,delta_tau_out
+    real(kind=dp), dimension(NumFreqBnd),intent(in) :: tau_cell_HI
+    real(kind=dp), dimension(NumFreqBnd),intent(in) :: tau_cell_HeI
+    real(kind=dp), dimension(NumFreqBnd),intent(in) :: tau_cell_HeII
+    real(kind=dp),pointer,dimension(:,:):: heattable, heattable_thin
+    real(kind=dp) :: phi_hv_h, phi_hv_he0, phi_hv_he1, f_heat, f_ion_h, f_ion_he0
+    integer       ::  n, i
+    real(kind=dp) ::  fra_sum1 ,fra_sum2,fra_sum3,fra_sum4
+    character,intent(in) :: source_typ
+    real(kind=dp) :: limit2=1.0e-4
+    integer :: Maximum_FreqBnd
+    
+    ! Initialize to zero
+    ! GM/130731: check this is ok for two types of sources (B and P)
+    phi_hv_h=0.0_dp
+    phi_hv_he0=0.0_dp
+    phi_hv_he1=0.0_dp
+    f_heat=0.0_dp
+    f_ion_h=0.0_dp
+    f_ion_he0=0.0_dp
+
+    ! Pick the correct table for this type of source
+    if (source_typ.eq.'B') then 
+       heattable => hphotint
+       heattable_thin => hphotintthin
+       Maximum_FreqBnd=bb_FreqBnd_UpperLimit
+       
+    elseif (source_typ.eq.'P') then
        heattable =>      pl_hphotint
        heattable_thin => pl_hphotintthin
+       Maximum_FreqBnd=NumFreqBnd
     endif
-
-      phi%h=0.0_dp
-      phi%he(:)=0.0_dp
-      phi_hv_h=0.0_dp
-      phi_hv_he0=0.0_dp
-      phi_hv_he1=0.0_dp
-      phi%hv_h=0.0_dp
-      phi%hv_he(:)=0.0_dp
-      f_heat=0.0_dp
-      f_ion_h=0.0_dp
-      f_ion_he0=0.0_dp
-
-
-do i=1,NumFreqBnd
-
-     phi_in= (phottable(in_t%ipos(i),i)+ &
-             (phottable(in_t%ipos_p1(i),i)-phottable(in_t%ipos(i),i))*in_t%residual(i))*NFlux
-
-     if (abs(delta_tau_out(i)-delta_tau_in(i)).gt.limit) then
-        phi_out=(phottable(out_t%ipos(i),i) +(phottable(out_t%ipos_p1(i),i) & 
-             -phottable(out_t%ipos(i),i)) *out_t%residual(i))*NFlux 
-        phi_tot=phi_in-phi_out
-     else
-        phi_tot=((phottable_thin(in_t%ipos(i),i)+(phottable_thin(in_t%ipos_p1(i),i)  & 
-             -phottable_thin(in_t%ipos_p1(i),i))*in_t%residual(i))&
-             *(delta_tau_out(i)-delta_tau_in(i)))*NFlux
-        phi_out=phi_in-phi_tot
-     endif
-     
-     select case (i) 
-     case (1) 
-    	phi%h=phi_tot/vol
-       	phi%int_out(0)=phi_out
-
-     case (2:NumBndin2+1)
-        call scale_int2(scaling(i*2-2),scaling(i*2-1),N_H,N_He0, i)
-        phi_tot=phi_tot
-    	phi%h=phi%h+scaling(i*2-2)*phi_tot/vol
-    	phi%he(0)=phi%he(0)+scaling(i*2-1)*phi_tot/vol
-    	phi%int_out(i-1)=phi_out
-     case (NumBndin2+2:NumFreqBnd)
-        phi_tot=phi_tot
-
-        call scale_int3(scaling(i*3-NumBndin2-4),scaling(i*3-NumBndin2-3) & 
-             ,scaling(i*3-NumBndin2-2), N_H,N_He0,N_He1,i)
-    	phi%h=phi%h+scaling(3*i-NumBndin2-4)*phi_tot/vol
-    	phi%he(0)=phi%he(0)+scaling(3*i-NumBndin2-3)*phi_tot/vol
-    	phi%he(1)=phi%he(1)+scaling(3*i-NumBndin2-2)*phi_tot/vol
-    	phi%int_out(i-1)=phi_out
-     end select
-     
-
-
-enddo
-
-
-
-    if(.not.isothermal) then
-! in general, I'm following Ricotti et al 2002
-
+    
+    ! in general, I'm following Ricotti et al 2002
+    
     CR1=(/0.3908_dp, 0.0554_dp, 1.0_dp/)
     bR1=(/0.4092_dp, 0.4614_dp, 0.2663_dp/)
     dR1=(/1.7592_dp, 1.6660_dp, 1.3163_dp/)
@@ -1308,132 +1473,134 @@ enddo
     bR2=(/0.38_dp,0.38_dp,0.34_dp/)
     !dR2=(/2.0_dp,2.0_dp,2.0_dp/) write explicitly ^2 -> introduce xeb
     
-    test1=0.0_dp
-    test2=0.0_dp
-
-       do i=1,3
-        y1R(i)= CR1(i)*(1.0_dp-i_state**bR1(i))**dR1(i)
-        xeb=1.0_dp-i_state**bR2(i) 
-        y2R(i)= CR2(i)*i_state**aR2(i)*xeb*xeb
-       enddo
-
-
-       do i=1,NumFreqBnd 
-
-
-      phi_hv_h=0.0_dp
-      phi_hv_he0=0.0_dp
-      phi_hv_he1=0.0_dp
-      select case (i)
-      case (1)
-         phi%hv_h_in = (heattable(in_t%ipos(1),1)+(heattable(in_t%ipos_p1(1),1)         &
-              -heattable(in_t%ipos(1),1))*in_t%residual(1))*NFlux  
-         if (abs(delta_tau_out(1)-delta_tau_in(1)).gt.limit2) then
-            phi%hv_h_out=(heattable(out_t%ipos(1),1)+(heattable(out_t%ipos_p1(1),1)    &
-                 -heattable(out_t%ipos(1),1))*out_t%residual(1))*NFlux 
-            phi_hv_h=  (phi%hv_h_in  -phi%hv_h_out)  /vol
-         else
-            phi_hv_h=(heattable_thin(in_t%ipos(1),1)+(heattable_thin(in_t%ipos_p1(1),1)   &
-                 -heattable_thin(in_t%ipos(1),1))*in_t%residual(1))&   
-                 *(delta_tau_out(1)-delta_tau_in(1))*NFlux/vol 
-         endif
-
-         f_heat    = phi_hv_h
-
-      case (2:NumBndin2+1)
-         phi%hv_h_in    =(heattable(in_t%ipos(i),2*i-2)+ &
-              (heattable(in_t%ipos_p1(i),2*i-2)-         &
-              heattable(in_t%ipos(i),2*i-2))*in_t%residual(i) )*NFlux
-         phi%hv_he_in(0)=(heattable(in_t%ipos(i),2*i-1)+ &
-              (heattable(in_t%ipos_p1(i),2*i-1)-         &
-              heattable(in_t%ipos(i),2*i-1))*in_t%residual(i))*NFlux
-         !********H
-         if (abs(delt_tau_o(2*i-2)-delta_tau_in(i)).gt.limit2) then
-            phi%hv_h_out=(heattable(out_t%ipos(i),2*i-2)+ &
-                 (heattable(out_t%ipos_p1(i),2*i-2)- &
-                 heattable(out_t%ipos(i),2*i-2))*out_t%residual(i))*NFlux
-            phi_hv_h    = scaling(2*i-2)*(phi%hv_h_in-phi%hv_h_out)/vol 
-         else
-            phi_hv_h = scaling(2*i-2)*(((heattable_thin(in_t%ipos(i),2*i-2)+ &
-                 (heattable_thin(in_t%ipos_p1(i),2*i-2)-            &
-                 heattable_thin(in_t%ipos_p1(i),2*i-2))*in_t%residual(i))&
-                 *(delta_tau_out(i)-delta_tau_in(i))))/vol*NFlux
-         endif
-         ! !********He0       
-         if (abs(delt_tau_o(2*i-1)-delta_tau_in(i)).gt.limit2) then
-            phi%hv_he_out(0)= (heattable(out_t%ipos(i),2*i-1)+ &
-                 (heattable(out_t%ipos_p1(i),2*i-1)-            &
-                 heattable(out_t%ipos(i),2*i-1))*out_t%residual(i))*NFlux
-            phi_hv_he0  =   scaling(2*i-1)*(phi%hv_he_in(0)-phi%hv_he_out(0))/vol
-
-         else 
-            phi_hv_he0 = scaling(2*i-1)*((heattable_thin(in_t%ipos(i),2*i-1)+&
-                 (heattable_thin(in_t%ipos_p1(i),2*i-1)-            &
-                 heattable_thin(in_t%ipos_p1(i),2*i-1)) *in_t%residual(i)) &
-                 *(delta_tau_out(i)- delta_tau_in(i)))/vol*NFlux
-         endif
-
-         fra_sum1=f1ion_H(i) *phi_hv_h+ f1ion_He0(i) *phi_hv_he0
-         fra_sum2=f2ion_H(i) *phi_hv_h+ f2ion_He0(i) *phi_hv_he0
-         fra_sum3=f1heat_H(i)*phi_hv_h+ f1heat_He0(i)*phi_hv_he0
-         fra_sum4=f2heat_H(i)*phi_hv_h+ f2heat_He0(i)*phi_hv_he0
-!**********************************************************************
-         f_ion_He0 =  y1R(2)*fra_sum1-y2R(2)*fra_sum2  +f_ion_He0
-         f_ion_H   =  y1R(1)*fra_sum1-y2R(1)*fra_sum2  +f_ion_H
-         f_heat    =  phi_hv_h+phi_hv_he0+f_heat-  y1R(3)*fra_sum3+y2R(3)*fra_sum4 
-           !all into heat? uncomment next line and comment out lines above
-       !   f_heat    =   phi_hv_h+phi_hv_he0+f_heat
-!**********************************************************************
-
-      case (NumBndin2+2:NumFreqBnd)
-         phi%hv_h_in  =(heattable(in_t%ipos(i),3*i-NumBndin2-4) + &
-              (heattable(in_t%ipos_p1(i),3*i-NumBndin2-4)-         &
-              heattable(in_t%ipos(i),3*i-NumBndin2-4))*in_t%residual(i))*NFlux 
-         phi%hv_he_in(0)=(heattable(in_t%ipos(i),3*i-NumBndin2-3)+ &
-              (heattable(in_t%ipos_p1(i),3*i-NumBndin2-3)-         &
-              heattable(in_t%ipos(i),3*i-NumBndin2-3))*in_t%residual(i))*NFlux
-         phi%hv_he_in(1)=(heattable(in_t%ipos(i),3*i-NumBndin2-2)+ &
-              (heattable(in_t%ipos_p1(i),3*i-NumBndin2-2)-         &
-              heattable(in_t%ipos(i),3*i-NumBndin2-2))*in_t%residual(i))*NFlux
-         !********H
-         if (abs(delt_tau_o(3*i-NumBndin2-4)-delta_tau_in(i)).gt.limit2) then
-            phi%hv_h_out= (heattable(out_t%ipos(i),3*i-NumBndin2-4)+&
-                 (heattable(out_t%ipos_p1(i),3*i-NumBndin2-4)-            &
-                 heattable(out_t%ipos(i),3*i-NumBndin2-4))*out_t%residual(i))*NFlux
-            phi_hv_h=scaling(3*i-NumBndin2-4)*(phi%hv_h_in-phi%hv_h_out)/vol
-         else
-            phi_hv_h =scaling(3*i-NumBndin2-4)*((heattable_thin(in_t%ipos(i),3*i-NumBndin2-4)+ &
-                 (heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-4)-            &
-                 heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-4))*in_t%residual(i))&
-                 *(delta_tau_out(i)-delta_tau_in(i)))/vol*NFlux
+    do i=1,3
+       y1R(i)= CR1(i)*(1.0_dp-i_state**bR1(i))**dR1(i)
+       xeb=1.0_dp-i_state**bR2(i) 
+       y2R(i)= CR2(i)*i_state**aR2(i)*xeb*xeb
+    enddo
+    
+    
+    do i=1, Maximum_FreqBnd
+       
+       phi_hv_h=0.0_dp
+       phi_hv_he0=0.0_dp
+       phi_hv_he1=0.0_dp
+       select case (i)
+       case (1)
+          phi%hv_h_in = (heattable(in_t%ipos(1),1)+(heattable(in_t%ipos_p1(1),1)         &
+               -heattable(in_t%ipos(1),1))*in_t%residual(1))*NFlux  
+          if (tau_cell_HI(i).gt.limit2) then
+          !if (abs(delta_tau_out(1)-delta_tau_in(1)).gt.limit2) then
+             phi%hv_h_out=(heattable(out_t%ipos(1),1)+(heattable(out_t%ipos_p1(1),1)    &
+                  -heattable(out_t%ipos(1),1))*out_t%residual(1))*NFlux 
+             phi_hv_h=  (phi%hv_h_in  -phi%hv_h_out)  *volweight
+          else
+             phi_hv_h=(heattable_thin(in_t%ipos(1),1)+(heattable_thin(in_t%ipos_p1(1),1)   &
+                  -heattable_thin(in_t%ipos(1),1))*in_t%residual(1))&   
+                  *(delta_tau_out(1)-delta_tau_in(1))*NFlux*volweight 
           endif
-
-! 	!********He0      
-          if (abs(delt_tau_o(3*i-NumBndin2-3)-delta_tau_in(i)).gt.limit2) then 
+          
+          f_heat    = phi_hv_h
+          
+       case (2:NumBndin2+1)
+          phi%hv_h_in    =(heattable(in_t%ipos(i),2*i-2)+ &
+               (heattable(in_t%ipos_p1(i),2*i-2)-         &
+               heattable(in_t%ipos(i),2*i-2))*in_t%residual(i) )*NFlux
+          phi%hv_he_in(0)=(heattable(in_t%ipos(i),2*i-1)+ &
+               (heattable(in_t%ipos_p1(i),2*i-1)-         &
+               heattable(in_t%ipos(i),2*i-1))*in_t%residual(i))*NFlux
+          !********H
+          if (tau_cell_HI(i).gt.limit2) then
+          !if (abs(delt_tau_o(2*i-2)-delta_tau_in(i)).gt.limit2) then
+             phi%hv_h_out=(heattable(out_t%ipos(i),2*i-2)+ &
+                  (heattable(out_t%ipos_p1(i),2*i-2)- &
+                  heattable(out_t%ipos(i),2*i-2))*out_t%residual(i))*NFlux
+             phi_hv_h    = scaling(2*i-2)*(phi%hv_h_in-phi%hv_h_out)*volweight 
+          else
+             phi_hv_h = scaling(2*i-2)*(((heattable_thin(in_t%ipos(i),2*i-2)+ &
+                  (heattable_thin(in_t%ipos_p1(i),2*i-2)-            &
+                  heattable_thin(in_t%ipos_p1(i),2*i-2))*in_t%residual(i))&
+                  *(delta_tau_out(i)-delta_tau_in(i))))*volweight*NFlux
+          endif
+          ! !********He0       
+          if (tau_cell_HeI(i).gt.limit2) then
+          !if (abs(delt_tau_o(2*i-1)-delta_tau_in(i)).gt.limit2) then
+             phi%hv_he_out(0)= (heattable(out_t%ipos(i),2*i-1)+ &
+                  (heattable(out_t%ipos_p1(i),2*i-1)-            &
+                  heattable(out_t%ipos(i),2*i-1))*out_t%residual(i))*NFlux
+             phi_hv_he0  =   scaling(2*i-1)*(phi%hv_he_in(0)-phi%hv_he_out(0))*volweight
+             
+          else 
+             phi_hv_he0 = scaling(2*i-1)*((heattable_thin(in_t%ipos(i),2*i-1)+&
+                  (heattable_thin(in_t%ipos_p1(i),2*i-1)-            &
+                  heattable_thin(in_t%ipos_p1(i),2*i-1)) *in_t%residual(i)) &
+                  *(delta_tau_out(i)- delta_tau_in(i)))*volweight*NFlux
+          endif
+          
+          fra_sum1=f1ion_H(i) *phi_hv_h+ f1ion_He0(i) *phi_hv_he0
+          fra_sum2=f2ion_H(i) *phi_hv_h+ f2ion_He0(i) *phi_hv_he0
+          fra_sum3=f1heat_H(i)*phi_hv_h+ f1heat_He0(i)*phi_hv_he0
+          fra_sum4=f2heat_H(i)*phi_hv_h+ f2heat_He0(i)*phi_hv_he0
+          !**********************************************************************
+          f_ion_He0 =  y1R(2)*fra_sum1-y2R(2)*fra_sum2  +f_ion_He0
+          f_ion_H   =  y1R(1)*fra_sum1-y2R(1)*fra_sum2  +f_ion_H
+          f_heat    =  phi_hv_h+phi_hv_he0+f_heat-  y1R(3)*fra_sum3+y2R(3)*fra_sum4 
+          !all into heat? uncomment next line and comment out lines above
+          !   f_heat    =   phi_hv_h+phi_hv_he0+f_heat
+          !**********************************************************************
+          
+       case (NumBndin2+2:NumFreqBnd)
+          phi%hv_h_in  =(heattable(in_t%ipos(i),3*i-NumBndin2-4) + &
+               (heattable(in_t%ipos_p1(i),3*i-NumBndin2-4)-         &
+               heattable(in_t%ipos(i),3*i-NumBndin2-4))*in_t%residual(i))*NFlux 
+          phi%hv_he_in(0)=(heattable(in_t%ipos(i),3*i-NumBndin2-3)+ &
+               (heattable(in_t%ipos_p1(i),3*i-NumBndin2-3)-         &
+               heattable(in_t%ipos(i),3*i-NumBndin2-3))*in_t%residual(i))*NFlux
+          phi%hv_he_in(1)=(heattable(in_t%ipos(i),3*i-NumBndin2-2)+ &
+               (heattable(in_t%ipos_p1(i),3*i-NumBndin2-2)-         &
+               heattable(in_t%ipos(i),3*i-NumBndin2-2))*in_t%residual(i))*NFlux
+          !********H
+          if (tau_cell_HI(i).gt.limit2) then
+          !if (abs(delt_tau_o(3*i-NumBndin2-4)-delta_tau_in(i)).gt.limit2) then
+             phi%hv_h_out= (heattable(out_t%ipos(i),3*i-NumBndin2-4)+&
+                  (heattable(out_t%ipos_p1(i),3*i-NumBndin2-4)-            &
+                  heattable(out_t%ipos(i),3*i-NumBndin2-4))*out_t%residual(i))*NFlux
+             phi_hv_h=scaling(3*i-NumBndin2-4)*(phi%hv_h_in-phi%hv_h_out)*volweight
+          else
+             phi_hv_h =scaling(3*i-NumBndin2-4)*((heattable_thin(in_t%ipos(i),3*i-NumBndin2-4)+ &
+                  (heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-4)-            &
+                  heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-4))*in_t%residual(i))&
+                  *(delta_tau_out(i)-delta_tau_in(i)))*volweight*NFlux
+          endif
+          
+          ! 	!********He0      
+          if (tau_cell_HeI(i).gt.limit2) then
+          !if (abs(delt_tau_o(3*i-NumBndin2-3)-delta_tau_in(i)).gt.limit2) then 
              phi%hv_he_out(0)=(heattable(out_t%ipos(i),3*i-NumBndin2-3)+ &
                   (heattable(out_t%ipos_p1(i),3*i-NumBndin2-3)-             &
                   heattable(out_t%ipos(i),3*i-NumBndin2-3))*out_t%residual(i))*NFlux
-             phi_hv_he0 =scaling(3*i-NumBndin2-3)*(phi%hv_he_in(0)-phi%hv_he_out(0))/vol
+             phi_hv_he0 =scaling(3*i-NumBndin2-3)*(phi%hv_he_in(0)-phi%hv_he_out(0))*volweight
           else
              phi_hv_he0=scaling(3*i-NumBndin2-3)*((heattable_thin(in_t%ipos(i),3*i     &
                   -NumBndin2-3)+  &
                   (heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-3)-      &
                   heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-3))*in_t%residual(i)) &
-                  *(delta_tau_out(i)-delta_tau_in(i)))/vol*NFlux
+                  *(delta_tau_out(i)-delta_tau_in(i)))*volweight*NFlux
           endif
-
-! 	!********He1       
-          if (abs(delt_tau_o(3*i-NumBndin2-2)-delta_tau_in(i)).gt.limit2) then
+          
+          ! 	!********He1       
+          if (tau_cell_HeII(i).gt.limit2) then
+          !if (abs(delt_tau_o(3*i-NumBndin2-2)-delta_tau_in(i)).gt.limit2) then
              phi%hv_he_out(1)=  (heattable(out_t%ipos(i),3*i-NumBndin2-2)+&
                   (heattable(out_t%ipos_p1(i),3*i-NumBndin2-2)-           &
                   heattable(out_t%ipos(i),3*i-NumBndin2-2))*out_t%residual(i))*NFlux
-             phi_hv_he1  =  scaling(3*i-NumBndin2-2)*(phi%hv_he_in(1)-phi%hv_he_out(1))/vol
+             phi_hv_he1  =  scaling(3*i-NumBndin2-2)*(phi%hv_he_in(1)-phi%hv_he_out(1))*volweight
           else 
              phi_hv_he1 =scaling(3*i-NumBndin2-2)* &
                   ((heattable_thin(in_t%ipos(i),3*i-NumBndin2-2)+&
                   (heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-2)             &
                   -heattable_thin(in_t%ipos_p1(i),3*i-NumBndin2-2))*in_t%residual(i)) & 
-                  *(delta_tau_out(i)- delta_tau_in(i)))/vol*NFlux
+                  *(delta_tau_out(i)- delta_tau_in(i)))*volweight*NFlux
           endif
           
           fra_sum1=f1ion_H(i) *phi_hv_h+f1ion_He0(i) *phi_hv_he0+f1ion_He1(i) *phi_hv_he1
@@ -1441,55 +1608,65 @@ enddo
           fra_sum3=f1heat_H(i)*phi_hv_h+f1heat_He0(i)*phi_hv_he0+f1heat_He1(i)*phi_hv_he1
           fra_sum4=f2heat_H(i)*phi_hv_h+f2heat_He0(i)*phi_hv_he0+f2heat_He1(i)*phi_hv_he1
           
-!**********************************************************************
+          !**********************************************************************
           f_ion_He0 =  y1R(2)*fra_sum1-y2R(2)*fra_sum2  +f_ion_He0
           f_ion_H   =  y1R(1)*fra_sum1-y2R(1)*fra_sum2  +f_ion_H
           f_heat    =   phi_hv_h+phi_hv_he0+phi_hv_he1-y1R(3)*fra_sum3+y2R(3)*fra_sum4+f_heat   
           ! all into heat? uncomment next line and comment out lines above                    
           !f_heat    =   phi_hv_h+phi_hv_he0+phi_hv_he1 +f_heat   
-!**********************************************************************          
+          !**********************************************************************          
        end select
-	
-
-     enddo 
-
-           phi%hv_h= f_heat!
-           phi%h=  f_ion_H/(frth0*hplanck)  +phi%h !phi%h+phi_hv_h*f_ion_H/(frth0*hplanck)!/vol
-           phi%he(0)=phi%he(0)  + f_ion_He0/(frthe0*hplanck)  !  phi_hv_h*f_ion_He0/(frthe0*hplanck)!/vol 
-    endif 
-
-
-  end subroutine lookuptable
-
+       
+       
+    enddo ! NumFreqBand
+    
+    ! phi%hv_h will contain the sum of the heating from H0, He0, 
+    ! He+ ionization!!!!
+    phi%hv_h= phi%hv_h + f_heat!
+    ! Corrections to photo-ionization rates due to secondary ionization
+    phi%h=  f_ion_H/(frth0*hplanck)  +phi%h !phi%h+phi_hv_h*f_ion_H/(frth0*hplanck)!*volweight
+    phi%he(0)=phi%he(0)  + f_ion_He0/(frthe0*hplanck)  !  phi_hv_h*f_ion_He0/(frthe0*hplanck)!*volweight 
+    
+  end subroutine heat_lookuptable
+  
+  !----------------------------------------------------------------------------
 
   subroutine scale_int2(scale1,scale2,N_H,N_He0,i)
-       real(kind=dp),intent(in) :: N_H,N_He0
-       integer,intent(in)       :: i
-       real(kind=dp),intent(out):: scale1,scale2
-       real(kind=dp) :: forscaleing
 
-       forscaleing=1.0_dp/(intm1(i)  *N_H +  intm2(i)  *N_He0)
+    real(kind=dp),intent(in) :: N_H,N_He0
+    integer,intent(in)       :: i
+    real(kind=dp),intent(out):: scale1,scale2
+    real(kind=dp) :: forscaleing
+    
+    forscaleing=1.0_dp/(intm1(i)  *N_H +  intm2(i)  *N_He0)
+    
+    scale1=intm1(i) *N_H   *forscaleing
+    scale2=intm2(i) *N_He0 *forscaleing
 
-       scale1=intm1(i) *N_H   *forscaleing
-       scale2=intm2(i) *N_He0 *forscaleing
-  end subroutine scale_int2  
+  end subroutine scale_int2
+  
+  !----------------------------------------------------------------------------
 
   subroutine scale_int3(scale1, scale2, scale3, N_H, N_He0, N_He1, i)
-
-       real(kind=dp),intent(in) :: N_H,N_He0,N_He1
-       integer,intent(in)       :: i
-       real(kind=dp),intent(out):: scale1,scale2,scale3
-       real(kind=dp) :: forscaleing
-
-       forscaleing=1.0_dp/(intm1(i)  *N_H  + intm2(i)  *N_He0+ intm3(i)  *N_He1  ) 
-       scale1=N_H    *intm1(i) *forscaleing
-       scale2=N_He0  *intm2(i)*forscaleing
-       scale3=N_He1  *intm3(i)*forscaleing 
+    
+    real(kind=dp),intent(in) :: N_H,N_He0,N_He1
+    integer,intent(in)       :: i
+    real(kind=dp),intent(out):: scale1,scale2,scale3
+    real(kind=dp) :: forscaleing
+    
+    forscaleing=1.0_dp/(intm1(i)  *N_H  + intm2(i)  *N_He0+ intm3(i)  *N_He1  ) 
+    scale1=N_H    *intm1(i) *forscaleing
+    scale2=N_He0  *intm2(i)*forscaleing
+    scale3=N_He1  *intm3(i)*forscaleing 
+    
   end subroutine scale_int3
+  
+  !----------------------------------------------------------------------------
 
   subroutine setup_scalingfactors
-    integer i
-
+    
+    integer :: i
+    
     allocate(steph0(1:NumFreqBnd))  
     allocate(freqmax(1:NumFreqBnd))  
     allocate(freqmin(1:NumFreqBnd))  
@@ -1499,444 +1676,445 @@ enddo
     allocate(intm1(1:NumFreqBnd))
     allocate(intm2(1:NumFreqBnd))
     allocate(intm3(1:NumFreqBnd))
-
-if (.not.isothermal) then
-    allocate(f1ion_h(2:NumFreqBnd))  
-    allocate(f1ion_he0(2:NumFreqBnd))  
-    allocate(f1ion_he1(2:NumFreqBnd))  
-    allocate(f2ion_h(2:NumFreqBnd)) 
-    allocate(f2ion_he0(2:NumFreqBnd)) 
-    allocate(f2ion_he1(2:NumFreqBnd)) 
-    allocate(f2heat_h(2:NumFreqBnd)) 
-    allocate(f2heat_he0(2:NumFreqBnd)) 
-    allocate(f2heat_he1(2:NumFreqBnd)) 
-    allocate(f1heat_h(2:NumFreqBnd)) 
-    allocate(f1heat_he0(2:NumFreqBnd))
-    allocate(f1heat_he1(2:NumFreqBnd))
-endif
-
-	if (NumBndin2.eq.3) then
-           freqmax(2)= 1.3_dp*frthe0   
-           freqmax(3)= 1.7_dp*frthe0 
-           freqmax(4)= frthe1
-	elseif (NumBndin2.eq.2) then
-           freqmax(2)= 1.5_dp*frthe0
-           freqmax(3)= frthe1
-	elseif (NumBndin2.eq.1) then
-           freqmax(2)= frthe1
-        elseif (NumBndin2.eq.6) then
-           freqmax(2:6)=(/1.15_dp,1.3_dp,1.5_dp,1.7_dp,1.9557_dp/)*frthe0
-           freqmax(7)=frthe1
-	elseif (NumBndin2.eq.10) then
-	   freqmax(2:10)=(/1.1_dp,1.2_dp,1.3_dp,1.4_dp, &
-		  	   1.5_dp,1.6_dp,1.7_dp,1.8_dp,1.9_dp/)*frthe0
-	   freqmax(11)=frthe1
-	elseif (NumBndin2.eq.26) then
-           freqmax(2:26)=(/1.02_dp,1.05_dp,1.07_dp, &
-			   1.1_dp ,1.15_dp,1.2_dp,  &
-		  	   1.25_dp,1.3_dp, 1.35_dp, &
-		       	   1.4_dp, 1.45_dp,1.5_dp,  &
-		           1.55_dp,1.6_dp,1.65_dp,  &
-		           1.7_dp,1.75_dp,1.8_dp,   &
-		           1.85_dp,1.9_dp,1.95_dp,  &
-			   2.0_dp,2.05_dp,2.1_dp,2.15_dp/)*frthe0
-	   freqmax(27)=frthe1
-	endif
-
-	if (NumBndin3.eq.9) then
-           freqmax(NumBndin2+2:NumBndin2+10)= frthe1 * & 
-		          (/1.5_dp,2.0_dp,  3.0_dp, 4.0_dp, &
-                            7.0_dp,10.0_dp,20.0_dp,50.0_dp,100.0_dp/)
-	elseif (NumBndin3.eq.4) then
-           freqmax(NumBndin2+2:NumBndin2+5)= frthe1*(/2.0_dp,4.0_dp,10.0_dp,100.0_dp/)
-	elseif (NumBndin3.eq.1) then
-           freqmax(NumBndin2+2)= frthe1*100.0_dp
-	elseif (NumBndin3.eq.11) then
-           freqmax(NumBndin2+2:NumBndin2+12)= frthe1*(/ &
-		            1.1_dp,1.2_dp,1.5_dp,  2.0_dp,3.0_dp, &
-			    4.0_dp,7.0_dp,10.0_dp,20.0_dp,50.0_dp,100.0_dp  /)
-	elseif (NumBndin3.eq.16) then
-           freqmax(NumBndin2+2:NumBndin2+17)= frthe1 * &
-			   (/1.05_dp,1.1_dp, 1.2_dp, 1.4_dp, 1.7_dp, 2.0_dp, 3.0_dp, &
-			      5.0_dp,7.0_dp,10.0_dp,15.0_dp,20.0_dp,30.0_dp,50.0_dp, &
-			     70.0_dp,100.0_dp/)
-        elseif (NumBndin3.eq.20) then
-           freqmax(NumBndin2+2:NumBndin2+21)= frthe1* (/ &
-                	     1.050_dp,  1.100_dp,  1.200_dp,  1.400_dp,  1.700_dp,  2.000_dp, &
-			     2.500_dp,  3.000_dp,  4.000_dp,  5.000_dp,  7.000_dp, 10.000_dp, &
-			    15.000_dp, 20.000_dp, 30.000_dp, 40.000_dp, 50.000_dp, 70.000_dp, &
-                            90.000_dp,100.0_dp/)  
-	endif
-       freqmax(1)=frthe0
-       freqmin(1)=frth0
-       do i=2,NumFreqBnd
-           freqmin(i)=freqmax(i-1)
-       enddo
-       do i=1,NumFreqBnd 
-           steph0(i)=(freqmax(i)-freqmin(i))/real(NumFreq)
-       enddo
-!-------------------------------------------------------------------------------
-! SETUP THE POWER LAW INDICES FOR H0, HE0 and HE1
-! MOVED HERE FROM CGSPHOTONSTANTS.
-! THESE WERE DETERMINED USING MATLAB SCRIPT MY_CROSS_SECTIONS2.M 
-! THE CROSS SECTION CURVES THAT I'M FITTING ARE FROM VERNER+1996
-! The same script also writes out the f_ion/f_heat needed for the secondary 
-! ionizations. Recipe from Ricotti , Gnedin and Shull, 2002
-
-        sh0(1)=2.761_dp
-        intm1(1)=sigh
-        intm2(1)=0.0_dp
-        intm3(1:NumBndin2+1)=0.0_dp  
-       
-
-
+    
     if (.not.isothermal) then
-    if (NumBndin2.eq.1) then
+       allocate(f1ion_h(2:NumFreqBnd))  
+       allocate(f1ion_he0(2:NumFreqBnd))  
+       allocate(f1ion_he1(2:NumFreqBnd))  
+       allocate(f2ion_h(2:NumFreqBnd)) 
+       allocate(f2ion_he0(2:NumFreqBnd)) 
+       allocate(f2ion_he1(2:NumFreqBnd)) 
+       allocate(f2heat_h(2:NumFreqBnd)) 
+       allocate(f2heat_he0(2:NumFreqBnd)) 
+       allocate(f2heat_he1(2:NumFreqBnd)) 
+       allocate(f1heat_h(2:NumFreqBnd)) 
+       allocate(f1heat_he0(2:NumFreqBnd))
+       allocate(f1heat_he1(2:NumFreqBnd))
+    endif
+    
+    if (NumBndin2.eq.3) then
+       freqmax(2)= 1.3_dp*frthe0   
+       freqmax(3)= 1.7_dp*frthe0 
+       freqmax(4)= frthe1
+    elseif (NumBndin2.eq.2) then
+       freqmax(2)= 1.5_dp*frthe0
+       freqmax(3)= frthe1
+    elseif (NumBndin2.eq.1) then
+       freqmax(2)= frthe1
+    elseif (NumBndin2.eq.6) then
+       freqmax(2:6)=(/1.15_dp,1.3_dp,1.5_dp,1.7_dp,1.9557_dp/)*frthe0
+       freqmax(7)=frthe1
+    elseif (NumBndin2.eq.10) then
+       freqmax(2:10)=(/1.1_dp,1.2_dp,1.3_dp,1.4_dp, &
+            1.5_dp,1.6_dp,1.7_dp,1.8_dp,1.9_dp/)*frthe0
+       freqmax(11)=frthe1
     elseif (NumBndin2.eq.26) then
-       f1ion_h(2:27)= (/ 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp/) 
-
-       f1ion_he0(2:27)= (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 1.0000_dp/) 
-
-       f1ion_he1(2:27)= (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp/) 
-
-       f2ion_h(2:27)=   (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.9971_dp, 0.9802_dp, 0.9643_dp, 0.9493_dp, &
-            0.9350_dp, 0.9215_dp, 0.9086_dp, 0.8964_dp, &
-            0.8847_dp, 0.8735_dp/)
-
-       f2ion_he0(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.9960_dp/) 
-
-       f2ion_he1(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp/) 
-
-
-       f1heat_h(2:27)=   (/0.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp/)
-
-       f1heat_he0(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp /)
-
-       f1heat_he1(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp /)
-
-       f2heat_h(2:27)=   (/0.0000_dp, 0.9704_dp, 0.9290_dp, 0.9037_dp, &
-            0.8687_dp, 0.8171_dp, 0.7724_dp, 0.7332_dp, &
-            0.6985_dp, 0.6675_dp, 0.6397_dp, 0.6145_dp, &
-            0.5916_dp, 0.5707_dp, 0.5514_dp, 0.5337_dp, &
-            0.5173_dp, 0.5021_dp, 0.4879_dp, 0.4747_dp, &
-            0.4623_dp, 0.4506_dp, 0.4397_dp, 0.4293_dp, &
-            0.4196_dp, 0.4103_dp/) 
-
-       f2heat_he0(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.9959_dp, &
-            0.9250_dp, 0.8653_dp, 0.8142_dp, 0.7698_dp, &
-            0.7309_dp, 0.6965_dp, 0.6657_dp, 0.6380_dp, &
-            0.6130_dp, 0.5903_dp, 0.5694_dp, 0.5503_dp, &
-            0.5327_dp, 0.5164_dp/)
-
-       f2heat_he1(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.0000_dp/)  
+       freqmax(2:26)=(/1.02_dp,1.05_dp,1.07_dp, &
+            1.1_dp ,1.15_dp,1.2_dp,  &
+            1.25_dp,1.3_dp, 1.35_dp, &
+            1.4_dp, 1.45_dp,1.5_dp,  &
+            1.55_dp,1.6_dp,1.65_dp,  &
+            1.7_dp,1.75_dp,1.8_dp,   &
+            1.85_dp,1.9_dp,1.95_dp,  &
+            2.0_dp,2.05_dp,2.1_dp,2.15_dp/)*frthe0
+       freqmax(27)=frthe1
     endif
+    
     if (NumBndin3.eq.9) then
+       freqmax(NumBndin2+2:NumBndin2+10)= frthe1 * & 
+            (/1.5_dp,2.0_dp,  3.0_dp, 4.0_dp, &
+            7.0_dp,10.0_dp,20.0_dp,50.0_dp,100.0_dp/)
+    elseif (NumBndin3.eq.4) then
+       freqmax(NumBndin2+2:NumBndin2+5)= frthe1*(/2.0_dp,4.0_dp,10.0_dp,100.0_dp/)
+    elseif (NumBndin3.eq.1) then
+       freqmax(NumBndin2+2)= frthe1*100.0_dp
+    elseif (NumBndin3.eq.11) then
+       freqmax(NumBndin2+2:NumBndin2+12)= frthe1*(/ &
+            1.1_dp,1.2_dp,1.5_dp,  2.0_dp,3.0_dp, &
+            4.0_dp,7.0_dp,10.0_dp,20.0_dp,50.0_dp,100.0_dp  /)
+    elseif (NumBndin3.eq.16) then
+       freqmax(NumBndin2+2:NumBndin2+17)= frthe1 * &
+            (/1.05_dp,1.1_dp, 1.2_dp, 1.4_dp, 1.7_dp, 2.0_dp, 3.0_dp, &
+            5.0_dp,7.0_dp,10.0_dp,15.0_dp,20.0_dp,30.0_dp,50.0_dp, &
+            70.0_dp,100.0_dp/)
     elseif (NumBndin3.eq.20) then
-       f1ion_h(NumBndin2+2:NumBndin2+21)= &
-            (/1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp /)
-
-       f1ion_he0(NumBndin2+2:NumBndin2+21)= &
-            (/1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp /)
-
-       f1ion_he1(NumBndin2+2:NumBndin2+21)= &
-            (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp /)
-
-       f2ion_h(NumBndin2+2:NumBndin2+21)=&
-            (/0.8600_dp, 0.8381_dp, 0.8180_dp, 0.7824_dp, 0.7249_dp, 0.6607_dp, &
-            0.6128_dp, 0.5542_dp, 0.5115_dp, 0.4518_dp, 0.4110_dp, 0.3571_dp, &
-            0.3083_dp, 0.2612_dp, 0.2325_dp, 0.1973_dp, 0.1757_dp, 0.1606_dp, &
-            0.1403_dp, 0.1269_dp /)
-
-       f2ion_he0(NumBndin2+2:NumBndin2+21)= &
-            (/0.9750_dp, 0.9415_dp, 0.9118_dp, 0.8609_dp, 0.7831_dp, 0.7015_dp, &
-            0.6436_dp, 0.5755_dp, 0.5273_dp, 0.4619_dp, 0.4182_dp, 0.3615_dp, &
-            0.3109_dp, 0.2627_dp, 0.2334_dp, 0.1979_dp, 0.1761_dp, 0.1609_dp, &
-            0.1405_dp, 0.1270_dp /)
-
-       f2ion_he1(NumBndin2+2:NumBndin2+21)= &
-            (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.8841_dp, &
-            0.7666_dp, 0.6518_dp, 0.5810_dp, 0.4940_dp, 0.4403_dp, 0.3744_dp, &
-            0.3183_dp, 0.2668_dp, 0.2361_dp, 0.1993_dp, 0.1771_dp, 0.1616_dp, &
-            0.1409_dp, 0.1273_dp /)
-
-       f1heat_h(NumBndin2+2:NumBndin2+21)=(/1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp /)
-
-       f1heat_he0(NumBndin2+2:NumBndin2+21)=(/1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp /)
-
-       f1heat_he1(NumBndin2+2:NumBndin2+21)=(/0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
-            1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp /)
-
-       f2heat_h(NumBndin2+2:NumBndin2+21)=(/0.3994_dp, 0.3817_dp, 0.3659_dp, &
-            0.3385_dp, 0.2961_dp, 0.2517_dp, 0.2207_dp, 0.1851_dp, 0.1608_dp, &
-            0.1295_dp, 0.1097_dp, 0.0858_dp, 0.0663_dp, 0.0496_dp, 0.0405_dp, &
-            0.0304_dp, 0.0248_dp, 0.0212_dp, 0.0167_dp, 0.0140_dp /)
-
-       f2heat_he0(NumBndin2+2:NumBndin2+21)=(/0.4974_dp, 0.4679_dp, 0.4424_dp, &
-            0.4001_dp, 0.3389_dp, &
-            0.2796_dp, 0.2405_dp, 0.1977_dp, 0.1697_dp, 0.1346_dp, 0.1131_dp, &
-            0.0876_dp, 0.0673_dp, 0.0501_dp, 0.0408_dp, 0.0305_dp, 0.0249_dp, &
-            0.0213_dp, 0.0168_dp, 0.0140_dp /)
-
-       f2heat_he1(NumBndin2+2:NumBndin2+21)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, &
-            0.0000_dp, 0.6202_dp,&
-            0.4192_dp, 0.3265_dp, 0.2459_dp, 0.2010_dp, 0.1513_dp, 0.1237_dp,&
-            0.0932_dp, 0.0701_dp, 0.0515_dp, 0.0416_dp, 0.0309_dp, 0.0251_dp,&
-            0.0214_dp, 0.0169_dp, 0.0141_dp /)
+       freqmax(NumBndin2+2:NumBndin2+21)= frthe1* (/ &
+            1.050_dp,  1.100_dp,  1.200_dp,  1.400_dp,  1.700_dp,  2.000_dp, &
+            2.500_dp,  3.000_dp,  4.000_dp,  5.000_dp,  7.000_dp, 10.000_dp, &
+            15.000_dp, 20.000_dp, 30.000_dp, 40.000_dp, 50.000_dp, 70.000_dp, &
+            90.000_dp,100.0_dp/)  
     endif
- endif
+    freqmax(1)=frthe0
+    freqmin(1)=frth0
+    do i=2,NumFreqBnd
+       freqmin(i)=freqmax(i-1)
+    enddo
+    do i=1,NumFreqBnd 
+       steph0(i)=(freqmax(i)-freqmin(i))/real(NumFreq)
+    enddo
+    !-------------------------------------------------------------------------------
+    ! SETUP THE POWER LAW INDICES FOR H0, HE0 and HE1
+    ! MOVED HERE FROM CGSPHOTONSTANTS.
+    ! THESE WERE DETERMINED USING MATLAB SCRIPT MY_CROSS_SECTIONS2.M 
+    ! THE CROSS SECTION CURVES THAT I'M FITTING ARE FROM VERNER+1996
+    ! The same script also writes out the f_ion/f_heat needed for the secondary 
+    ! ionizations. Recipe from Ricotti , Gnedin and Shull, 2002
+    
+    sh0(1)=2.761_dp
+    intm1(1)=sigh
+    intm2(1)=0.0_dp
+    intm3(1:NumBndin2+1)=0.0_dp  
+    
+    
+    
+    if (.not.isothermal) then
+       if (NumBndin2.eq.1) then
+       elseif (NumBndin2.eq.26) then
+          f1ion_h(2:27)= (/ 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp/) 
+          
+          f1ion_he0(2:27)= (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 1.0000_dp/) 
+          
+          f1ion_he1(2:27)= (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp/) 
+          
+          f2ion_h(2:27)=   (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.9971_dp, 0.9802_dp, 0.9643_dp, 0.9493_dp, &
+               0.9350_dp, 0.9215_dp, 0.9086_dp, 0.8964_dp, &
+               0.8847_dp, 0.8735_dp/)
+          
+          f2ion_he0(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.9960_dp/) 
+          
+          f2ion_he1(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp/) 
+          
+          
+          f1heat_h(2:27)=   (/0.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp/)
+          
+          f1heat_he0(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp /)
+          
+          f1heat_he1(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp /)
+          
+          f2heat_h(2:27)=   (/0.0000_dp, 0.9704_dp, 0.9290_dp, 0.9037_dp, &
+               0.8687_dp, 0.8171_dp, 0.7724_dp, 0.7332_dp, &
+               0.6985_dp, 0.6675_dp, 0.6397_dp, 0.6145_dp, &
+               0.5916_dp, 0.5707_dp, 0.5514_dp, 0.5337_dp, &
+               0.5173_dp, 0.5021_dp, 0.4879_dp, 0.4747_dp, &
+               0.4623_dp, 0.4506_dp, 0.4397_dp, 0.4293_dp, &
+               0.4196_dp, 0.4103_dp/) 
+          
+          f2heat_he0(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.9959_dp, &
+               0.9250_dp, 0.8653_dp, 0.8142_dp, 0.7698_dp, &
+               0.7309_dp, 0.6965_dp, 0.6657_dp, 0.6380_dp, &
+               0.6130_dp, 0.5903_dp, 0.5694_dp, 0.5503_dp, &
+               0.5327_dp, 0.5164_dp/)
+          
+          f2heat_he1(2:27)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.0000_dp/)  
+       endif
+       if (NumBndin3.eq.9) then
+       elseif (NumBndin3.eq.20) then
+          f1ion_h(NumBndin2+2:NumBndin2+21)= &
+               (/1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp /)
+          
+          f1ion_he0(NumBndin2+2:NumBndin2+21)= &
+               (/1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp /)
+          
+          f1ion_he1(NumBndin2+2:NumBndin2+21)= &
+               (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp /)
+          
+          f2ion_h(NumBndin2+2:NumBndin2+21)=&
+               (/0.8600_dp, 0.8381_dp, 0.8180_dp, 0.7824_dp, 0.7249_dp, 0.6607_dp, &
+               0.6128_dp, 0.5542_dp, 0.5115_dp, 0.4518_dp, 0.4110_dp, 0.3571_dp, &
+               0.3083_dp, 0.2612_dp, 0.2325_dp, 0.1973_dp, 0.1757_dp, 0.1606_dp, &
+               0.1403_dp, 0.1269_dp /)
+          
+          f2ion_he0(NumBndin2+2:NumBndin2+21)= &
+               (/0.9750_dp, 0.9415_dp, 0.9118_dp, 0.8609_dp, 0.7831_dp, 0.7015_dp, &
+               0.6436_dp, 0.5755_dp, 0.5273_dp, 0.4619_dp, 0.4182_dp, 0.3615_dp, &
+               0.3109_dp, 0.2627_dp, 0.2334_dp, 0.1979_dp, 0.1761_dp, 0.1609_dp, &
+               0.1405_dp, 0.1270_dp /)
+          
+          f2ion_he1(NumBndin2+2:NumBndin2+21)= &
+               (/0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.0000_dp, 0.8841_dp, &
+               0.7666_dp, 0.6518_dp, 0.5810_dp, 0.4940_dp, 0.4403_dp, 0.3744_dp, &
+               0.3183_dp, 0.2668_dp, 0.2361_dp, 0.1993_dp, 0.1771_dp, 0.1616_dp, &
+               0.1409_dp, 0.1273_dp /)
 
-
-
- if (NumBndin2.eq.3) then
-    sh0(2:4) =(/2.8542_dp, 2.9086_dp, 2.9600_dp/)
-    she0(2:4)=(/1.6770_dp, 1.8758_dp, 2.0458_dp/)
-    intm1(2:4)=(/1.239e-18_dp, 5.86e-19_dp,2.69e-19_dp/)
-    intm2(2:4)=(/sighe0, 4.793e-18_dp,2.90e-18_dp/)  
- elseif (NumBndin2.eq.2) then
-    sh0(2:3) =(/2.8697_dp, 2.9486_dp/)
-    she0(2:3)=(/1.7385_dp, 2.0061_dp/)
-    intm1(2:3)=(/1.239e-18_dp, 3.87e-19_dp/)
-    intm2(2:3)=(/sighe0, 3.688e-18_dp/)  
- elseif(NumBndin2.eq.1) then
-    sh0(2) =2.9118_dp
-    she0(2)=1.8832_dp
-    intm1(2)=    1.239e-18_dp
-    intm2(2)=    sighe0
- elseif(NumBndin2.eq.6) then
-    sh0(2:7) =(/ 2.8408_dp,2.8685_dp,2.8958_dp,2.9224_dp,2.9481_dp,2.9727_dp/)
-    she0(2:7)=(/1.6168_dp,1.7390_dp,1.8355_dp,1.9186_dp,2.0018_dp,2.0945_dp/)
-    intm1(2:7)=(/1.164e-18_dp,8.33e-19_dp,5.859e-19_dp,3.874e-19_dp,2.687e-19_dp,1.777e-19_dp/)
-    intm2(2:7)=(/sighe0,5.9315e-18_dp, 4.7927e-18_dp,3.6875e-18_dp,2.9001e-18_dp,2.1906e-18_dp/)
- elseif(NumBndin2.eq.10) then
-    sh0(2:11) = (/2.8360_dp, 2.8554_dp, 2.8729_dp,2.8887_dp,2.9031_dp,2.9164_dp, &
-         2.9287_dp,2.9400_dp,2.9507_dp,2.9701_dp/)
-    she0(2:11)=(/1.5932_dp, 1.6849_dp, 1.7561_dp, 1.8126_dp, 1.8592_dp, 1.9000_dp, &
-         1.9379_dp, 1.9744_dp, 2.0105_dp, 2.0840_dp /)
-    intm1(2:11)=(/1.239152e-18_dp, 9.455687e-19_dp, 7.374876e-19_dp, 5.859440e-19_dp, &
-         4.729953e-19_dp, 3.874251e-19_dp, 3.209244e-19_dp, 2.686933e-19_dp, &
-         2.271125e-19_dp, 1.936094e-19_dp/)
-    intm2(2:11)=(/7.434699e-18_dp, 6.387263e-18_dp, 5.516179e-18_dp, 4.792724e-18_dp, &
-         4.190200e-18_dp, 3.687526e-18_dp, 3.261781e-18_dp, 2.900074e-18_dp, &
-         2.590455e-18_dp, 2.323526e-18_dp/)
- elseif (NumBndin2.eq.26) then
-    sh0(2:27) = (/2.8277_dp, 2.8330_dp, 2.8382_dp, 2.8432_dp, 2.8509_dp, 2.8601_dp, &
-         2.8688_dp, 2.8771_dp, &
-         2.8850_dp, 2.8925_dp, 2.8997_dp, 2.9066_dp, 2.9132_dp, 2.9196_dp, &
-         2.9257_dp, 2.9316_dp, 2.9373_dp, 2.9428_dp, 2.9481_dp, 2.9532_dp, &
-         2.9582_dp, 2.9630_dp, 2.9677_dp, 2.9722_dp, 2.9766_dp, 2.9813_dp/)
-    she0(2:27)= (/1.5509_dp, 1.5785_dp, 1.6047_dp, 1.6290_dp, 1.6649_dp, 1.7051_dp, &
-         1.7405_dp, 1.7719_dp, &
-         1.8000_dp, 1.8253_dp, 1.8486_dp, 1.8701_dp, 1.8904_dp, 1.9098_dp, &
-         1.9287_dp, 1.9472_dp, 1.9654_dp, 1.9835_dp, 2.0016_dp, 2.0196_dp, &
-         2.0376_dp, 2.0557_dp, 2.0738_dp, 2.0919_dp, 2.1099_dp, 2.1302_dp/)
-    intm1(2:27)=(/1.239152e-18_dp, 1.171908e-18_dp, 1.079235e-18_dp, 1.023159e-18_dp, &
-         9.455687e-19_dp, 8.329840e-19_dp, &
-         7.374876e-19_dp, 6.559608e-19_dp, 5.859440e-19_dp, 5.254793e-19_dp, &
-         4.729953e-19_dp, 4.272207e-19_dp, 3.874251e-19_dp, 3.521112e-19_dp, &
-         3.209244e-19_dp, 2.932810e-19_dp, 2.686933e-19_dp, 2.467523e-19_dp, &
-         2.271125e-19_dp, 2.094813e-19_dp, 1.936094e-19_dp, 1.792838e-19_dp, &
-         1.663215e-19_dp, 1.545649e-19_dp, 1.438778e-19_dp, 1.341418e-19_dp/)
-    intm2(2:27)=(/7.434699e-18_dp, 7.210641e-18_dp, 6.887151e-18_dp, 6.682491e-18_dp, &
-         6.387263e-18_dp, 5.931487e-18_dp, &
-         5.516179e-18_dp, 5.137743e-18_dp, 4.792724e-18_dp, 4.477877e-18_dp, &
-         4.190200e-18_dp, 3.926951e-18_dp, 3.687526e-18_dp, 3.465785e-18_dp, &
-         3.261781e-18_dp, 3.073737e-18_dp, 2.900074e-18_dp, 2.739394e-18_dp, &
-         2.590455e-18_dp, 2.452158e-18_dp, 2.323526e-18_dp, 2.203694e-18_dp, &
-         2.091889e-18_dp, 1.987425e-18_dp, 1.889687e-18_dp, 1.798126e-18_dp/)
- endif
-
- if (NumBndin3.eq.9) then
-    sh0(NumBndin2+2:NumBndin2+10) =(/3.0207_dp,3.0777_dp,3.1303_dp,3.1773_dp,&
-         3.2292_dp,3.2765_dp,3.3230_dp,3.3775_dp,3.4155_dp/)
-    she0(NumBndin2+2:NumBndin2+10)=(/2.3157_dp,2.5951_dp,2.8157_dp,2.9700_dp,3.0976_dp,&
-         3.1892_dp,3.2636_dp,3.3407_dp,3.3913_dp/)
-    she1(NumBndin2+2:NumBndin2+10)=(/2.7377_dp,2.8167_dp,2.8904_dp,2.9577_dp,3.0345_dp,&
-         3.1069_dp,3.1811_dp,3.2727_dp,3.3397_dp/)
-    intm1(NumBndin2+2:NumBndin2+10)=(/1.230696e-19_dp, 3.617600e-20_dp,&
-         1.492667e-20_dp, 4.196728e-21_dp, &
-         1.682670e-21_dp, 2.763830e-22_dp, &
-         8.591126e-23_dp, 8.593853e-24_dp, 3.898672e-25_dp/) 
-    intm2(NumBndin2+2:NumBndin2+10)=(/1.690781e-18_dp, 6.623773e-19_dp, &
-         3.142134e-19_dp, 1.005051e-19_dp, &
-         4.278712e-20_dp, 7.574790e-21_dp, &
-         2.429426e-21_dp, 2.534069e-22_dp, 1.189810e-23_dp/)
-    intm3(NumBndin2+2:NumBndin2+10)=(/sighe1,5.233870e-19_dp, 2.328072e-19_dp, &
-         7.214988e-20_dp, 3.081577e-20_dp, 5.646276e-21_dp, &
-         1.864734e-21_dp, 2.059271e-22_dp, 1.029637e-23_dp/)
- elseif (NumBndin3.eq.1) then
-    sh0(NumBndin2+2) = 3.3369_dp
-    she0(NumBndin2+2)= 3.2681_dp
-    she1(NumBndin2+2)= 3.2082_dp
-    intm1(NumBndin2+2)= 1.23e-19_dp
-    intm2(NumBndin2+2)= 1.691e-18_dp
-    intm3(NumBndin2+2)=sighe1
- elseif (NumBndin3.eq.4) then
-    sh0(NumBndin2+2:NumBndin2+5)  = (/3.0465_dp,3.1516_dp,3.2501_dp,3.3833_dp/)
-    she0(NumBndin2+2:NumBndin2+5) = (/2.4431_dp,2.8878_dp,3.1390_dp,3.3479_dp/)
-    she1(NumBndin2+2:NumBndin2+5) = (/2.7735_dp,2.9209_dp,3.0663_dp,3.2833_dp/)
-    intm1(NumBndin2+2:NumBndin2+5)= (/1.2307e-19_dp,1.4927e-20_dp,1.6827e-21_dp,8.59e-23_dp/)
-    intm2(NumBndin2+2:NumBndin2+5) =(/1.6908e-18_dp,3.1421e-19_dp,4.2787e-20_dp,2.4294e-21_dp/)
-    intm3(NumBndin2+2:NumBndin2+5) = (/1.5873e-18_dp,2.328e-19_dp,3.0816e-20_dp,1865e-21_dp/)
- elseif (NumBndin3.eq.11) then	
-    sh0(NumBndin2+2:NumBndin2+12) =(/2.9926_dp,3.0088_dp,3.0357_dp,3.0777_dp,3.1303_dp, &
-         3.1773_dp,3.2292_dp,3.2765_dp,3.3230_dp,3.3775_dp,3.4155_dp /)
-    she0(NumBndin2+2:NumBndin2+12)=(/2.1803_dp,2.2564_dp,2.3901_dp,2.5951_dp,2.8157_dp, &
-         2.9700_dp,3.0976_dp,3.1892_dp,3.2636_dp,3.3407_dp,3.3913_dp/)
-    she1(NumBndin2+2:NumBndin2+12)=(/2.6989_dp,2.7213_dp,2.7585_dp,2.8167_dp,2.8904_dp, &
-         2.9577_dp,3.0345_dp,3.1069_dp,3.1811_dp,3.2727_dp,3.3397_dp/)
-    intm1(NumBndin2+2:NumBndin2+12)=(/ 1.2307e-19_dp,9.2539e-20_dp,7.1230e-20_dp,3.6176e-20_dp, &
-         1.4927e-20_dp,4.1967e-21_dp,1.6827e-21_dp, 2.7638e-22_dp, &
-         8.5911e-23_dp,8.5939e-24_dp,3.8987e-25_dp/)
-    intm2(NumBndin2+2:NumBndin2+12)=(/1.6908e-18_dp,1.3737e-18_dp,1.1289e-18_dp,6.6238e-19_dp, &
-         3.1421e-19_dp, 1.0051e-19_dp,4.2787e-20_dp,7.5748e-21_dp, & 
-         2.4294e-21_dp,2.5341e-22_dp,1.1898e-23_dp/)
-    intm3(NumBndin2+2:NumBndin2+12)=(/1.5873e-18_dp,1.2274e-18_dp,9.6869e-19_dp,5.2339e-19_dp, &
-         2.3281e-19_dp, 7.2150e-20_dp, 3.0816e-20_dp,5.6463e-21_dp, &
-         1.8647e-21_dp,2.0593e-22_dp,1.0296e-23_dp/)
- elseif (NumBndin3.eq.16) then	
-    sh0(NumBndin2+2:NumBndin2+17) =(/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
-         3.0872_dp, 3.1303_dp, 3.1920_dp, 3.2410_dp, 3.2765_dp, &
-         3.3107_dp, 3.3376_dp, 3.3613_dp, 3.3878_dp, 3.4078_dp, 3.4343_dp/)
-
-    she0(NumBndin2+2:NumBndin2+17)=(/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
-         2.6397_dp, 2.8157_dp, 3.0093_dp, 3.1229_dp, 3.1892_dp, &
-         3.2451_dp, 3.2853_dp, 3.3187_dp, 3.3546_dp, 3.3811_dp, 3.4157_dp/)
-
-    she1(NumBndin2+2:NumBndin2+17)=(/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
-         2.8300_dp, 2.8904_dp, 2.9793_dp, 3.0522_dp, 3.1069_dp, &
-         3.1612_dp, 3.2051_dp, 3.2448_dp, 3.2904_dp, 3.3258_dp, 3.3740_dp/)
-
-    intm1(NumBndin2+2:NumBndin2+17)=(/ 1.230696e-19_dp, 1.063780e-19_dp, 9.253883e-20_dp, &
-         7.123014e-20_dp, 4.464019e-20_dp, 2.465533e-20_dp, &	
-         1.492667e-20_dp, 4.196728e-21_dp, 8.223247e-22_dp, &
-         2.763830e-22_dp, 8.591126e-23_dp, 2.244684e-23_dp, &	
-         8.593853e-24_dp, 2.199718e-24_dp, 3.898672e-25_dp, 1.238718e-25_dp/)
-
-    intm2(NumBndin2+2:NumBndin2+17)=(/1.690781e-18_dp, 1.521636e-18_dp, 1.373651e-18_dp, &
-         1.128867e-18_dp, 7.845096e-19_dp, 4.825331e-19_dp, &
-         3.142134e-19_dp, 1.005051e-19_dp, 2.165403e-20_dp, &
-         7.574790e-21_dp, 2.429426e-21_dp, 6.519748e-22_dp, &
-         2.534069e-22_dp, 6.599821e-23_dp, 1.189810e-23_dp, 3.814490e-24_dp/)
-
-    intm3(NumBndin2+2:NumBndin2+17)=(/1.587280e-18_dp, 1.391911e-18_dp, 1.227391e-18_dp, &
-         9.686899e-19_dp, 6.338284e-19_dp, 3.687895e-19_dp, &
-         2.328072e-19_dp, 7.214988e-20_dp, 1.576429e-20_dp, &
-         5.646276e-21_dp, 1.864734e-21_dp, 5.177347e-22_dp, &
-         2.059271e-22_dp, 5.526508e-23_dp, 1.029637e-23_dp, 3.363164e-24_dp/)
- elseif (NumBndin3.eq.20) then
-    intm1(NumBndin2+2:NumBndin2+21)=(/1.230696e-19_dp, 1.063780e-19_dp, 9.253883e-20_dp, &
-         7.123014e-20_dp, 4.464019e-20_dp, 2.465533e-20_dp, &
-         1.492667e-20_dp, 7.446712e-21_dp, 4.196728e-21_dp, &
-         1.682670e-21_dp, 8.223247e-22_dp, 2.763830e-22_dp, &
-         8.591126e-23_dp, 2.244684e-23_dp, 8.593853e-24_dp, &
-         2.199718e-24_dp, 8.315674e-25_dp, 3.898672e-25_dp, &
-         1.238718e-25_dp, 5.244957e-26_dp/)
-    intm2(NumBndin2+2:NumBndin2+21)=(/1.690781e-18_dp, 1.521636e-18_dp, 1.373651e-18_dp, &
-         1.128867e-18_dp, 7.845096e-19_dp, 4.825331e-19_dp, &
-         3.142134e-19_dp, 1.696228e-19_dp, 1.005051e-19_dp, &
-         4.278712e-20_dp, 2.165403e-20_dp, 7.574790e-21_dp, &
-         2.429426e-21_dp, 6.519748e-22_dp, 2.534069e-22_dp, &
-         6.599821e-23_dp, 2.520412e-23_dp, 1.189810e-23_dp, &
-         3.814490e-24_dp, 1.624492e-24_dp/)
-    intm3(NumBndin2+2:NumBndin2+21)=(/1.587280e-18_dp, 1.391911e-18_dp, 1.227391e-18_dp, &
-         9.686899e-19_dp, 6.338284e-19_dp, 3.687895e-19_dp, &
-         2.328072e-19_dp, 1.226873e-19_dp, 7.214988e-20_dp, &
-         3.081577e-20_dp, 1.576429e-20_dp, 5.646276e-21_dp, &
-         1.864734e-21_dp, 5.177347e-22_dp, 2.059271e-22_dp, &
-         5.526508e-23_dp, 2.151467e-23_dp, 1.029637e-23_dp, &
-         3.363164e-24_dp, 1.450239e-24_dp/)
-    sh0(NumBndin2+2:NumBndin2+21)=(/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
-         3.0872_dp, 3.1166_dp, 3.1455_dp, 3.1773_dp, 3.2089_dp, &
-         3.2410_dp, 3.2765_dp, 3.3107_dp, 3.3376_dp, 3.3613_dp, &
-         3.3816_dp, 3.3948_dp, 3.4078_dp, 3.4197_dp, 3.4379_dp/)
-    she0(NumBndin2+2:NumBndin2+21)=(/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
-         2.6397_dp, 2.7642_dp, 2.8714_dp, 2.9700_dp, 3.0528_dp, &
-         3.1229_dp, 3.1892_dp, 3.2451_dp, 3.2853_dp, 3.3187_dp, &
-         3.3464_dp, 3.3640_dp, 3.3811_dp, 3.3967_dp, 3.4203_dp/)
-    she1(NumBndin2+2:NumBndin2+21)=(/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
-         2.8300_dp, 2.8711_dp, 2.9121_dp, 2.9577_dp, 3.0041_dp, &
-         3.0522_dp, 3.1069_dp, 3.1612_dp, 3.2051_dp, 3.2448_dp, &
-         3.2796_dp, 3.3027_dp, 3.3258_dp, 3.3472_dp, 3.3805_dp/)
- endif
-
+          f1heat_h(NumBndin2+2:NumBndin2+21)=(/1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp /)
+          
+          f1heat_he0(NumBndin2+2:NumBndin2+21)=(/1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp /)
+          
+          f1heat_he1(NumBndin2+2:NumBndin2+21)=(/0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, &
+               1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp, 1.0000_dp /)
+          
+          f2heat_h(NumBndin2+2:NumBndin2+21)=(/0.3994_dp, 0.3817_dp, 0.3659_dp, &
+               0.3385_dp, 0.2961_dp, 0.2517_dp, 0.2207_dp, 0.1851_dp, 0.1608_dp, &
+               0.1295_dp, 0.1097_dp, 0.0858_dp, 0.0663_dp, 0.0496_dp, 0.0405_dp, &
+               0.0304_dp, 0.0248_dp, 0.0212_dp, 0.0167_dp, 0.0140_dp /)
+          
+          f2heat_he0(NumBndin2+2:NumBndin2+21)=(/0.4974_dp, 0.4679_dp, 0.4424_dp, &
+               0.4001_dp, 0.3389_dp, &
+               0.2796_dp, 0.2405_dp, 0.1977_dp, 0.1697_dp, 0.1346_dp, 0.1131_dp, &
+               0.0876_dp, 0.0673_dp, 0.0501_dp, 0.0408_dp, 0.0305_dp, 0.0249_dp, &
+               0.0213_dp, 0.0168_dp, 0.0140_dp /)
+          
+          f2heat_he1(NumBndin2+2:NumBndin2+21)=  (/0.0000_dp, 0.0000_dp, 0.0000_dp, &
+               0.0000_dp, 0.6202_dp,&
+               0.4192_dp, 0.3265_dp, 0.2459_dp, 0.2010_dp, 0.1513_dp, 0.1237_dp,&
+               0.0932_dp, 0.0701_dp, 0.0515_dp, 0.0416_dp, 0.0309_dp, 0.0251_dp,&
+               0.0214_dp, 0.0169_dp, 0.0141_dp /)
+       endif
+    endif
+    
+    
+    
+    if (NumBndin2.eq.3) then
+       sh0(2:4) =(/2.8542_dp, 2.9086_dp, 2.9600_dp/)
+       she0(2:4)=(/1.6770_dp, 1.8758_dp, 2.0458_dp/)
+       intm1(2:4)=(/1.239e-18_dp, 5.86e-19_dp,2.69e-19_dp/)
+       intm2(2:4)=(/sighe0, 4.793e-18_dp,2.90e-18_dp/)  
+    elseif (NumBndin2.eq.2) then
+       sh0(2:3) =(/2.8697_dp, 2.9486_dp/)
+       she0(2:3)=(/1.7385_dp, 2.0061_dp/)
+       intm1(2:3)=(/1.239e-18_dp, 3.87e-19_dp/)
+       intm2(2:3)=(/sighe0, 3.688e-18_dp/)  
+    elseif(NumBndin2.eq.1) then
+       sh0(2) =2.9118_dp
+       she0(2)=1.8832_dp
+       intm1(2)=    1.239e-18_dp
+       intm2(2)=    sighe0
+    elseif(NumBndin2.eq.6) then
+       sh0(2:7) =(/ 2.8408_dp,2.8685_dp,2.8958_dp,2.9224_dp,2.9481_dp,2.9727_dp/)
+       she0(2:7)=(/1.6168_dp,1.7390_dp,1.8355_dp,1.9186_dp,2.0018_dp,2.0945_dp/)
+       intm1(2:7)=(/1.164e-18_dp,8.33e-19_dp,5.859e-19_dp,3.874e-19_dp,2.687e-19_dp,1.777e-19_dp/)
+       intm2(2:7)=(/sighe0,5.9315e-18_dp, 4.7927e-18_dp,3.6875e-18_dp,2.9001e-18_dp,2.1906e-18_dp/)
+    elseif(NumBndin2.eq.10) then
+       sh0(2:11) = (/2.8360_dp, 2.8554_dp, 2.8729_dp,2.8887_dp,2.9031_dp,2.9164_dp, &
+            2.9287_dp,2.9400_dp,2.9507_dp,2.9701_dp/)
+       she0(2:11)=(/1.5932_dp, 1.6849_dp, 1.7561_dp, 1.8126_dp, 1.8592_dp, 1.9000_dp, &
+            1.9379_dp, 1.9744_dp, 2.0105_dp, 2.0840_dp /)
+       intm1(2:11)=(/1.239152e-18_dp, 9.455687e-19_dp, 7.374876e-19_dp, 5.859440e-19_dp, &
+            4.729953e-19_dp, 3.874251e-19_dp, 3.209244e-19_dp, 2.686933e-19_dp, &
+            2.271125e-19_dp, 1.936094e-19_dp/)
+       intm2(2:11)=(/7.434699e-18_dp, 6.387263e-18_dp, 5.516179e-18_dp, 4.792724e-18_dp, &
+            4.190200e-18_dp, 3.687526e-18_dp, 3.261781e-18_dp, 2.900074e-18_dp, &
+            2.590455e-18_dp, 2.323526e-18_dp/)
+    elseif (NumBndin2.eq.26) then
+       sh0(2:27) = (/2.8277_dp, 2.8330_dp, 2.8382_dp, 2.8432_dp, 2.8509_dp, 2.8601_dp, &
+            2.8688_dp, 2.8771_dp, &
+            2.8850_dp, 2.8925_dp, 2.8997_dp, 2.9066_dp, 2.9132_dp, 2.9196_dp, &
+            2.9257_dp, 2.9316_dp, 2.9373_dp, 2.9428_dp, 2.9481_dp, 2.9532_dp, &
+            2.9582_dp, 2.9630_dp, 2.9677_dp, 2.9722_dp, 2.9766_dp, 2.9813_dp/)
+       she0(2:27)= (/1.5509_dp, 1.5785_dp, 1.6047_dp, 1.6290_dp, 1.6649_dp, 1.7051_dp, &
+            1.7405_dp, 1.7719_dp, &
+            1.8000_dp, 1.8253_dp, 1.8486_dp, 1.8701_dp, 1.8904_dp, 1.9098_dp, &
+            1.9287_dp, 1.9472_dp, 1.9654_dp, 1.9835_dp, 2.0016_dp, 2.0196_dp, &
+            2.0376_dp, 2.0557_dp, 2.0738_dp, 2.0919_dp, 2.1099_dp, 2.1302_dp/)
+       intm1(2:27)=(/1.239152e-18_dp, 1.171908e-18_dp, 1.079235e-18_dp, 1.023159e-18_dp, &
+            9.455687e-19_dp, 8.329840e-19_dp, &
+            7.374876e-19_dp, 6.559608e-19_dp, 5.859440e-19_dp, 5.254793e-19_dp, &
+            4.729953e-19_dp, 4.272207e-19_dp, 3.874251e-19_dp, 3.521112e-19_dp, &
+            3.209244e-19_dp, 2.932810e-19_dp, 2.686933e-19_dp, 2.467523e-19_dp, &
+            2.271125e-19_dp, 2.094813e-19_dp, 1.936094e-19_dp, 1.792838e-19_dp, &
+            1.663215e-19_dp, 1.545649e-19_dp, 1.438778e-19_dp, 1.341418e-19_dp/)
+       intm2(2:27)=(/7.434699e-18_dp, 7.210641e-18_dp, 6.887151e-18_dp, 6.682491e-18_dp, &
+            6.387263e-18_dp, 5.931487e-18_dp, &
+            5.516179e-18_dp, 5.137743e-18_dp, 4.792724e-18_dp, 4.477877e-18_dp, &
+            4.190200e-18_dp, 3.926951e-18_dp, 3.687526e-18_dp, 3.465785e-18_dp, &
+            3.261781e-18_dp, 3.073737e-18_dp, 2.900074e-18_dp, 2.739394e-18_dp, &
+            2.590455e-18_dp, 2.452158e-18_dp, 2.323526e-18_dp, 2.203694e-18_dp, &
+            2.091889e-18_dp, 1.987425e-18_dp, 1.889687e-18_dp, 1.798126e-18_dp/)
+    endif
+    
+    if (NumBndin3.eq.9) then
+       sh0(NumBndin2+2:NumBndin2+10) =(/3.0207_dp,3.0777_dp,3.1303_dp,3.1773_dp,&
+            3.2292_dp,3.2765_dp,3.3230_dp,3.3775_dp,3.4155_dp/)
+       she0(NumBndin2+2:NumBndin2+10)=(/2.3157_dp,2.5951_dp,2.8157_dp,2.9700_dp,3.0976_dp,&
+            3.1892_dp,3.2636_dp,3.3407_dp,3.3913_dp/)
+       she1(NumBndin2+2:NumBndin2+10)=(/2.7377_dp,2.8167_dp,2.8904_dp,2.9577_dp,3.0345_dp,&
+            3.1069_dp,3.1811_dp,3.2727_dp,3.3397_dp/)
+       intm1(NumBndin2+2:NumBndin2+10)=(/1.230696e-19_dp, 3.617600e-20_dp,&
+            1.492667e-20_dp, 4.196728e-21_dp, &
+            1.682670e-21_dp, 2.763830e-22_dp, &
+            8.591126e-23_dp, 8.593853e-24_dp, 3.898672e-25_dp/) 
+       intm2(NumBndin2+2:NumBndin2+10)=(/1.690781e-18_dp, 6.623773e-19_dp, &
+            3.142134e-19_dp, 1.005051e-19_dp, &
+            4.278712e-20_dp, 7.574790e-21_dp, &
+            2.429426e-21_dp, 2.534069e-22_dp, 1.189810e-23_dp/)
+       intm3(NumBndin2+2:NumBndin2+10)=(/sighe1,5.233870e-19_dp, 2.328072e-19_dp, &
+            7.214988e-20_dp, 3.081577e-20_dp, 5.646276e-21_dp, &
+            1.864734e-21_dp, 2.059271e-22_dp, 1.029637e-23_dp/)
+    elseif (NumBndin3.eq.1) then
+       sh0(NumBndin2+2) = 3.3369_dp
+       she0(NumBndin2+2)= 3.2681_dp
+       she1(NumBndin2+2)= 3.2082_dp
+       intm1(NumBndin2+2)= 1.23e-19_dp
+       intm2(NumBndin2+2)= 1.691e-18_dp
+       intm3(NumBndin2+2)=sighe1
+    elseif (NumBndin3.eq.4) then
+       sh0(NumBndin2+2:NumBndin2+5)  = (/3.0465_dp,3.1516_dp,3.2501_dp,3.3833_dp/)
+       she0(NumBndin2+2:NumBndin2+5) = (/2.4431_dp,2.8878_dp,3.1390_dp,3.3479_dp/)
+       she1(NumBndin2+2:NumBndin2+5) = (/2.7735_dp,2.9209_dp,3.0663_dp,3.2833_dp/)
+       intm1(NumBndin2+2:NumBndin2+5)= (/1.2307e-19_dp,1.4927e-20_dp,1.6827e-21_dp,8.59e-23_dp/)
+       intm2(NumBndin2+2:NumBndin2+5) =(/1.6908e-18_dp,3.1421e-19_dp,4.2787e-20_dp,2.4294e-21_dp/)
+       intm3(NumBndin2+2:NumBndin2+5) = (/1.5873e-18_dp,2.328e-19_dp,3.0816e-20_dp,1865e-21_dp/)
+    elseif (NumBndin3.eq.11) then	
+       sh0(NumBndin2+2:NumBndin2+12) =(/2.9926_dp,3.0088_dp,3.0357_dp,3.0777_dp,3.1303_dp, &
+            3.1773_dp,3.2292_dp,3.2765_dp,3.3230_dp,3.3775_dp,3.4155_dp /)
+       she0(NumBndin2+2:NumBndin2+12)=(/2.1803_dp,2.2564_dp,2.3901_dp,2.5951_dp,2.8157_dp, &
+            2.9700_dp,3.0976_dp,3.1892_dp,3.2636_dp,3.3407_dp,3.3913_dp/)
+       she1(NumBndin2+2:NumBndin2+12)=(/2.6989_dp,2.7213_dp,2.7585_dp,2.8167_dp,2.8904_dp, &
+            2.9577_dp,3.0345_dp,3.1069_dp,3.1811_dp,3.2727_dp,3.3397_dp/)
+       intm1(NumBndin2+2:NumBndin2+12)=(/ 1.2307e-19_dp,9.2539e-20_dp,7.1230e-20_dp,3.6176e-20_dp, &
+            1.4927e-20_dp,4.1967e-21_dp,1.6827e-21_dp, 2.7638e-22_dp, &
+            8.5911e-23_dp,8.5939e-24_dp,3.8987e-25_dp/)
+       intm2(NumBndin2+2:NumBndin2+12)=(/1.6908e-18_dp,1.3737e-18_dp,1.1289e-18_dp,6.6238e-19_dp, &
+            3.1421e-19_dp, 1.0051e-19_dp,4.2787e-20_dp,7.5748e-21_dp, & 
+            2.4294e-21_dp,2.5341e-22_dp,1.1898e-23_dp/)
+       intm3(NumBndin2+2:NumBndin2+12)=(/1.5873e-18_dp,1.2274e-18_dp,9.6869e-19_dp,5.2339e-19_dp, &
+            2.3281e-19_dp, 7.2150e-20_dp, 3.0816e-20_dp,5.6463e-21_dp, &
+            1.8647e-21_dp,2.0593e-22_dp,1.0296e-23_dp/)
+    elseif (NumBndin3.eq.16) then	
+       sh0(NumBndin2+2:NumBndin2+17) =(/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
+            3.0872_dp, 3.1303_dp, 3.1920_dp, 3.2410_dp, 3.2765_dp, &
+            3.3107_dp, 3.3376_dp, 3.3613_dp, 3.3878_dp, 3.4078_dp, 3.4343_dp/)
+       
+       she0(NumBndin2+2:NumBndin2+17)=(/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
+            2.6397_dp, 2.8157_dp, 3.0093_dp, 3.1229_dp, 3.1892_dp, &
+            3.2451_dp, 3.2853_dp, 3.3187_dp, 3.3546_dp, 3.3811_dp, 3.4157_dp/)
+       
+       she1(NumBndin2+2:NumBndin2+17)=(/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
+            2.8300_dp, 2.8904_dp, 2.9793_dp, 3.0522_dp, 3.1069_dp, &
+            3.1612_dp, 3.2051_dp, 3.2448_dp, 3.2904_dp, 3.3258_dp, 3.3740_dp/)
+       
+       intm1(NumBndin2+2:NumBndin2+17)=(/ 1.230696e-19_dp, 1.063780e-19_dp, 9.253883e-20_dp, &
+            7.123014e-20_dp, 4.464019e-20_dp, 2.465533e-20_dp, &	
+            1.492667e-20_dp, 4.196728e-21_dp, 8.223247e-22_dp, &
+            2.763830e-22_dp, 8.591126e-23_dp, 2.244684e-23_dp, &	
+            8.593853e-24_dp, 2.199718e-24_dp, 3.898672e-25_dp, 1.238718e-25_dp/)
+       
+       intm2(NumBndin2+2:NumBndin2+17)=(/1.690781e-18_dp, 1.521636e-18_dp, 1.373651e-18_dp, &
+            1.128867e-18_dp, 7.845096e-19_dp, 4.825331e-19_dp, &
+            3.142134e-19_dp, 1.005051e-19_dp, 2.165403e-20_dp, &
+            7.574790e-21_dp, 2.429426e-21_dp, 6.519748e-22_dp, &
+            2.534069e-22_dp, 6.599821e-23_dp, 1.189810e-23_dp, 3.814490e-24_dp/)
+       
+       intm3(NumBndin2+2:NumBndin2+17)=(/1.587280e-18_dp, 1.391911e-18_dp, 1.227391e-18_dp, &
+            9.686899e-19_dp, 6.338284e-19_dp, 3.687895e-19_dp, &
+            2.328072e-19_dp, 7.214988e-20_dp, 1.576429e-20_dp, &
+            5.646276e-21_dp, 1.864734e-21_dp, 5.177347e-22_dp, &
+            2.059271e-22_dp, 5.526508e-23_dp, 1.029637e-23_dp, 3.363164e-24_dp/)
+    elseif (NumBndin3.eq.20) then
+       intm1(NumBndin2+2:NumBndin2+21)=(/1.230696e-19_dp, 1.063780e-19_dp, 9.253883e-20_dp, &
+            7.123014e-20_dp, 4.464019e-20_dp, 2.465533e-20_dp, &
+            1.492667e-20_dp, 7.446712e-21_dp, 4.196728e-21_dp, &
+            1.682670e-21_dp, 8.223247e-22_dp, 2.763830e-22_dp, &
+            8.591126e-23_dp, 2.244684e-23_dp, 8.593853e-24_dp, &
+            2.199718e-24_dp, 8.315674e-25_dp, 3.898672e-25_dp, &
+            1.238718e-25_dp, 5.244957e-26_dp/)
+       intm2(NumBndin2+2:NumBndin2+21)=(/1.690781e-18_dp, 1.521636e-18_dp, 1.373651e-18_dp, &
+            1.128867e-18_dp, 7.845096e-19_dp, 4.825331e-19_dp, &
+            3.142134e-19_dp, 1.696228e-19_dp, 1.005051e-19_dp, &
+            4.278712e-20_dp, 2.165403e-20_dp, 7.574790e-21_dp, &
+            2.429426e-21_dp, 6.519748e-22_dp, 2.534069e-22_dp, &
+            6.599821e-23_dp, 2.520412e-23_dp, 1.189810e-23_dp, &
+            3.814490e-24_dp, 1.624492e-24_dp/)
+       intm3(NumBndin2+2:NumBndin2+21)=(/1.587280e-18_dp, 1.391911e-18_dp, 1.227391e-18_dp, &
+            9.686899e-19_dp, 6.338284e-19_dp, 3.687895e-19_dp, &
+            2.328072e-19_dp, 1.226873e-19_dp, 7.214988e-20_dp, &
+            3.081577e-20_dp, 1.576429e-20_dp, 5.646276e-21_dp, &
+            1.864734e-21_dp, 5.177347e-22_dp, 2.059271e-22_dp, &
+            5.526508e-23_dp, 2.151467e-23_dp, 1.029637e-23_dp, &
+            3.363164e-24_dp, 1.450239e-24_dp/)
+       sh0(NumBndin2+2:NumBndin2+21)=(/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
+            3.0872_dp, 3.1166_dp, 3.1455_dp, 3.1773_dp, 3.2089_dp, &
+            3.2410_dp, 3.2765_dp, 3.3107_dp, 3.3376_dp, 3.3613_dp, &
+            3.3816_dp, 3.3948_dp, 3.4078_dp, 3.4197_dp, 3.4379_dp/)
+       she0(NumBndin2+2:NumBndin2+21)=(/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
+            2.6397_dp, 2.7642_dp, 2.8714_dp, 2.9700_dp, 3.0528_dp, &
+            3.1229_dp, 3.1892_dp, 3.2451_dp, 3.2853_dp, 3.3187_dp, &
+            3.3464_dp, 3.3640_dp, 3.3811_dp, 3.3967_dp, 3.4203_dp/)
+       she1(NumBndin2+2:NumBndin2+21)=(/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
+            2.8300_dp, 2.8711_dp, 2.9121_dp, 2.9577_dp, 3.0041_dp, &
+            3.0522_dp, 3.1069_dp, 3.1612_dp, 3.2051_dp, 3.2448_dp, &
+            3.2796_dp, 3.3027_dp, 3.3258_dp, 3.3472_dp, 3.3805_dp/)
+    endif
+    
   end subroutine setup_scalingfactors
+  
+  ! =======================================================================
 
-! =======================================================================
 end module radiation
