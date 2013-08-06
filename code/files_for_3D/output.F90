@@ -191,17 +191,28 @@ contains
           open(unit=51,file=file1,form="formatted",status="unknown")
 
           ! Write data
-          do i=1,mesh(1)
-             write(51,"(7(1pe10.3,1x))")  &
-                  xh(i,srcpos(2,1),srcpos(3,1),0), &
-                  xh(i,srcpos(2,1),srcpos(3,1),1), &
-                  ndens(i,srcpos(2,1),srcpos(3,1)), &
-                  xhe(i,srcpos(2,1),srcpos(3,1),0), &
-                  xhe(i,srcpos(2,1),srcpos(3,1),1), &                 
-                  xhe(i,srcpos(2,1),srcpos(3,1),2), &                        
-                  temperature_grid(i,srcpos(2,1),srcpos(3,1),0)
-                 
-          enddo
+          if (.not.isothermal) then
+             do i=1,mesh(1)
+                write(51,"(7(1pe10.3,1x))")  &
+                     xh(i,srcpos(2,1),srcpos(3,1),0), &
+                     xh(i,srcpos(2,1),srcpos(3,1),1), &
+                     ndens(i,srcpos(2,1),srcpos(3,1)), &
+                     xhe(i,srcpos(2,1),srcpos(3,1),0), &
+                     xhe(i,srcpos(2,1),srcpos(3,1),1), &                 
+                     xhe(i,srcpos(2,1),srcpos(3,1),2), &                        
+                     temperature_grid(i,srcpos(2,1),srcpos(3,1),0)
+             enddo
+          else
+             do i=1,mesh(1)
+                write(51,"(7(1pe10.3,1x))")  &
+                     xh(i,srcpos(2,1),srcpos(3,1),0), &
+                     xh(i,srcpos(2,1),srcpos(3,1),1), &
+                     ndens(i,srcpos(2,1),srcpos(3,1)), &
+                     xhe(i,srcpos(2,1),srcpos(3,1),0), &
+                     xhe(i,srcpos(2,1),srcpos(3,1),1), &                 
+                     xhe(i,srcpos(2,1),srcpos(3,1),2)
+             enddo
+          endif
           ! Close file
           close(51)
        else
@@ -489,6 +500,7 @@ contains
           write(95,"(f6.3,8(1pe10.3))") zred_now,totions,grtotal_src, &
                volfrac,massfrac
 
+          photcons_flag=0
 !*** for the moment, I turn that off, until I checked, how I calculate those quantities.
           !if (abs(1.0-photcons) > 0.15) then
              !if ((1.0-photcons) > 0.15 .and. &
