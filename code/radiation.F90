@@ -1328,14 +1328,16 @@ contains
           tau_cell_HeII(i_subband) = colum_cell_HeII*sigma_HeII(i_subband)
        enddo
               
-       call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
+       if (NormFlux(nsrc) > 0.0) &  
+            call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
             tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,sourcetype, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,"B", &
             vol,i_state,colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
        
-       call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
+       if (NormFluxPL(nsrc) > 0.0) &  
+            call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
             tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,sourcetype, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,"P", &
             vol,i_state,colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
        
     endif
@@ -1386,7 +1388,7 @@ contains
     read_table = table(table_position%ipos(i_subband),i_subband2)+ &
          ( table(table_position%ipos_p1(i_subband),i_subband2)- &
          table(table_position%ipos(i_subband),i_subband2) ) * &
-         table_position%residual(i_subband2)
+         table_position%residual(i_subband)
     
   end function read_table
 
@@ -1395,7 +1397,7 @@ contains
   ! find out the correct position in the photo and heating tables
   subroutine photo_lookuptable(tau_pos_in,tau_pos_out,phi, &
        tau_in_all,tau_out_all, &
-       NFlux,sourcetype, &
+       NFlux,table_type, &
        vol,colum_cell_HI,colum_cell_HeI,colum_cell_HeII)
     
     use cgsphotoconstants
@@ -1405,7 +1407,7 @@ contains
     real(kind=dp), intent(in) :: NFlux, vol
     real(kind=dp), intent(in) :: colum_cell_HI, colum_cell_HeI, colum_cell_HeII
     real(kind=dp), dimension(NumFreqBnd), intent(in) :: tau_in_all, tau_out_all
-    character,intent(in) :: sourcetype
+    character,intent(in) :: table_type
     
     integer ::  n, i_subband, i
     real(kind=dp) :: phi_photo_in_all, phi_photo_out_all, phi_photo_all
@@ -1420,11 +1422,11 @@ contains
     ! pointers point to the correct tables to use, BB or PL source
     ! Set the maximum frequency band to consider (and limit the
     ! loop over the subbands below)
-    if (sourcetype.eq.'B') then 
+    if (table_type == "B") then 
        photo_thick_table => bb_photo_thick_table
        photo_thin_table => bb_photo_thin_table
        Maximum_FreqBnd=bb_FreqBnd_UpperLimit
-    elseif (sourcetype.eq.'P') then
+    elseif (table_type == "P") then
        photo_thick_table => pl_photo_thick_table
        photo_thin_table => pl_photo_thin_table
        Maximum_FreqBnd=NumFreqBnd
@@ -1518,7 +1520,7 @@ contains
   subroutine heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
        tau_in_all,tau_out_all, &
        tau_cell_HI,tau_cell_HeI,tau_cell_HeII, &
-       NFlux,sourcetype, &
+       NFlux,table_type, &
        vol,i_state,colum_cell_HI,colum_cell_HeI,colum_cell_HeII)
 
     use cgsphotoconstants
@@ -1528,7 +1530,7 @@ contains
     real(kind=dp), intent(in) :: NFlux, vol, i_state
     real(kind=dp), intent(in) :: colum_cell_HI, colum_cell_HeI, colum_cell_HeII
     real(kind=dp), dimension(NumFreqBnd), intent(in) :: tau_in_all, tau_out_all
-    character,intent(in) :: sourcetype
+    character,intent(in) :: table_type
     real(kind=dp), dimension(NumFreqBnd),intent(in) :: tau_cell_HI, tau_cell_HeI, tau_cell_HeII
 
     integer ::  n, i_subband, i
@@ -1547,11 +1549,11 @@ contains
     ! pointers point to the correct tables to use, BB or PL source
     ! Set the maximum frequency band to consider (and limit the
     ! loop over the subbands below)
-    if (sourcetype.eq.'B') then 
+    if (table_type == "B") then 
        heat_thick_table => bb_heat_thick_table
        heat_thin_table => bb_heat_thin_table
        Maximum_FreqBnd=bb_FreqBnd_UpperLimit
-    elseif (sourcetype.eq.'P') then
+    elseif (table_type == "P") then
        heat_thick_table => pl_heat_thick_table
        heat_thin_table => pl_heat_thin_table
        Maximum_FreqBnd=NumFreqBnd
