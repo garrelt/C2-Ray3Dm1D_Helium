@@ -107,6 +107,7 @@ contains
   subroutine evolve_ini ()
     
     allocate(phih_grid(mesh(1),mesh(2),mesh(3)))
+    phih_grid=0.0 ! Needs value for initial output
     allocate(phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
     allocate(phiheat(mesh(1),mesh(2),mesh(3)))
     
@@ -122,6 +123,7 @@ contains
     allocate(buffer(mesh(1),mesh(2),mesh(3)))
     allocate(photon_loss_src_thread(1:NumFreqBnd,nthreads))
   !   allocate(photon_loss_src_thread(1:NumFreqBnd,1))   
+
   end subroutine evolve_ini
 
   ! ===========================================================================
