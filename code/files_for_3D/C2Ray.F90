@@ -33,6 +33,7 @@ Program C2Ray
 
   use precision, only: dp
   use clocks, only: setup_clocks, update_clocks, report_clocks
+  use report_memory_module, only: report_memory
   use file_admin, only: stdinput, logf, file_input, flag_for_file_input
   use c2ray_parameters, only: cosmological, type_of_clumping, &
        use_LLS, type_of_LLS,stop_on_photon_violation
@@ -222,12 +223,20 @@ Program C2Ray
      ! Reset restart flag now that everything has been dealt with
      restart=0 
 
+#ifdef MPILOG     
+     write(logf,*) 'First output'
+#endif 
      ! If start of simulation output
      if (NumSrc > 0 .and. sim_time == 0.0) call output(time2zred(sim_time),sim_time,dt, &
           photcons_flag)
 
+#ifdef MPILOG     
+     write(logf,*) 'Start of loop'
+#endif 
+     if (rank == 0) flush(logf)
      ! Loop until end time is reached
      do
+        if (rank == 0) call report_memory(logf)
         ! Make sure you produce output at the correct time
         actual_dt=min(next_output_time-sim_time,dt)         
         ! Report time and time step
@@ -243,6 +252,7 @@ Program C2Ray
         if (type_of_clumping /= 5) call set_clumping(zred)  
         if (use_LLS .and. type_of_LLS /= 2) call set_LLS(zred)        
         ! Take one time step
+        if (rank == 0) flush(logf)
         if (NumSrc > 0) call evolve3D(actual_dt,iter_restart)  
         ! Reset flag for restart from iteration 
         ! (evolve3D is the last routine affected by this)
