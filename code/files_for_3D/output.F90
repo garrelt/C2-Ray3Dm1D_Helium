@@ -23,7 +23,7 @@ module output_module
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
-  use evolve, only: phih_grid
+  use evolve, only: phih_grid, phiheat
   use sourceprops, only: srcpos, NormFlux, NumSrc
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
@@ -354,6 +354,16 @@ contains
           open(unit=53,file=file1,form="unformatted",status="unknown")
           write(53) mesh(1),mesh(2),mesh(3)
           write(53) (((real(phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(phiheat(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(53)
 

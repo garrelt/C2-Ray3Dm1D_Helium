@@ -51,7 +51,7 @@ module evolve
 
   private
 
-  public :: evolve3D, phih_grid, evolve_ini, phihe_grid
+  public :: evolve3D, phih_grid, evolve_ini, phihe_grid, phiheat
 
   !> Periodic boundary conditions, has to be true for this version
   logical,parameter :: periodic_bc = .true.
@@ -110,6 +110,7 @@ contains
     phih_grid=0.0 ! Needs value for initial output
     allocate(phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
     allocate(phiheat(mesh(1),mesh(2),mesh(3)))
+    phiheat=0.0 ! Needs value for initial output
     
     allocate(xh_av(mesh(1),mesh(2),mesh(3),0:1))
     allocate(xhe_av(mesh(1),mesh(2),mesh(3),0:2))
