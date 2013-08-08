@@ -72,7 +72,7 @@ contains
        proc_unit=proc_unit+1
     enddo
 
-    write(report_file_unit,"(A)") "---------- Memory report ----------",line
+    write(report_file_unit,"(A)") "---------- Memory report ----------"
 
     ! Open /proc/self/status
     open(unit=proc_unit,file="/proc/self/status",status="old", &
