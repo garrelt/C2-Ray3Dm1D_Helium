@@ -59,11 +59,11 @@ FC = ifort # Intel compiler
 MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
-#IFORTFLAGS = -O0 -g -DIFORT -u -fpe0 -p #-check all -traceback -fpp  #!<
-IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -p #-check all -traceback
+#IFORTFLAGS = -DMPILOG -O0 -g -DIFORT -u -fpe0 -shared-intel -check all -traceback -fpp  #!<
+IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
 #IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
-F90FLAGS1 = $(IFORTFLAGS)  #!<
+#F90FLAGS1 = $(IFORTFLAGS)  #!<
 #F90FLAGS1 = -xW $(IFORTFLAGS) 
 F90FLAGS1 = -xO $(IFORTFLAGS) 
 #F90FLAGS1 = -xT $(IFORTFLAGS) # Laptop 
@@ -130,8 +130,8 @@ LIBS = -lirc
 
 #-------------------------------------------------------
 
-UTILS1= ../precision.o ../mrgrnk.o ../ctrper.o ../romberg.o ../file_admin.o
-UTILS2= precision.o mrgrnk.o ctrper.o romberg.o file_admin.o
+UTILS1= ../precision.o ../mrgrnk.o ../ctrper.o ../romberg.o ../file_admin.o ../report_memory.o
+UTILS2= precision.o mrgrnk.o ctrper.o romberg.o file_admin.o report_memory.o
 
 CONSTANTS1 = ../mathconstants.o ../cgsconstants.o  ../cgsphotoconstants.o  ../cgsastroconstants.o ../c2ray_parameters.o ../cosmoparms.o ../abundances.o ../atomic.o
 
@@ -147,13 +147,17 @@ GENERAL1=../cosmology.o  ../cooling_h.o ../radiation_including_pls_new.o   ../th
 
 GENERAL2=cosmology.o  cooling_h.o radiation_including_pls_new.o   thermal.o time_ini.o doric.o photonstatistics.o evolve8.o output.o
 
-TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test.o
+GENERAL1_KYL=../cosmology.o  ../cooling_h.o ../radiation.o   ../thermal.o ../time_ini.o ../doric.o photonstatistics.o evolve8.o output.o
 
-TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test.o
+GENERAL2_KYL=cosmology.o  cooling_h.o radiation.o   thermal.o time_ini.o doric.o photonstatistics.o evolve8.o output.o
 
-#TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test2.o
+TEST= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test.o
 
-#TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test2.o
+TEST_2= clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test.o
+
+TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test2.o
+
+TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test2.o
 
 TEST4_1= ../clocks.o  ../test4.o grid.o ../tped.o mat_ini_test4.o sourceprops_test4.o
 
@@ -175,19 +179,64 @@ GADGET2= clocks.o gadget.o grid.o tped.o mat_ini_Gadget.o sourceprops_gadget.o
 
 C2Ray_3D_test_periodic: F90=$(FC)
 C2Ray_3D_test_periodic: F90FLAGS = $(F90FLAGS1)
-C2Ray_3D_test_periodic: $(UTILS1) sizes.o $(CONSTANTS1)    ../no_mpi.o $(TEST1) $(GENERAL1) C2Ray.o
-	$(F90) $(OPTIONS) -o $@  $(UTILS2) sizes.o $(CONSTANTS2)  no_mpi.o $(TEST2) $(GENERAL2) C2Ray.o
+C2Ray_3D_test_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2) C2Ray.o
+
+C2Ray_3D_test_kyl_periodic: F90=$(FC)
+C2Ray_3D_test_kyl_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_periodic_mpi: F90=$(MPIFC)
 C2Ray_3D_test_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
-C2Ray_3D_test_periodic_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)   mpi.o $(TEST1) $(GENERAL1) C2Ray.o
-	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(TEST2) $(GENERAL2) C2Ray.o
+C2Ray_3D_test_periodic_mpi: $(UTILS1) sizes.o $(CONSTANTS1) ../mpi.o $(TEST) $(GENERAL1) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) mpi.o $(TEST_2) $(GENERAL2) C2Ray.o
+
+C2Ray_3D_test_kyl_periodic_mpi: F90=$(MPIFC)
+C2Ray_3D_test_kyl_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
+C2Ray_3D_test_kyl_periodic_mpi: $(UTILS1) sizes.o $(CONSTANTS1) ../mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_periodic_omp: F90=$(FC)
 C2Ray_3D_test_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
-C2Ray_3D_test_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../no_mpi.o $(TEST1) $(GENERAL1) C2Ray.o
-	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)  no_mpi.o $(TEST2) $(GENERAL2) C2Ray.o
+C2Ray_3D_test_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2) C2Ray.o
 
+C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
+C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
+C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
+
+#--------TEST2----------------------------------------------------------------
+C2Ray_3D_test2_periodic: F90=$(FC)
+C2Ray_3D_test2_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_test2_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST1) $(GENERAL1) C2Ray.o
+	$(F90) $(OPTIONS) -o $@  $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST2) $(GENERAL2) C2Ray.o
+
+C2Ray_3D_test2_kyl_periodic: F90=$(FC)
+C2Ray_3D_test2_kyl_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_test2_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST1) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@  $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST2) $(GENERAL2_KYL) C2Ray.o
+
+C2Ray_3D_test2_periodic_mpi: F90=$(MPIFC)
+C2Ray_3D_test2_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
+C2Ray_3D_test2_periodic_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)   mpi.o $(TEST1) $(GENERAL1) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(TEST2) $(GENERAL2) C2Ray.o
+
+C2Ray_3D_test2_kyl_periodic_mpi: F90=$(MPIFC)
+C2Ray_3D_test2_kyl_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
+C2Ray_3D_test2_kyl_periodic_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)   mpi.o $(TEST1) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(TEST2) $(GENERAL2_KYL) C2Ray.o
+
+C2Ray_3D_test2_periodic_omp: F90=$(FC)
+C2Ray_3D_test2_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
+C2Ray_3D_test2_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../no_mpi.o $(TEST1) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)  no_mpi.o $(TEST2) $(GENERAL2_KYL) C2Ray.o
+
+C2Ray_3D_test2_kyl_periodic_omp: F90=$(FC)
+C2Ray_3D_test2_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
+C2Ray_3D_test2_kyl_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../no_mpi.o $(TEST1) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)  no_mpi.o $(TEST2) $(GENERAL2_KYL) C2Ray.o
 
 #--------TEST4----------------------------------------------------------------
 
@@ -244,6 +293,11 @@ C2Ray_3D_cubep3m_periodic: F90FLAGS = $(F90FLAGS1)
 C2Ray_3D_cubep3m_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
+C2Ray_3D_cubep3m_kyl_periodic: F90=$(FC)
+C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_cubep3m_kyl_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
+
 C2Ray_3D_cubep3m_periodic_mpi: F90=$(MPIFC)
 C2Ray_3D_cubep3m_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
 C2Ray_3D_cubep3m_periodic_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../mpi.o $(CUBEP3M1) $(GENERAL1) C2Ray.o
@@ -258,6 +312,11 @@ C2Ray_3D_cubep3m_periodic_omp_mpi: F90=$(MPIFC)
 C2Ray_3D_cubep3m_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) $(MPI_FLAGS)
 C2Ray_3D_cubep3m_periodic_omp_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../mpi.o $(CUBEP3M1) $(GENERAL1) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
+
+C2Ray_3D_cubep3m_kyl_periodic_omp_mpi: F90=$(MPIFC)
+C2Ray_3D_cubep3m_kyl_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) $(MPI_FLAGS)
+C2Ray_3D_cubep3m_kyl_periodic_omp_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_cubep3m_periodic_compr_mpi: F90=$(MPIFC)
 C2Ray_3D_cubep3m_periodic_compr_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
