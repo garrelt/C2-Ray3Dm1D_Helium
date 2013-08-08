@@ -156,13 +156,35 @@ contains
     ! Set photon conservation flag to zero on all processors
     photcons_flag=0
 
+#ifdef MPILOG     
+     write(logf,*) 'output 1'
+#endif 
     if (streams(1) == 1) call write_stream1 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 2'
+#endif 
     if (streams(2) == 1) call write_stream2 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 3'
+#endif 
     if (streams(3) == 1) call write_stream3 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 4'
+#endif 
     if (streams(4) == 1) call write_stream4 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 5'
+#endif 
     if (streams(5) == 1) call write_stream5 (zred_now)
 
+#ifdef MPILOG     
+     write(logf,*) 'output 6'
+#endif 
     call write_photonstatistics (zred_now,time,dt,photcons_flag)
+
+#ifdef MPILOG     
+     write(logf,*) 'output 7'
+#endif 
 
   end subroutine output
 
@@ -314,8 +336,17 @@ contains
                   j=1,mesh(2)),k=1,mesh(3))
              close(153)
 
+#ifdef MPILOG     
+             write(logf,*) 'output 3: temper3d'
+             flush(logf)
+#endif 
           endif
 
+#ifdef MPILOG
+          write(logf,*) allocated(phih_grid)
+          write(logf,*) 'shape phih_grid: ',shape(phih_grid)
+          flush(logf)
+#endif 
           write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"IonRates3D_"// &
                trim(adjustl(file1))//base_extension
@@ -326,6 +357,10 @@ contains
                k=1,mesh(3))
           close(53)
 
+#ifdef MPILOG     
+          write(logf,*) 'output 3: IonRates3D'
+          flush(logf)
+#endif 
        else
           ! Report error
           write(logf,*) "Calling stream 3 output where we should not."
