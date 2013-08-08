@@ -862,6 +862,8 @@ contains
     ! report a table value
     write(logf,*) "bb_photo_thick_table: ",sum(bb_photo_thick_table(0,:))
     write(logf,*) "bb_photo_thin_table: ",sum(bb_photo_thin_table(0,:))
+    write(logf,*) "bb_heat_thick_table: ",(bb_heat_thick_table(0,1))
+    write(logf,*) "bb_heat_thin_table: ",(bb_heat_thin_table(0,1))
     write(logf,*) "Rstar2: ",R_star2
     
   end subroutine spec_integration
@@ -1260,7 +1262,6 @@ contains
     real(kind=dp) :: colum_cell_HI
     real(kind=dp) :: colum_cell_HeI
     real(kind=dp) :: colum_cell_HeII
-    real(kind=dp) :: NFlux
     real(kind=dp), dimension(1:NumFreqBnd) :: tau_in_all
     real(kind=dp), dimension(1:NumFreqBnd) :: tau_out_all
     real(kind=dp), dimension(1:NumFreqBnd) :: tau_cell_HI
@@ -1328,16 +1329,16 @@ contains
           tau_cell_HeII(i_subband) = colum_cell_HeII*sigma_HeII(i_subband)
        enddo
               
-       if (NormFlux(nsrc) > 0.0) &  
+       if (NormFlux(nsrc) > 0.0) & 
             call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
             tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,"B", &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFlux(nsrc),"B", &
             vol,i_state,colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
-       
+
        if (NormFluxPL(nsrc) > 0.0) &  
             call heat_lookuptable(tau_pos_in,tau_pos_out,phi, &
             tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NFlux,"P", &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFluxPL(nsrc),"P", &
             vol,i_state,colum_cell_HI,colum_cell_HeI, colum_cell_HeII )
        
     endif
@@ -1511,7 +1512,7 @@ contains
       end select
       
    enddo
-   
+
  end subroutine photo_lookuptable
 
 !---------------------------------------------------------------------------
@@ -1529,9 +1530,9 @@ contains
     type(tablepos), intent(in) :: tau_pos_in, tau_pos_out
     real(kind=dp), intent(in) :: NFlux, vol, i_state
     real(kind=dp), intent(in) :: colum_cell_HI, colum_cell_HeI, colum_cell_HeII
-    real(kind=dp), dimension(NumFreqBnd), intent(in) :: tau_in_all, tau_out_all
+    real(kind=dp), dimension(1:NumFreqBnd), intent(in) :: tau_in_all, tau_out_all
     character,intent(in) :: table_type
-    real(kind=dp), dimension(NumFreqBnd),intent(in) :: tau_cell_HI, tau_cell_HeI, tau_cell_HeII
+    real(kind=dp), dimension(1:NumFreqBnd),intent(in) :: tau_cell_HI, tau_cell_HeI, tau_cell_HeII
 
     integer ::  n, i_subband, i
     real(kind=dp) :: phi_heat_HI, phi_heat_HeI, phi_heat_HeII
@@ -1578,9 +1579,9 @@ contains
     ! loop through the frequency bands
     do i_subband=1,Maximum_FreqBnd
        
-       phi_heat_HI = 0.0_dp
-       phi_heat_HeI = 0.0_dp
-       phi_heat_HeII = 0.0_dp
+       !phi_heat_HI = 0.0_dp
+       !phi_heat_HeI = 0.0_dp
+       !phi_heat_HeII = 0.0_dp
        
        select case (i_subband)
           
@@ -1608,7 +1609,7 @@ contains
           
           ! Save the heating in f_heat variable
           f_heat = phi_heat_HI
-          
+
           ! band 2
        case (NumBndin1+1:NumBndin1+NumBndin2)
           
