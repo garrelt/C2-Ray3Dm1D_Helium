@@ -243,7 +243,7 @@ contains
           enddo
        enddo
     enddo
-    write(*,*) 'avgdens', avg_dens
+
     ! Report density field properties
     if (rank == 0) then
        write(logf,*) "Raw density diagnostics (cm^-3)"
