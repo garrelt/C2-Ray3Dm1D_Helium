@@ -1753,7 +1753,7 @@ contains
     enddo
        
     !Total heating rate on current cell
-    phi%heat = f_heat 
+    phi%heat = phi%heat + f_heat 
     !Final HI photoionization rate modified by secondary ionization
     phi%photo_cell_HI = phi%photo_cell_HI+f_ion_HI/(ion_freq_HI*hplanck) 
     !Final HeI photoionization rate modified by secondary ionization
