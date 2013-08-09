@@ -59,13 +59,13 @@ FC = ifort # Intel compiler
 MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
-#IFORTFLAGS = -DMPILOG -O0 -g -DIFORT -u -fpe0 -shared-intel -check all -traceback -fpp  #!<
+#IFORTFLAGS = -O0 -g -u -fpe0 -DIFORT -shared-intel -check all -traceback -fpp  #!<
 IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
 #IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
-#F90FLAGS1 = $(IFORTFLAGS)  #!<
+F90FLAGS1 = $(IFORTFLAGS)  #!<
 #F90FLAGS1 = -xW $(IFORTFLAGS) 
-F90FLAGS1 = -xO $(IFORTFLAGS) 
+#F90FLAGS1 = -xO $(IFORTFLAGS) 
 #F90FLAGS1 = -xT $(IFORTFLAGS) # Laptop 
 #F90FLAGS1 = -xB $(IFORTFLAGS)
 
@@ -187,6 +187,11 @@ C2Ray_3D_test_kyl_periodic: F90FLAGS = $(F90FLAGS1)
 C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
+C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
+C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
+C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
+
 C2Ray_3D_test_periodic_mpi: F90=$(MPIFC)
 C2Ray_3D_test_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
 C2Ray_3D_test_periodic_mpi: $(UTILS1) sizes.o $(CONSTANTS1) ../mpi.o $(TEST) $(GENERAL1) C2Ray.o
@@ -201,11 +206,6 @@ C2Ray_3D_test_periodic_omp: F90=$(FC)
 C2Ray_3D_test_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
 C2Ray_3D_test_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2) C2Ray.o
-
-C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
-C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
-C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
-	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 #--------TEST2----------------------------------------------------------------
 C2Ray_3D_test2_periodic: F90=$(FC)
