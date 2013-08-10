@@ -95,6 +95,7 @@ module radiation
   real(kind=dp) :: pl_scaling           ! The scaling of the flux
   real(kind=dp) :: Edd_Efficiency       ! Eddinton efficieny
   real(kind=dp) :: source_ionzing_photon_rate  ! The rate of ionizing photon generated from the source
+  real(kind=dp) :: pl_S_star
 
   real(kind=dp), dimension(:), allocatable :: delta_freq      ! Frequency width of integration 
   real(kind=dp), dimension(:), allocatable :: freq_max        ! Maximum freqeucny of integration 
@@ -664,6 +665,9 @@ contains
            pl_S_star_band3, ' s^-1'
    endif
 
+   ! Save the PL total ionizing photon rate
+   ! For the BB source this number is already known.
+   pl_S_star = pl_S_star_band1+pl_S_star_band2+pl_S_star_band3
     ! Report back to the log file
     if (rank == 0) then
 

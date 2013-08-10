@@ -23,8 +23,8 @@ module photonstatistics
   use grid, only: vol
   use material, only: ndens, clumping, clumping_point
   use tped, only: electrondens
-  use sourceprops, only: NormFlux, NumSrc
-  use radiation, only: S_star, NumFreqBnd
+  use sourceprops, only: NormFlux, NormFluxPL, NumSrc
+  use radiation, only: S_star, pl_S_star, NumFreqBnd
   use c2ray_parameters, only: type_of_clumping
   use abundances, only: abu_he
 
@@ -269,7 +269,8 @@ contains
     total_photon_loss=sum(photon_loss)*dt* &
          real(mesh(1))*real(mesh(2))*real(mesh(3))
     total_LLS_loss = LLS_loss*dt         
-    totalsrc=sum(NormFlux(1:NumSrc))*s_star*dt
+    totalsrc=(sum(NormFlux(1:NumSrc))*S_star + &
+         sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
     photcons=(total_ion-totcollisions-recomions)/(totalsrc)
     if (rank == 0) then
        write(90,"(9(1pe10.3))") &
@@ -279,7 +280,7 @@ contains
             totrec/total_ion, &             !  fraction of recombinations 
             total_photon_loss/totalsrc, &   ! lost photon fraction
             totcollisions/total_ion         ! fraction of collisions
-       write(logf,*) h1_before,h1_after
+       !write(logf,*) h1_before,h1_after
     endif
     
   end subroutine report_photonstatistics
@@ -291,7 +292,8 @@ contains
 
     real(kind=dp),intent(in) :: dt !< time step
 
-    grtotal_src=grtotal_src+sum(NormFlux(1:NumSrc))*s_star*dt
+    grtotal_src=grtotal_src+(sum(NormFlux(1:NumSrc))*S_star + &
+         sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
     grtotal_ion=grtotal_ion+total_ion-totcollisions
 
   end subroutine update_grandtotal_photonstatistics

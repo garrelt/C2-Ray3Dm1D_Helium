@@ -24,12 +24,12 @@ module output_module
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
   use evolve, only: phih_grid, phiheat
-  use sourceprops, only: srcpos, NormFlux, NumSrc
+  use sourceprops, only: srcpos, NormFlux, NormFluxPL, NumSrc
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
   use photonstatistics, only: photon_loss, grtotal_src
   use photonstatistics, only: initialize_photonstatistics
-  use radiation, only: T_eff,R_star,L_star,S_star
+  use radiation, only: T_eff,R_star,L_star,S_star, pl_S_star
 
 
   implicit none
@@ -514,7 +514,8 @@ contains
           total_photon_loss=sum(photon_loss)*dt* &
                real(mesh(1))*real(mesh(2))*real(mesh(3))
           !total_ion=total_ion + total_photon_loss
-          totalsrc=sum(NormFlux(1:NumSrc))*s_star*dt
+          totalsrc=(sum(NormFlux(1:NumSrc))*S_star + &
+               sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
           photcons=(total_ion-totcollisions)/totalsrc
           !PhotonCounts: time
           !              Number of (ionizations + recombinations) / photons 
