@@ -1806,11 +1806,6 @@ contains
        if (.not. isothermal) &
             phiheat(pos(1),pos(2),pos(3))=phiheat(pos(1),pos(2),pos(3))+phi%heat
 
-       if ( all( pos(:) == srcpos(:,1) ) ) then 
-          write(logf,*) "phis in grid: ",phih_grid(pos(1),pos(2),pos(3)), &
-                phihe_grid(pos(1),pos(2),pos(3),0), phihe_grid(pos(1),pos(2),pos(3),1), &
-                phiheat(pos(1),pos(2),pos(3))
-       endif
        ! Photon statistics: register number of photons leaving the grid
        ! Note: This is only the H0 photo-ionization rate
        if ( (any(rtpos(:) == last_l(:))) .or. &
@@ -1949,11 +1944,7 @@ contains
     yhe1_av_old=xhe_av(pos(1),pos(2),pos(3),1)
     yhe2_av_old=xhe_av(pos(1),pos(2),pos(3),2)
     call get_temperature_point (pos(1),pos(2),pos(3),temper_inter,temp_av_new,temper_old)
-    if ( all( pos(:) == srcpos(:,1) ) ) then 
-       write(logf,*) "tempers: ",temper_inter,temp_av_new,temper_old
-       write(logf,*) "phis: ",phi%photo_cell_HI, phi%photo_cell_HeI, phi%photo_cell_HeII, &
-            phi%heat
-    endif
+
 !    write(*,*) 'after temperature point 2'  
 !    write(*,*) ion%h_av(0),ion%he_av(0),ion%he_av(2),temp_av_new
     if ( (abs((ion%h_av(0)-yh0_av_old)) > minimum_fractional_change                .and. &
