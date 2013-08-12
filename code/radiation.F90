@@ -500,7 +500,7 @@ contains
        
     ! Report back to the log file
     if (rank == 0) then
-       if(sourcetype == 'B') then
+       if(sourcetype == 'B' .or. sourcetype == " ") then
           write(logf,'(/a)')           'Using a black body with'
           write(logf,'(a,1pe10.3,a)')   ' Teff =       ', T_eff, ' K'
           write(logf,'(a,1pe10.3,a)')   ' Radius =     ', R_star/r_solar, ' R_solar'
@@ -521,14 +521,14 @@ contains
        ! The power-law ionizing luminosity is specified (energy sense). 
        pl_ionizing_luminosity = EddLum*Edd_Efficiency
        pl_ionizing_luminosity_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
-       pl_ionizing_luminosity = pl_ionizing_luminosity_wanted
+       pl_ionizing_luminosity_wanted = pl_ionizing_luminosity
        pl_scaling = pl_ionizing_luminosity_wanted/pl_ionizing_luminosity_unscaled
        pl_S_star = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
     endif
     
     ! Report back to the log file
     if (rank == 0) then
-       if (sourcetype == 'P') then
+       if (sourcetype == 'P' .or. sourcetype == " ") then
           write(logf,'(/a)')           'Using a power law source with'
           write(logf,'(a,1pe10.3)')   ' Power law index = ', pl_index
           write(logf,'(a,1pe10.3)')   ' Efficiency parameter = ', pl_ionizing_luminosity/EddLum
@@ -553,7 +553,7 @@ contains
 
     ! Report back to the log file
     if (rank == 0) then
-       write(logf,'(A,(1PE12.5),A//)') ' Number of BB photons in band 1: ', &
+       write(logf,'(/A,(1PE12.5),A//)') ' Number of BB photons in band 1: ', &
             bb_S_star_band1, ' s^-1'
        write(logf,'(A,(1PE12.5),A//)') ' Number of PL photons in band 1: ', &
             pl_S_star_band1, ' s^-1'
