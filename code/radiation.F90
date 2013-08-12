@@ -85,8 +85,10 @@ module radiation
   real(kind=dp) :: R_star2 = 0.0     ! Square of R_star
   real(kind=dp) :: h_over_kT    ! Planck constant over k_B * T_eff
 
-  ! The highest frequency subband used for the black body source
+  ! The lowest and highest frequency subbands used for the bb and pl source
   integer :: bb_FreqBnd_UpperLimit=NumFreqBnd
+  integer :: pl_FreqBnd_LowerLimit
+  integer :: pl_FreqBnd_UpperLimit
 
   ! Power law source properties
   real(kind=dp) :: pl_index = 1.0            ! Power law index
@@ -392,11 +394,15 @@ contains
              read(stdinput,*) pl_index      ! Read power law index, this number equal to one plus that of energy 
              write(logf,*) 'Power law index is ', pl_index
              if (.not.file_input) write(*,'(A,$)') 'give lower and upper frequency limits in eV '
-             read(stdinput,*) pl_minfreq,pl_maxfreq     ! Read lower and upper frequency limits in eV	
-             write(logf,*) 'The lower energy limit is ', pl_minfreq, ' eV'
-             write(logf,*) 'The upper energy limit is ', pl_maxfreq, ' eV'
+             read(stdinput,*) pl_MinFreq,pl_MaxFreq     ! Read lower and upper frequency limits in eV	
+             write(logf,*) 'The lower energy limit is ', pl_MinFreq, ' eV'
+             write(logf,*) 'The upper energy limit is ', pl_MaxFreq, ' eV'
              if (.not.file_input) write(*,'(A)') 'However, this is not implemented right now '          	
-             
+
+             ! Convert eVs to Hz for the frequency limits
+             pl_MinFreq = pl_MinFreq * ev2fr
+             pl_MaxFreq = pl_MaxFreq * ev2fr
+
              ! set some fiducial values for the BB source here, though they are not useful
              R_star=r_solar
              S_star=0.0
@@ -421,6 +427,10 @@ contains
          mympierror)
     call MPI_BCAST(pl_S_star,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
          mympierror)
+    call MPI_BCAST(pl_MinFreq,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
+         mympierror)
+    call MPI_BCAST(pl_MaxFreq,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
+         mympierror)
 #endif
     
        ! In case neither blackbody nor power-law source
@@ -440,6 +450,8 @@ contains
        ! to S_star in routine spec_diag
        pl_scaling=1.0
        pl_S_star=0.0
+       pl_MinFreq=pl_MinFreq_nominal
+       pl_MaxFreq=pl_MaxFreq_nominal
     endif
     
     ! This is h/kT
@@ -513,17 +525,21 @@ contains
     ! needed to achieve either the specified ionizing photon rate or ionizing luminosity
     if (pl_S_star > 0.0) then
        ! Total power-law ionizing photon rate is specified (photon sense)
-       pl_S_star_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
+       pl_S_star_unscaled = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","S")
+       !pl_S_star_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
        pl_S_star_wanted = pl_S_star
        pl_scaling = pl_S_star_wanted/pl_S_star_unscaled
-       pl_ionizing_luminosity = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
+       pl_ionizing_luminosity = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","L")
+       !pl_ionizing_luminosity = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
     else
        ! The power-law ionizing luminosity is specified (energy sense). 
        pl_ionizing_luminosity = EddLum*Edd_Efficiency
-       pl_ionizing_luminosity_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
+       pl_ionizing_luminosity_unscaled = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","L")
+       !pl_ionizing_luminosity_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
        pl_ionizing_luminosity_wanted = pl_ionizing_luminosity
        pl_scaling = pl_ionizing_luminosity_wanted/pl_ionizing_luminosity_unscaled
-       pl_S_star = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
+       pl_S_star = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","S")
+       !pl_S_star = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
     endif
     
     ! Report back to the log file
@@ -534,6 +550,8 @@ contains
           write(logf,'(a,1pe10.3)')   ' Efficiency parameter = ', pl_ionizing_luminosity/EddLum
           write(logf,'(a,1pe10.3)')   ' Ionizing photon rate = ', pl_S_star
           write(logf,'(a,1pe10.3)')   ' Ionizing luminosity = ', pl_ionizing_luminosity
+          write(logf,'(a,2f8.3,a)')   ' between energies ', &
+               pl_MinFreq/(1e3*ev2fr),pl_MaxFreq/(1e3*ev2fr),' kEv'
        endif
     endif
     
@@ -673,7 +691,31 @@ contains
        write(logf,"(A,I3)") "Using BB up to frequency band ", &
             bb_FreqBnd_UpperLimit
        write(logf,"(A,F10.2,A)") "  this is energy ", &
-            freq_min(bb_FreqBnd_UpperLimit)/ev2fr," eV"
+            freq_min(bb_FreqBnd_UpperLimit+1)/ev2fr," eV"
+    endif
+
+    ! Find out how far to follow the PL SED (used in lookuptable routines)
+    pl_FreqBnd_UpperLimit=NumFreqBnd
+    do i_subband=1,NumFreqBnd
+       if (freq_min(i_subband) > pl_MaxFreq) then
+          pl_FreqBnd_UpperLimit=i_subband-1
+          exit
+       endif
+    enddo
+    pl_FreqBnd_LowerLimit=1
+    do i_subband=NumFreqBnd,1,-1
+       if (freq_min(i_subband) < pl_MinFreq) then
+          pl_FreqBnd_LowerLimit=i_subband
+          exit
+       endif
+    enddo
+    if (rank == 0) then
+       write(logf,"(2(A,I3))") "Using PL from frequency band ", &
+            pl_FreqBnd_LowerLimit," to ",pl_FreqBnd_UpperLimit
+       write(logf,"(A,F10.2,A)") "  these are energies ", &
+            freq_min(pl_FreqBnd_LowerLimit)/ev2fr," and ", &
+            (freq_min(pl_FreqBnd_UpperLimit)+ &
+            delta_freq(pl_FreqBnd_UpperLimit)*real(NumFreq))/ev2fr," eV"
     endif
 
 #ifdef MPILOG
@@ -1416,6 +1458,7 @@ contains
     integer ::  i_subband, i
     real(kind=dp) :: phi_photo_in_all, phi_photo_out_all, phi_photo_all
     real(kind=dp), pointer, dimension(:,:) :: photo_thick_table, photo_thin_table
+    integer :: Minimum_FreqBnd
     integer :: Maximum_FreqBnd
         
     ! New source. Set all the rates to zero to initialize them.
@@ -1427,15 +1470,17 @@ contains
     if (table_type == "B") then 
        photo_thick_table => bb_photo_thick_table
        photo_thin_table => bb_photo_thin_table
+       Minimum_FreqBnd=1
        Maximum_FreqBnd=bb_FreqBnd_UpperLimit
     elseif (table_type == "P") then
        photo_thick_table => pl_photo_thick_table
        photo_thin_table => pl_photo_thin_table
-       Maximum_FreqBnd=NumFreqBnd
+       Minimum_FreqBnd=pl_FreqBnd_LowerLimit
+       Maximum_FreqBnd=pl_FreqBnd_UpperLimit
     endif
     
     ! loop through the relevant frequency bands
-    do i_subband=1, Maximum_FreqBnd
+    do i_subband=Minimum_FreqBnd, Maximum_FreqBnd
        
        ! Incoming total photoionization rate
        phi_photo_in_all = NFlux* &
@@ -1547,6 +1592,7 @@ contains
     real(kind=dp) :: f_heat, f_ion_HI, f_ion_HeI
     real(kind=dp) :: fra_sum1, fra_sum2, fra_sum3, fra_sum4
     real(kind=dp), pointer, dimension(:,:) :: heat_thick_table, heat_thin_table
+    integer :: Minimum_FreqBnd
     integer :: Maximum_FreqBnd
     ! Related to secondary ionizations
     real(kind=dp), dimension(1:3) :: y1R, y2R
@@ -1561,11 +1607,13 @@ contains
     if (table_type == "B") then 
        heat_thick_table => bb_heat_thick_table
        heat_thin_table => bb_heat_thin_table
+       Minimum_FreqBnd=1
        Maximum_FreqBnd=bb_FreqBnd_UpperLimit
     elseif (table_type == "P") then
        heat_thick_table => pl_heat_thick_table
        heat_thin_table => pl_heat_thin_table
-       Maximum_FreqBnd=NumFreqBnd
+       Minimum_FreqBnd=pl_FreqBnd_LowerLimit
+       Maximum_FreqBnd=pl_FreqBnd_UpperLimit
     endif
 
     ! initialization to zero of local cumulative variables
@@ -1592,7 +1640,7 @@ contains
 
     ! Current cell individual heating rates of HI, HeI, HeII
     ! loop through the frequency bands
-    do i_subband=1,Maximum_FreqBnd
+    do i_subband=Minimum_FreqBnd,Maximum_FreqBnd
        
        ! For every subband these will contain the heating due to
        ! the different species by photons in that subband.

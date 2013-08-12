@@ -468,8 +468,7 @@ contains
     real(kind=dp) :: Mass !< mass in units of grid masses
     real(kind=dp) :: PL_Luminosity_from_mass
 
-    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/Omega0/ &
-         (mass_nom*M_SOLAR)*EddLeff_nom
+    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/Omega0/EddLum
 
   end function PL_Luminosity_from_mass
 
