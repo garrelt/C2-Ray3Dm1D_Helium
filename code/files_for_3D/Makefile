@@ -59,13 +59,13 @@ FC = ifort # Intel compiler
 MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
-#IFORTFLAGS = -O0 -g -u -fpe0 -DIFORT -shared-intel -check all -traceback -fpp  #!<
+#IFORTFLAGS = -DMPILOG -O0 -g -u -fpe0 -DIFORT -shared-intel -check all -traceback -fpp  #!<
 IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
 #IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
-F90FLAGS1 = $(IFORTFLAGS)  #!<
+#F90FLAGS1 = $(IFORTFLAGS)  #!<
 #F90FLAGS1 = -xW $(IFORTFLAGS) 
-#F90FLAGS1 = -xO $(IFORTFLAGS) 
+F90FLAGS1 = -xO $(IFORTFLAGS) 
 #F90FLAGS1 = -xT $(IFORTFLAGS) # Laptop 
 #F90FLAGS1 = -xB $(IFORTFLAGS)
 
