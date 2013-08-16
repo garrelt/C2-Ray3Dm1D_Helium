@@ -1,5 +1,5 @@
 !>
-!! \Brief This module contains data and routines for MPI parallelization
+!! \brief This module contains data and routines for MPI parallelization
 !!
 !! Module for C2Ray / Capreole (3D)
 !!
@@ -43,17 +43,16 @@ module my_mpi
 
 #ifdef IFORT
   USE IFPORT, only: hostnm
+#endif
+#ifdef MY_OPENMP
+  USE OMP_LIB, only: omp_get_num_threads, omp_get_thread_num
+#endif
+
+#ifdef PGI
 #ifdef MY_OPENMP
   USE OMP_LIB, only: omp_get_num_threads, omp_get_thread_num
 #endif
 #endif
-
-#ifdef GFORT
-#ifdef MY_OPENMP
-  USE OMP_LIB, only: omp_get_num_threads, omp_get_thread_num
-#endif
-#endif
-
 
   implicit none
 
@@ -111,7 +110,10 @@ contains
 
     ! Report OpenMP usage
 #ifdef MY_OPENMP
-    if (rank == 0) write(logf,*) " Running in OpenMP mode"
+    if (rank == 0) then
+       write(logf,*) " Running in OpenMP mode"
+       write(logf,*) ' Number of OpenMP threads on MPI rank 0 is ',nthreads
+    endif
 #endif
 
 #ifdef MPILOG
@@ -137,7 +139,7 @@ contains
 #endif
 
     ! Let OpenMP threads report
-    !$omp parallel default(private)
+    !$omp parallel default(shared) private(tn)
 #ifdef MY_OPENMP
     tn=omp_get_thread_num()+1
     write(logf,*) 'Thread number ',tn,' reporting'
