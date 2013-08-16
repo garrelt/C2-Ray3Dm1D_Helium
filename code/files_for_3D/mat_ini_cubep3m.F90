@@ -23,8 +23,6 @@ module material
   use abundances, only: mu, abu_he
   use c2ray_parameters, only: type_of_clumping,clumping_factor, cosmological, type_of_LLS
 
-  
-
   implicit none
 
   ! ndens - number density (cm^-3) of a cell
@@ -205,12 +203,14 @@ contains
        ! Allocate ionization fraction arrays
        allocate(xh(mesh(1),mesh(2),mesh(3),0:1))
        allocate(xhe(mesh(1),mesh(2),mesh(3),0:2))
-       ! Assign ionization fractions (completely neutral)
+       ! Assign ionization fractions. For z = 40 - 20 RECFAST gives 
+       ! an average ionization fraction of about 2e-4 for H and
+       ! 1e-15 for He. We use this here.
        ! In case of a restart this will be overwritten in xfrac_ini
-       xh(:,:,:,0)=1.0
-       xh(:,:,:,1)=0.0
-       xhe(:,:,:,0)=1.0
-       xhe(:,:,:,1)=0.0
+       xh(:,:,:,1)=2e-4
+       xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
+       xhe(:,:,:,1)=1e-15_dp
+       xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)
        xhe(:,:,:,2)=0.0
        ! Initialize LLS parametets
        call LLS_init ()       
@@ -456,6 +456,41 @@ contains
   end subroutine xfrac_ini
 
   ! ===========================================================================
+  
+  subroutine protect_ionization_fractions(xfrac,lowfrac,highfrac,ifraction, &
+       name)
+
+    integer,intent(in) :: lowfrac
+    integer,intent(in) :: highfrac
+    integer,intent(in) :: ifraction
+    real(kind=dp),dimension(mesh(1),mesh(2),mesh(3),lowfrac:highfrac), &
+         intent(inout) :: xfrac
+    character(len=*) :: name
+
+    integer :: i,j,k
+
+    ! Check the fractions for negative values
+    do k=1,mesh(3)
+       do j=1,mesh(2)
+          do i=1,mesh(1)
+             if (xfrac(i,j,k,ifraction) < 0.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' < 0 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=0.0_dp
+             endif
+             if (xfrac(i,j,k,ifraction) > 1.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' > 1 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=1.0_dp
+             endif
+          enddo
+       enddo
+    enddo
+    
+  end subroutine protect_ionization_fractions
+
   ! ===========================================================================
 
   subroutine temper_ini (zred_now)
