@@ -1,7 +1,16 @@
+!>
+!! \brief This module contains data and routines for handling the source
+!! luminosities.
+!! 
+!! \b Author: Garrelt Mellema, Ilian Iliev
+!!
+!! \b Date: 30-Jan-2008
+!!
+!! \b Version: Test simulation with reading in file with source locations
+!! \b and ionizing photon rates
+
 module sourceprops
   
-  ! Version: test
-
   use precision, only: dp
   use my_mpi
   use file_admin, only: logf
@@ -12,48 +21,53 @@ module sourceprops
   !use material, only: xh
   use grid, only: x,y,z
   use c2ray_parameters, only: phot_per_atom, lifetime, &
-       S_star_nominal, StillNeutral, Number_Sourcetypes
+       S_star_nominal, pl_S_star_nominal,StillNeutral, Number_Sourcetypes
   
-  integer :: NumSrc 
+  implicit none
+
+  !> base name of source list files
+  character(len=100),parameter,private :: &
+       sourcelistfile_base="test_sources.dat"
+
+  integer :: NumSrc=0 !< Number of sources 
   integer,dimension(:,:),allocatable :: srcpos
-  real(kind=dp),dimension(:,:),allocatable :: rsrcpos
-  real(kind=dp),dimension(:),allocatable :: NormFlux, NormFluxPL
-  integer,dimension(:),allocatable :: srcSeries
-  
+  real(kind=dp),dimension(:),allocatable :: NormFlux !< normalized ionizing flux of sources
+  real(kind=dp),dimension(:),allocatable :: NormFluxPL !< normalized ionizing flux of sources
+  integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
+
+  character(len=512),private :: sourcelistfile,sourcelistfilesuppress
+
 contains
   
   ! =======================================================================
-  
+
+  !> Set the source properties for this redshift
   subroutine source_properties(zred_now,nz,lifetime2,restart)
-    
+
     ! Input routine: establish the source properties
-    ! Authors: Garrelt Mellema, Ilian Iliev
-    ! Update: 30-Jan-2008 (20-Sep-2006 (3-jan-2005, 15-Apr-2004))
-    
+
     ! For random permutation of sources
     use  m_ctrper
-    
+
     real(kind=dp),intent(in) :: zred_now ! current redshift
     real(kind=dp),intent(in) :: lifetime2 ! time step
     integer,intent(in) :: nz
     integer,intent(in) :: restart
-    
-    character(len=512) :: sourcelistfile,sourcelistfilesuppress
+
     integer :: ns,ns0
-    
+
 #ifdef MPI
     integer :: mympierror
 #endif
-    
+
 #ifdef MPILOG     
     write(logf,*) "Check sourceprops: ",zred_now,nz,lifetime2,restart
 #endif 
     
     ! Deallocate source arrays
     if (allocated(srcpos)) deallocate(srcpos)
-    if (allocated(rsrcpos)) deallocate(rsrcpos)
     if (allocated(NormFlux)) deallocate(NormFlux)
-    if (allocated(NormFluxPL)) deallocate(NormFluxPL)    
+    if (allocated(NormFluxPL)) deallocate(NormFluxPL)
     if (allocated(srcSeries)) deallocate(srcSeries)
     
     ! Rank 0 reads in sources
@@ -61,29 +75,35 @@ contains
        ! Construct the file names
        sourcelistfile=trim(adjustl(dir_src))//"test_sources.dat"
        open(unit=50,file=sourcelistfile,status="old")
-       ! Number of sources
+
+       ! Establish number of sources
        read(50,*) NumSrc
+
     endif ! end of rank 0 test
     
 #ifdef MPI
     ! Distribute source number to all other nodes
     call MPI_BCAST(NumSrc,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
-    
+
+#ifdef MPILOG
+    if (rank /=0) write(logf,*) "Number of sources, with suppression: ",NumSrc
+#endif
+
     ! Allocate arrays for this NumSrc
     if (NumSrc > 0) then
        allocate(srcpos(3,NumSrc))
-       allocate(rsrcpos(3,NumSrc))
-       allocate(NormFlux(NumSrc))
-       allocate(NormFluxPL(NumSrc))    
+       allocate(NormFlux(0:NumSrc)) ! 0 will hold lost photons
+       allocate(NormFluxPL(NumSrc))
        allocate(SrcSeries(NumSrc))
-       
+
        ! Fill in the source arrays
        if (rank == 0) then
           do ns=1,NumSrc
              read(50,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
                   NormFlux(ns),NormFluxPL(ns)
              NormFlux(ns)=NormFlux(ns)/S_star_nominal
+             NormFluxPL(ns)=NormFluxPL(ns)/pl_S_star_nominal
           enddo
           close(50)
           
@@ -113,42 +133,30 @@ contains
           ! Note, no normalization is used for PL source
           !NormFluxPL(10)=3.0_dp
           
-          ! Source is always at cell centre!!
-          do ns=1,NumSrc
-             rsrcpos(1,ns)=x(srcpos(1,ns))
-             rsrcpos(2,ns)=y(srcpos(2,ns))
-             rsrcpos(3,ns)=z(srcpos(3,ns))
-          enddo
-       endif ! of rank 0 test
-       
-       
-#ifdef MPI
-       ! Distribute the source parameters to the other nodes
-       call MPI_BCAST(srcpos,3*NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(rsrcpos,3*NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(NormFlux,NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(NormFluxPL,NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-#endif
-       
-       if (rank == 0) then
-          write(logf,*) 'Total flux= ',sum(NormFlux)*S_star_nominal,' s^-1'
-          
+          write(logf,*) 'Total photon rate (BB)= ', &
+               sum(NormFlux)*S_star_nominal,' s^-1'
+          write(logf,*) 'Total photon rate (PL)= ', &
+               sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
+
           ! Create array of source numbers for generating random order
           do ns=1,NumSrc
              SrcSeries(ns)=ns
           enddo
           ! Make a random order
           call ctrper(SrcSeries(1:NumSrc),1.0)
-       endif
-       
+       endif ! of rank 0 test
+
 #ifdef MPI
+       ! Distribute the source parameters to the other nodes
+       call MPI_BCAST(srcpos,3*NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
+       call MPI_BCAST(NormFlux,NumSrc+1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+       call MPI_BCAST(NormFluxPL,NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        ! Distribute the source series to the other nodes
        call MPI_BCAST(SrcSeries,NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
        
     endif
-    
-    
+
   end subroutine source_properties
   
   ! =======================================================================
