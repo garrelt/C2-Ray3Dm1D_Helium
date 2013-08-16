@@ -55,12 +55,12 @@ DORIC2= doric.o #
 # there are also some different versions of RADIATION.
 # radiation_monocromatic takes different inputs, see input file
 # inputs/isochromatic
-RADIATION= ../radiation_including_pls_new.o 
+#RADIATION= ../radiation_including_pls_new.o 
 #RADIATION= radiation_monocromatic.o 
-#RADIATION= ../radiation.o
+RADIATION= ../radiation.o
 #RADIATION2= radiation_monocromatic.o
-RADIATION2= radiation_including_pls_new.o
-#RADIATION2= radiation.o
+#RADIATION2= radiation_including_pls_new.o
+RADIATION2= radiation.o
 #-----------------------------------------------------------
 
 # Building C2Ray_1D: 
