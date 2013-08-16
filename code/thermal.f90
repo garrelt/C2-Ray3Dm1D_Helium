@@ -69,8 +69,13 @@ contains
     !internal_energy = temper2pressr(end_temper,ndens_atom,electrondens(ndens_atom,ion%begin_HII, &
     !                                ion%begin_HeII,ion%begin_HeIII))/(gamma1)
 
-    ! Set the cosmological rate
-    cosmo_cool_rate = 0.0
+    ! Set the cosmological cooling rate
+    if (cosmological) then
+       ! Disabled for testing
+       cosmo_cool_rate=cosmo_cool(internal_energy)
+    else
+       cosmo_cool_rate=0.0
+    endif
 
     ! Thermal process is only done if the temperature of the cell 
     ! is larger than the minimum temperature requirement
