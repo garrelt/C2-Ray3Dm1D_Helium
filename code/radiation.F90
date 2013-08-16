@@ -27,11 +27,14 @@ module radiation
   use romberg, only: scalar_romberg, &                   ! 1D integration function
                      vector_romberg, &                   ! 1D integration subroutine
                      romberg_initialisation              ! Romberg initialisation procedure
-  use c2ray_parameters, only: T_eff_nominal,&            ! Black body  effective temperature for for nominal SED
-                              S_star_nominal, &          ! Ionizing photon rate for for nominal SED
-                              pl_index_nominal,&         ! Power law index for for nominal SED
-                              EddLeff_nominal,&          ! Eddington efficiency for for nominal SED
-                              EddLum                     ! Eddington luminosity for for nominal SED
+  use c2ray_parameters, only: T_eff_nominal,&            ! Black body  effective temperature for for nominal BB SED
+                              S_star_nominal, &          ! Ionizing photon rate for for nominal BB SED
+                              pl_index_nominal,&         ! Power law index for for nominal PL SED
+                              EddLeff_nominal,&          ! Eddington efficiency for for nominal PL SED
+                              EddLum, &                  ! Eddington luminosity for for nominal PL SED
+                              pl_S_star_nominal, &       ! Ionizing photon rate for nominal PL SED
+                              pl_MinFreq_nominal, &      ! Lowest frequency for nominal PL SED
+                              pl_MaxFreq_nominal         ! Highest frequency for nominal PL SED
   use material, only: isothermal
 
   implicit none
@@ -188,6 +191,7 @@ module radiation
      real(kind=dp) :: heat_out_HeII          ! HeII heating rate outgoing from the cell
      real(kind=dp) :: heat                   ! Total heating rate of the cell
      real(kind=dp) :: photo_in               ! Total photoionization rate incoming to the cell
+     real(kind=dp) :: photo_out               ! Total photoionization rate incoming to the cell
   end type photrates
 
   ! This definition allows adding two variables of type photrates using the 
@@ -433,7 +437,7 @@ contains
          mympierror)
 #endif
     
-       ! In case neither blackbody nor power-law source
+       ! In case source properties are taken from c2ray_parameters
     else
        ! T_eff and S_star are assumed to have been set in the c2ray_parameter module
        T_eff=T_eff_nominal
@@ -444,14 +448,14 @@ contains
        L_star=R_star*R_star*4.0d0*pi*sigma_SB*T_eff**4
        
        ! Power law source properties set to nominal values from c2ray_parameter module
-       Edd_Efficiency=EddLeff_nominal
        pl_index=pl_index_nominal
+       pl_MinFreq=pl_MinFreq_nominal
+       pl_MaxFreq=pl_MaxFreq_nominal
+       pl_S_star=pl_S_star_nominal
        ! Assign some fiducial values, these are scaled to correspond 
        ! to S_star in routine spec_diag
        pl_scaling=1.0
-       pl_S_star=0.0
-       pl_MinFreq=pl_MinFreq_nominal
-       pl_MaxFreq=pl_MaxFreq_nominal
+       Edd_Efficiency=0.0
     endif
     
     ! This is h/kT
@@ -531,6 +535,7 @@ contains
        pl_scaling = pl_S_star_wanted/pl_S_star_unscaled
        pl_ionizing_luminosity = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","L")
        !pl_ionizing_luminosity = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
+       Edd_Efficiency = pl_ionizing_luminosity / EddLum
     else
        ! The power-law ionizing luminosity is specified (energy sense). 
        pl_ionizing_luminosity = EddLum*Edd_Efficiency
@@ -547,7 +552,7 @@ contains
        if (sourcetype == 'P' .or. sourcetype == " ") then
           write(logf,'(/a)')           'Using a power law source with'
           write(logf,'(a,1pe10.3)')   ' Power law index = ', pl_index
-          write(logf,'(a,1pe10.3)')   ' Efficiency parameter = ', pl_ionizing_luminosity/EddLum
+          write(logf,'(a,1pe10.3)')   ' Efficiency parameter = ', Edd_Efficiency
           write(logf,'(a,1pe10.3)')   ' Ionizing photon rate = ', pl_S_star
           write(logf,'(a,1pe10.3)')   ' Ionizing luminosity = ', pl_ionizing_luminosity
           write(logf,'(a,2f8.3,a)')   ' between energies ', &
@@ -712,7 +717,7 @@ contains
     if (rank == 0) then
        write(logf,"(2(A,I3))") "Using PL from frequency band ", &
             pl_FreqBnd_LowerLimit," to ",pl_FreqBnd_UpperLimit
-       write(logf,"(A,F10.2,A)") "  these are energies ", &
+       write(logf,"(A,2(F10.2,A))") "  these are energies ", &
             freq_min(pl_FreqBnd_LowerLimit)/ev2fr," and ", &
             (freq_min(pl_FreqBnd_UpperLimit)+ &
             delta_freq(pl_FreqBnd_UpperLimit)*real(NumFreq))/ev2fr," eV"
@@ -858,15 +863,16 @@ contains
 #endif
 
     ! report a table value
-    write(logf,*) "bb_photo_thick_table: ",sum(bb_photo_thick_table(0,:))
-    write(logf,*) "bb_photo_thin_table: ",sum(bb_photo_thin_table(0,:))
-    write(logf,*) "bb_heat_thick_table: ",(bb_heat_thick_table(0,1))
-    write(logf,*) "bb_heat_thin_table: ",(bb_heat_thin_table(0,1))
-    write(logf,*) "Rstar2: ",R_star2
+    if (rank == 0) then
+       write(logf,*) "bb_photo_thick_table: ",sum(bb_photo_thick_table(0,:))
+       write(logf,*) "bb_photo_thin_table: ",sum(bb_photo_thin_table(0,:))
+       write(logf,*) "bb_heat_thick_table: ",(bb_heat_thick_table(0,1))
+       write(logf,*) "bb_heat_thin_table: ",(bb_heat_thin_table(0,1))
+       write(logf,*) "Rstar2: ",R_star2
+    endif
     
   end subroutine spec_integration
   
-
 !---------------------------------------------------------------------------
   
   subroutine allocate_spec_integration_arrays
@@ -1511,47 +1517,51 @@ contains
 
        endif
 
-      ! Current cell individual photoionization rate of HI, HeI, HeII
-      select case (i_subband) 
+       ! Collect all outgoing photons
+       photo_lookuptable%photo_out = &
+            photo_lookuptable%photo_out + phi_photo_out_all
 
-      ! band 1
-      case (NumBndin1) 
-     
-         ! Assign to the HI photo-ionization rate
-         photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
-              phi_photo_all/vol
-         
-         ! band 2
-      case (NumBndin1+1:NumBndin1+NumBndin2)
-                  
-         ! Assign to the HI photo-ionization rate
-         photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
-              scaling_HI(i_subband)*phi_photo_all/vol 
-         ! Assign to the HeI photo-ionization rate
-         photo_lookuptable%photo_cell_HeI = photo_lookuptable%photo_cell_HeI + &
-              scaling_HeI(i_subband)*phi_photo_all/vol
-         
-         ! band 3
-      case (NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+NumBndin3)
-         
-         ! Assign to the HI photo-ionization rate
-         photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
-              scaling_HI(i_subband)*phi_photo_all/vol
-
-         ! Assign the HeI photo-ionization rate
-         photo_lookuptable%photo_cell_HeI = photo_lookuptable%photo_cell_HeI +&
-              scaling_HeI(i_subband)*phi_photo_all/vol
-
-         ! Assign the HeII photo-ionization rate
-         photo_lookuptable%photo_cell_HeII = photo_lookuptable%photo_cell_HeII +&
-              scaling_HeII(i_subband)*phi_photo_all/vol
-
-      end select
-      
-   enddo
-
- end function photo_lookuptable
- 
+       ! Current cell individual photoionization rate of HI, HeI, HeII
+       select case (i_subband) 
+          
+          ! band 1
+       case (NumBndin1) 
+          
+          ! Assign to the HI photo-ionization rate
+          photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
+               phi_photo_all/vol
+          
+          ! band 2
+       case (NumBndin1+1:NumBndin1+NumBndin2)
+          
+          ! Assign to the HI photo-ionization rate
+          photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
+               scaling_HI(i_subband)*phi_photo_all/vol 
+          ! Assign to the HeI photo-ionization rate
+          photo_lookuptable%photo_cell_HeI = photo_lookuptable%photo_cell_HeI + &
+               scaling_HeI(i_subband)*phi_photo_all/vol
+          
+          ! band 3
+       case (NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+NumBndin3)
+          
+          ! Assign to the HI photo-ionization rate
+          photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
+               scaling_HI(i_subband)*phi_photo_all/vol
+          
+          ! Assign the HeI photo-ionization rate
+          photo_lookuptable%photo_cell_HeI = photo_lookuptable%photo_cell_HeI +&
+               scaling_HeI(i_subband)*phi_photo_all/vol
+          
+          ! Assign the HeII photo-ionization rate
+          photo_lookuptable%photo_cell_HeII = photo_lookuptable%photo_cell_HeII +&
+               scaling_HeII(i_subband)*phi_photo_all/vol
+          
+       end select
+       
+    enddo
+    
+  end function photo_lookuptable
+  
  !---------------------------------------------------------------------------
  
  ! find out the correct position in the photo and heating tables.
@@ -1672,7 +1682,7 @@ contains
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,i_subband)
-             phi_heat_out_HI = phi_heat_in_HI+phi_heat_HI
+             phi_heat_out_HI = phi_heat_in_HI-phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
           endif
           
@@ -1698,7 +1708,7 @@ contains
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,2*i_subband-2)
-             phi_heat_out_HI = phi_heat_in_HI+phi_heat_HI
+             phi_heat_out_HI = phi_heat_in_HI-phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
           endif
           
@@ -1723,7 +1733,7 @@ contains
              phi_heat_HeI = NFlux * tau_cell_HeI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,2*i_subband-1)
-             phi_heat_out_HeI=phi_heat_in_HeI+phi_heat_HeI
+             phi_heat_out_HeI=phi_heat_in_HeI-phi_heat_HeI
              phi_heat_HeI = phi_heat_HeI/vol
           endif
           
@@ -1763,7 +1773,7 @@ contains
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,3*i_subband-NumBndin2-4)
-             phi_heat_out_HI = phi_heat_in_HI+phi_heat_HI
+             phi_heat_out_HI = phi_heat_in_HI-phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
           endif
           
@@ -1785,7 +1795,7 @@ contains
              phi_heat_HeI = NFlux * tau_cell_HeI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,3*i_subband-NumBndin2-3)
-             phi_heat_out_HeI = phi_heat_in_HeI+phi_heat_HeI
+             phi_heat_out_HeI = phi_heat_in_HeI-phi_heat_HeI
              phi_heat_HeI = phi_heat_HeI/vol
           endif
           
@@ -1806,7 +1816,7 @@ contains
              phi_heat_HeII = NFlux * tau_cell_HeII(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
                   tau_pos_in,i_subband,3*i_subband-NumBndin2-2)
-             phi_heat_out_HeII = phi_heat_in_HeII+phi_heat_HeII
+             phi_heat_out_HeII = phi_heat_in_HeII-phi_heat_HeII
              phi_heat_HeII = phi_heat_HeII/vol
           endif
           
@@ -2544,6 +2554,7 @@ contains
     photrates_add%heat_out_HeII = rate1%heat_out_HeII + rate2%heat_out_HeII
     photrates_add%heat = rate1%heat + rate2%heat
     photrates_add%photo_in = rate1%photo_in + rate2%photo_in
+    photrates_add%photo_out = rate1%photo_out + rate2%photo_out
     
   end function photrates_add
   
@@ -2571,6 +2582,7 @@ contains
     rate1%heat_out_HeII = 0.0
     rate1%heat = 0.0
     rate1%photo_in = 0.0
+    rate1%photo_out = 0.0
     
   end subroutine set_photrates_to_zero
   
