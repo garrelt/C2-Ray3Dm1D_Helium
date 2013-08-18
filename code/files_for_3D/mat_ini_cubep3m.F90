@@ -482,7 +482,7 @@ contains
        if (rank == 0) then
           write(zred_str,"(f6.3)") zred_now
           temper_file= trim(adjustl(results_dir))// &
-               "temper3d_"//trim(adjustl(zred_str))//".bin"
+               "Temper3D_"//trim(adjustl(zred_str))//".bin"
           
           write(unit=logf,fmt="(2A)") "Reading temperature from ", &
                trim(temper_file)
@@ -495,9 +495,12 @@ contains
              write(logf,*) "WARNING: file with temperatures unusable, as"
              write(logf,*) "mesh found in file: ",m1,m2,m3
           else
-             read(20) temperature_grid
+             read(20) temperature_grid(:,:,:,0)
           endif
-          
+          ! Fill the other parts of the temperature_grid array
+          ! See evolve for what they are used for
+          temperature_grid(:,:,:,1)=temperature_grid(:,:,:,0)
+          temperature_grid(:,:,:,2)=temperature_grid(:,:,:,0)
           ! close file
           close(20)
        endif
