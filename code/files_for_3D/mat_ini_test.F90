@@ -361,6 +361,42 @@ contains
   end subroutine xfrac_ini
 
   ! ===========================================================================
+  
+  subroutine protect_ionization_fractions(xfrac,lowfrac,highfrac,ifraction, &
+       name)
+
+    integer,intent(in) :: lowfrac
+    integer,intent(in) :: highfrac
+    integer,intent(in) :: ifraction
+    real(kind=dp),dimension(mesh(1),mesh(2),mesh(3),lowfrac:highfrac), &
+         intent(inout) :: xfrac
+    character(len=*) :: name
+
+    integer :: i,j,k
+
+    ! Check the fractions for negative values
+    do k=1,mesh(3)
+       do j=1,mesh(2)
+          do i=1,mesh(1)
+             if (xfrac(i,j,k,ifraction) < 0.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' < 0 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=0.0_dp
+             endif
+             if (xfrac(i,j,k,ifraction) > 1.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' > 1 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=1.0_dp
+             endif
+          enddo
+       enddo
+    enddo
+    
+  end subroutine protect_ionization_fractions
+
+  ! ===========================================================================
 
   subroutine temper_ini (zred_now)
 
@@ -385,7 +421,7 @@ contains
        if (rank == 0) then
           write(zred_str,"(f6.3)") zred_now
           temper_file= trim(adjustl(results_dir))// &
-               "temper3d_"//trim(adjustl(zred_str))//".bin"
+               "Temper3D_"//trim(adjustl(zred_str))//".bin"
           
           write(unit=logf,fmt="(2A)") "Reading temperature from ", &
                trim(temper_file)
@@ -398,9 +434,14 @@ contains
              write(logf,*) "WARNING: file with temperatures unusable, as"
              write(logf,*) "mesh found in file: ",m1,m2,m3
           else
-             read(20) temperature_grid
+             read(20) temperature_grid(:,:,:,0)
           endif
           
+          ! Fill the other parts of the temperature grid array
+          ! See evolve for their use
+          temperature_grid(:,:,:,1)=temperature_grid(:,:,:,0)
+          temperature_grid(:,:,:,2)=temperature_grid(:,:,:,0)
+
           ! close file
           close(20)
        endif
