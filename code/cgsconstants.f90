@@ -96,9 +96,9 @@ module cgsconstants
   !> Helium collisional ionization parameter 2
   real(kind=dp),dimension(0:1),parameter :: fhe=(/0.63,1.30/)
   !> Helium collisional ionization parameter
-  real(kind=dp),dimension(0:1),parameter :: colhe=(/1.3e-8*fhe(0)*xihe(0)/(ethe(0)*ethe(0)), &
-  	1.3e-8*fhe(1)*xihe(1)/(ethe(1)*ethe(1))/)
-
+  real(kind=dp),dimension(0:1),parameter :: colhe= &
+       (/1.3e-8*fhe(0)*xihe(0)/(ethe(0)*ethe(0)), &
+       1.3e-8*fhe(1)*xihe(1)/(ethe(1)*ethe(1))/)
 
    !> Hydrogen 0 A recombination parameter
    real(kind=dp) :: arech0
@@ -147,7 +147,8 @@ module cgsconstants
     ! 
     ! For He+ --> He0 see email from august, 11th 2008. 
     ! For now, use old fit.
-    real(kind=dp) :: fit1,fit2,sqrtt0,lambda,dielectronic
+    !real(kind=dp) :: fit1,fit2
+    real(kind=dp) :: sqrtt0,lambda,dielectronic
     real(kind=dp),intent(in):: temp0
 
     ! Hydorgen A&B recombination rate ------------------------------------------

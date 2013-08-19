@@ -66,8 +66,8 @@ contains
     
     ! Initialize lengths and volumes to proper units
     if (cosmological) then
-    	call redshift_evol(time)
-    	call cosmo_evol( )
+       call redshift_evol(time)
+       call cosmo_evol( )
     endif
     
   end subroutine cosmology_init
