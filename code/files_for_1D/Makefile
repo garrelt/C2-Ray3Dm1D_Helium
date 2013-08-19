@@ -1,21 +1,21 @@
 # MAKROS----------------------------------------------------
 # F90 compiler
 
-F90 = ifort
-#F90 = gfortran
+#F90 = ifort
 
 # ifort options
-IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT
+#IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT
 #IFORTFLAGS = -g -C -traceback -fpe0 -DIFORT
 #IFORTFLAGS = -g -C -DIFORT
 #IFORTFLAGS = -pg -g  -O0 -u -fpe0 -check all -traceback -ipo -DIFORT
 
 #F90FLAGS1 = $(IFORTFLAGS) 
 #F90FLAGS1 = -axW $(IFORTFLAGS) 
-F90FLAGS1 = -axO $(IFORTFLAGS) 
+#F90FLAGS1 = -axO $(IFORTFLAGS) 
 
-#GFORTFLAGS = -O
-#F90FLAGS1 = $(GFORTFLAGS) 
+F90 = gfortran
+GFORTFLAGS = -O3 -Wall -Wextra -fcheck=all -ffree-line-length-none -Warray-temporaries -ffpe-trap=invalid,zero,overflow -fcheck=all -fall-intrinsics
+F90FLAGS1 = $(GFORTFLAGS) 
 
 #F90FLAGS = $(F90FLAGS1) -openmp -DMPI
 #F90FLAGS = $(F90FLAGS1) -DMPI
