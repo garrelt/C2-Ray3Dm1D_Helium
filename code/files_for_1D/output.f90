@@ -5,7 +5,7 @@
 !!
 !! \b Date: 2012-10-13 (but older)
 !!
-!! \b Version: 1D, radial (spherically symmetric) grid.
+!! \b Version: 1D, radial (spherically symmetric) grid, ydrogen + helium
 
 module output_module
   
@@ -20,6 +20,7 @@ module output_module
   use my_mpi, only: rank
   use file_admin, only: stdinput, results_dir, file_input, logf
   use tped
+  use radiation, only: T_eff,R_star,L_star,S_star, pl_S_star
 
   implicit none
   
@@ -67,23 +68,24 @@ contains
           open(unit=90,file=trim(adjustl(results_dir))//"PhotonCounts.out", &
                form="formatted",status="unknown",position="append")
           ! Write header with description of what is in the file
-          write(90,*) "Columns: Rate of change for H0, H+, He0, He+, He2+, " &
-               "total photon losses, rate of ionizations + recombinations".
-
-       !GM/121013: Commented out as it is not used
-       !open(unit=91,file=trim(adjustl(results_dir))//'Analytical.out', &
-       !     form='formatted',status='unknown')
-       !write(91,*) 'Time - Numerical Solution - Analytical solution -', &
-       !     'Fractional Error'
-
-       ! GM/121013: Extra diagnostic files
-       ! nit: number of iterations?
-       ! Outputtimes.out: simulation time corresponding to outputs
-       ! Inputnumbers.out: ?
-       open(unit=48,file='nit',status='unknown')
-       open(unit=50,file='Outputtimes.out',status='unknown')
-       open(unit=52,file='Inputnumbers.out',status='unknown')
-
+          write(90,*) "Columns: Rate of change for H0, H+, He0, He+, He2+, ", &
+               "total photon losses, rate of ionizations + recombinations"
+          
+          !GM/121013: Commented out as it is not used
+          !open(unit=91,file=trim(adjustl(results_dir))//'Analytical.out', &
+          !     form='formatted',status='unknown')
+          !write(91,*) 'Time - Numerical Solution - Analytical solution -', &
+          !     'Fractional Error'
+          
+          ! GM/121013: Extra diagnostic files
+          ! nit: number of iterations?
+          ! Outputtimes.out: simulation time corresponding to outputs
+          ! Inputnumbers.out: ?
+          open(unit=48,file='nit',status='unknown')
+          open(unit=50,file='Outputtimes.out',status='unknown')
+          open(unit=52,file='Inputnumbers.out',status='unknown')
+       
+       endif
     endif
     if (do_photonstatistics) call initialize_photonstatistics ()
     
@@ -165,14 +167,13 @@ contains
     use grid, only: x,dr
     use material
     use photonstatistics
-    use radiation, only: teff,rstar,lstar,S_star
     
     real(kind=dp),intent(in) :: time !< current simulation time
     real(kind=dp),intent(in) :: dt !< time step taken
     real(kind=dp),intent(in) :: end_time !< end simulation at this time
     integer, intent(in)      :: step    
 
-    integer :: i,j,k,ns
+    integer :: i
     character(len=40) :: file1
 
     if (rank == 0) then
@@ -208,15 +209,13 @@ contains
     use grid, only: x,dr
     use material
     use photonstatistics
-    use radiation, only: teff,rstar,lstar,S_star
     
     real(kind=dp),intent(in) :: time !< current simulation time
     real(kind=dp),intent(in) :: dt !< time step taken
     real(kind=dp),intent(in) :: end_time !< end simulation at this time
     integer, intent(in)      :: step    
 
-    real(kind=dp) :: totalsrc
-    logical crossing,recording_photonstats
+    logical recording_photonstats
 
     if (rank == 0) then
        if (do_photonstatistics .and. time > 0.0) then
@@ -262,14 +261,12 @@ contains
     use grid, only: x,dr
     use material
     use photonstatistics
-    use radiation, only: teff,rstar,lstar,S_star
     
     real(kind=dp),intent(in) :: time !< current simulation time
     real(kind=dp),intent(in) :: dt !< time step taken
     real(kind=dp),intent(in) :: end_time !< end simulation at this time
     integer, intent(in)      :: step    
 
-    integer :: i,j,k,ns
     real(kind=dp) :: ana_front,num_front,num_front1,num_front2
 
     if (rank == 0) then
@@ -313,9 +310,9 @@ contains
     !     LambertW(x): the LambertW function.(real argument and ouput)
     !     expint(n,x): the exponentional integral of order n
 
+    use mathconstants, only: pi
     use cosmology
     use material
-    use radiation
     use grid
     
     real(kind=dp),intent(in) :: time !< current simulation time
@@ -323,7 +320,7 @@ contains
     
     real(kind=dp) :: StromgrenRadius
     real(kind=dp) :: typical_dens
-    real(kind=dp) :: L,K,a,S1,t_reccore
+    real(kind=dp) :: L,K,t_reccore
     real(kind=dp) :: tratio
     !real(kind=dp) :: LambertW
     !real(kind=dp) :: expint     
@@ -549,7 +546,8 @@ contains
     ! print*,'expint called',n,x,etatratio
     ! print*,'args',n,x
     if(n<0 .or. x<0. .or. (x == 0. .and. (n==0 .or. n==1)))then
-       pause 'bad arguments in expint'
+       !pause 'bad arguments in expint'
+       write(logf,*) 'bad arguments in expint'
     else if(n == 0)then
        expint=exp(-x)/x
     else if(x == 0.)then
@@ -572,7 +570,7 @@ contains
              return
           endif
        enddo
-       pause 'continued fraction failed in expint'
+       write(logf,*) 'continued fraction failed in expint'
     else
        if(nm1 /= 0)then
           expint=1./nm1
@@ -598,7 +596,7 @@ contains
              return
           end if
        enddo
-       pause 'series failed in expint'
+       write(logf,*) 'series failed in expint'
     endif
     return
   END FUNCTION expint

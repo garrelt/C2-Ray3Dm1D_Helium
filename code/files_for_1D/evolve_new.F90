@@ -26,7 +26,14 @@ module evolve
   use material, only: ndens, xh, xhe, temper
   use photonstatistics, only: state_before, calculate_photon_statistics, &
        photon_loss
+  use c2ray_parameters, only: minimum_fractional_change
+  use c2ray_parameters, only: minimum_fraction_of_atoms
+  use c2ray_parameters, only: minium_fraction_of_photons
+  use c2ray_parameters, only: convergence_fraction
+  use c2ray_parameters, only: subboxsize, max_subbox
+  use c2ray_parameters, only: epsilon
   use abundances, only: abu_he
+
   implicit none
 
   !private
@@ -77,7 +84,7 @@ contains
     integer,dimension(Ndim) :: pos
 
     ! Loop variables
-    integer :: i,j,k,l,nx,niter
+    integer :: i
 
     ! Flag variable (passed back from evolve0D_global)
     integer :: conv_flag
@@ -137,14 +144,12 @@ contains
 
     use mathconstants, only: pi
     use tped, only: electrondens
-    use doric_module, only: doric, coldens, coldensh_bndry, &
-         coldenshe0_bndry,coldenshe1_bndry
-    use radiation, only: photoion, photrates
-    use c2ray_parameters, only: epsilon,convergence1,convergence2,convergence_frac,convergence_frac2
+    use doric_module, only: doric, coldens, coldens_bndry_HI, &
+         coldens_bndry_HeI,coldens_bndry_HeII
+    use radiation, only: photoion_rates, photrates
     use material, only: isothermal, ionstates, gamma_uvb  
     use thermalevolution, only: thermal
-    use cgsconstants,only : ini_rec_colion_factors,breche1,vfrac
-    use cgsphotoconstants, only: s_H_heth, s_H_heLya,s_He_heLya,sighe0, s_He_he2,sighe1,s_He_he2,s_H_he2
+    use cgsconstants,only : ini_rec_colion_factors
 
     implicit none
 
@@ -158,10 +163,8 @@ contains
     !> mesh position of cell being done
     integer,dimension(Ndim),intent(in) :: rtpos 
 
-    logical :: finalpass
-    integer :: nx,nd,nit,it,idim ! loop counters
+    integer :: nx,nit ! loop counters
     integer,dimension(Ndim) :: pos
-    integer,dimension(Ndim) :: srcpos1
     real(kind=dp) :: coldensh_in
     real(kind=dp) :: coldenshe0_in
     real(kind=dp) :: coldenshe1_in
@@ -170,21 +173,18 @@ contains
     real(kind=dp) :: coldenshe1_cell
     real(kind=dp),dimension(0:1) :: hecolum_in,hecolum_out
     real(kind=dp) :: path, hcolum_out
-    real(kind=dp) :: de, istate,oldhav,oldhe0av,oldhe1av
+    real(kind=dp) :: de,oldhav,oldhe0av,oldhe1av
     real(kind=dp) :: ndens_p
     real(kind=dp) :: avg_temper
-    real(kind=dp) :: tau_H_heth, tau_H_heLya,tau_He_heth,tau_He_heLya,yfrac,zfrac
-    real(kind=dp) :: y2afrac,y2bfrac,tau_He2_he2th,tau_He_he2th,tau_H_he2th
+    real(kind=dp) :: yfrac,zfrac
+    real(kind=dp) :: y2afrac,y2bfrac
     real(kind=dp) :: dist,vol_ph
-    real(kind=dp) :: temper0,temper1,temper2,avhe0,avh,ionh0old,ionh1old
-    real(kind=dp) :: yh0_av_old,yh1_av_old,yhe0_av_old,yhe1_av_old,yhe2_av_old,yhe0_old,yh0_old
+    real(kind=dp) :: temper0,temper1,temper2,ionh0old,ionh1old
+    real(kind=dp) :: yh0_av_old,yh1_av_old,yhe0_av_old,yhe1_av_old,yhe2_av_old
     real(kind=dp) :: ionhe0old,ionhe1old,ionhe2old,ionheavold
-    real(kind=dp) :: convergence
     type(ionstates)  :: ion
     type(photrates) :: phi
     integer :: testpos
-
-    convergence=convergence1
 
     pos(1)=rtpos(1)
     ! Initialize local ionization states to the global ones
@@ -212,9 +212,9 @@ contains
     ! Find the column density at the entrance point of the cell (short
     ! characteristics)
     if (pos(1).eq.1) then
-       coldensh_in = coldensh_bndry()
-       coldenshe0_in = coldenshe0_bndry()
-       coldenshe1_in = coldenshe1_bndry()
+       coldensh_in = coldens_bndry_HI()
+       coldenshe0_in = coldens_bndry_HeI()
+       coldenshe1_in = coldens_bndry_HeII()
     else
        coldensh_in = coldensh_out(pos(1)-1)
        coldenshe0_in = coldenshe0_out(pos(1)-1)
@@ -256,17 +256,22 @@ contains
           hcolum_out=coldensh_in+coldensh_cell
           hecolum_in= (/coldenshe0_in,coldenshe1_in/)
           hecolum_out=(/coldenshe0_in+coldenshe0_cell ,coldenshe1_in+coldenshe1_cell/)       
-          call photoion(phi,coldensh_in,hcolum_out,hecolum_in,hecolum_out,vol_ph,1, &
-               ion%h_av(1))
+          ! Calculate (photon-conserving) photo-ionization rate
+          phi=photoion_rates(coldensh_in,hcolum_out, &
+               hecolum_in(0), hecolum_out(0), &
+               hecolum_in(1), hecolum_out(1), &
+               vol_ph,1,ion%h_av(1))
 
-          phi%h=phi%h/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0))
-          phi%he(0)=phi%he(0)/(ndens_p*abu_he*ion%he_av(0))
-          phi%he(1)=phi%he(1)/(ndens_p*abu_he*ion%he_av(1)) 
+          phi%photo_cell_HI=phi%photo_cell_HI/(ion%h_av(0)*ndens_p* &
+               (1.0_dp-abu_he))
+          phi%photo_cell_HeI=phi%photo_cell_HeI/(ion%he_av(nx)*ndens_p*abu_he)
+          phi%photo_cell_HeII=phi%photo_cell_HeII/(ion%he_av(nx)*ndens_p*abu_he)
 
+          !write(logf,*) "phiheat= ",phi%heat, pos
           ! Add the UV background
-          phi%h=phi%h + gamma_uvb(1)
-          phi%he(0)=phi%he(0) + gamma_uvb(2)
-          phi%he(1)=phi%he(1) + gamma_uvb(3)
+          phi%photo_cell_HI=phi%photo_cell_HI + gamma_uvb(1)
+          phi%photo_cell_HeI=phi%photo_cell_HeI + gamma_uvb(2)
+          phi%photo_cell_HeII=phi%photo_cell_HeII + gamma_uvb(3)
 
           !   phi%h=phi%h/(ndens_p*abu_he*ion%he_av(1)+ndens_p*abu_he*ion%he_av(0)+ndens_p*(1.0_dp-abu_he)*ion%h_av(0))
           !   phi%he(0)=phi%he(0)/(ndens_p*(1.0_dp-abu_he)*ion%h_av(0)+ndens_p*abu_he*ion%he_av(0))
@@ -274,48 +279,37 @@ contains
 
           !       phi%h=phi%h/ndens_p
           !       phi%he=phi%he/ndens_p
-          !-----------------------------------------------------------------------
+          !--------------------------------------------------------------------
 
           de=electrondens(ndens_p,ion%h_av,ion%he_av)
 
-          if (.not.isothermal) call ini_rec_colion_factors(avg_temper) !initialize the collisional ion 
-          !and recomb rates for new T    
+          ! initialize the collisional ion and recomb rates for new T
+          if (.not.isothermal) call ini_rec_colion_factors(avg_temper) 
 
-          !----------------DORIC BLOCK---------------------------------------------
+          !----------------DORIC BLOCK-----------------------------------------
           coldensh_cell  =coldens(path,ion%h(0),ndens_p,(1.0_dp-abu_he))   ! average or not average?
           coldenshe0_cell=coldens(path,ion%he(0),ndens_p,abu_he)           ! average or not average?
           coldenshe1_cell=coldens(path,ion%he(1),ndens_p,abu_he)           ! average or not average?
-          tau_H_heth  = coldensh_cell*s_H_heth     ! sigh*(frthe0/frth0)**(-sh0) opt depth of H at he0 ion threshold
-          tau_He_heth = coldenshe0_cell*sighe0     ! sighe0                  ! opt depth of He0 at he0 ion threshold
-          tau_H_heLya = coldensh_cell*s_H_heLya    ! sigh*(40.817eV/frth0)**(-sh0)       opt depth of H  at he+Lya 
-          tau_He_heLya= coldenshe0_cell*s_He_heLya      ! sighe0*(40.817eV/frthe0)**(-she0)   opt depth of He at he+Lya  
-          tau_He2_he2th = coldenshe1_cell*sighe1 
-          tau_He_he2th = coldenshe0_cell*    s_He_he2
-          tau_H_he2th = coldensh_cell*s_H_he2
-          yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
-          zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
-          y2afrac= tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
-          y2bfrac= tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+
+          ! Prepare factors needed by doric
+          call prepare_doric_factors(coldensh_cell, coldenshe0_cell, &
+               coldenshe1_cell, yfrac, zfrac, y2afrac,y2bfrac)
+
           call doric(dt,de,ndens_p,ion,phi,yfrac,zfrac,y2afrac,y2bfrac)! calculate de new?  (2)
-          !-----------------------------------------------------------------------
+          !--------------------------------------------------------------------
 
           de=electrondens(ndens_p,ion%h_av,ion%he_av)
 
-          !----------------DORIC BLOCK---------------------------------------------
+          !----------------DORIC BLOCK------------------------------------------
+
           coldensh_cell  =coldens(path,ion%h(0),    ndens_p,(1.0_dp-abu_he))  ! average or not average?
           coldenshe0_cell=coldens(path,ion%he(0),ndens_p,         abu_he)  ! average or not average?
           coldenshe1_cell=coldens(path,ion%he_av(1),ndens_p,abu_he)
-          tau_H_heth  = coldensh_cell  *s_H_heth     ! sigh*(frthe0/frth0)**(-sh0) opt depth of H at he0 ion threshold
-          tau_He_heth = coldenshe0_cell*sighe0     ! sighe0                  ! opt depth of He0 at he0 ion threshold
-          tau_H_heLya = coldensh_cell*s_H_heLya    ! sigh*(40.817eV/frth0)**(-sh0)       opt depth of H  at he+Lya 
-          tau_He_heLya= coldenshe0_cell*s_He_heLya      ! sighe0*(40.817eV/frthe0)**(-she0)   opt depth of He at he+Lya 
-          tau_He2_he2th = coldenshe1_cell*sighe1 
-          tau_He_he2th = coldenshe0_cell*    s_He_he2
-          tau_H_he2th = coldensh_cell*s_H_he2
-          yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
-          zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
-          y2afrac= tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
-          y2bfrac= tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+
+          ! Prepare factors needed by doric
+          call prepare_doric_factors(coldensh_cell, coldenshe0_cell, &
+               coldenshe1_cell, yfrac, zfrac, y2afrac,y2bfrac)
+
           ionh0old=ion%h(0)
           ionh1old=ion%h(1)
           ionhe0old=ion%he(0)
@@ -327,7 +321,6 @@ contains
           oldhe1av=ion%he_av(1)
 
           call doric(dt,de,ndens_p,ion,phi, yfrac, zfrac,y2afrac,y2bfrac) 
-
 
           ion%h(0)=0.5*(ion%h(0)+ionh0old)
           ion%h(1)=0.5*(ion%h(1)+ionh1old)
@@ -342,36 +335,38 @@ contains
 
           temper1=temper0       ! set temper1 to the original temperature
 
-          if (nit.eq.1.and.abs(ion%h_old(0)-ion%h(0)).gt.0.1 .and. &
-               abs(ion%he_old(0)-ion%he(0)).gt.0.1) then
-             continue
-          else
-             if (.not.isothermal) &
-                  call thermal(dt,temper1,avg_temper,de,ndens_p, &
-                  ion,phi)               
-          endif
+!          if (nit.eq.1.and.abs(ion%h_old(0)-ion%h(0)).gt.0.1 .and. &
+!               abs(ion%he_old(0)-ion%he(0)).gt.0.1) then
+!             continue
+!          else
+             if (.not.isothermal) then
+                if (pos(1) == mesh(1)/2) write(logf,*) "phiheat= ",phi%heat
+                call thermal(dt,temper1,avg_temper,de,ndens_p, &
+                     ion,phi)               
+             endif
+!          endif
 
-          if(  ( (abs(ion%h_av(0)-yh0_av_old)/ion%h_av(0).lt.convergence) &
+          if(  ( (abs(ion%h_av(0)-yh0_av_old)/ion%h_av(0).lt.minimum_fractional_change) &
                .or.                       &
-               (ion%h_av(0).lt.convergence_frac)   &
+               (ion%h_av(0).lt.minimum_fraction_of_atoms)   &
                )   &
                .and.                             &
-               ( (abs(ion%he_av(1)-yhe1_av_old)/ion%he_av(1).lt.convergence) &
+               ( (abs(ion%he_av(1)-yhe1_av_old)/ion%he_av(1).lt.minimum_fractional_change) &
                .or.                        &
-               (ion%he_av(1).lt.convergence_frac)   &
+               (ion%he_av(1).lt.minimum_fraction_of_atoms)   &
                )    &
                .and.                              &
-               ( (abs(ion%he_av(2)-yhe2_av_old)/ion%he_av(2).lt.convergence) &
+               ( (abs(ion%he_av(2)-yhe2_av_old)/ion%he_av(2).lt.minimum_fractional_change) &
                .or.                        &
-               (ion%he_av(2).lt.convergence_frac)   &
+               (ion%he_av(2).lt.minimum_fraction_of_atoms)   &
                )    &
                .and.                              &
-               (  (abs(ion%he_av(0)-yhe0_av_old)/ion%he_av(0).lt.convergence) &
+               (  (abs(ion%he_av(0)-yhe0_av_old)/ion%he_av(0).lt.minimum_fractional_change) &
                .or.                        &
-               (ion%he_av(0).lt.convergence_frac)   &
+               (ion%he_av(0).lt.minimum_fraction_of_atoms)   &
                )    & 
                .and. &
-               abs(temper1-temper2)/temper1.lt.convergence &
+               abs(temper1-temper2)/temper1.lt.minimum_fractional_change &
                ) then 
              exit
           else
@@ -398,12 +393,12 @@ contains
 
        enddo ! end of iteration
     else 
-       phi%h=0.0_dp
-       phi%h_out=0.0_dp
-       phi%he(0)=0.0_dp
-       phi%he(1)=0.0_dp
-       phi%he_out(0)=0.0_dp
-       phi%he_out(1)=0.0_dp
+       phi%photo_cell_HI=0.0_dp
+       phi%photo_out_HI=0.0_dp
+       phi%photo_cell_HeI=0.0_dp
+       phi%photo_cell_HeII=0.0_dp
+       phi%photo_out_HeI=0.0_dp
+       phi%photo_out_HeII=0.0_dp
        !GM/130801: not sure what this is useful for
        !phi%int_out(:)=0.0_dp
     endif
@@ -433,5 +428,44 @@ contains
     !(phi%int1_out+phi%int2_out+phi%int3_out)*vol(pos(1))/vol_ph
     !(sum(phi%int_out(:)))*vol(pos(1))/vol_ph
   end subroutine evolve0D
+
+  ! ===========================================================================
+
+  subroutine prepare_doric_factors(NHI,NHeI,NHeII,yfrac,zfrac,y2afrac,y2bfrac)
+
+    use cgsphotoconstants, only: sigma_H_heth, sigma_H_heLya,sigma_He_heLya
+    use cgsphotoconstants, only: sigma_HeI_at_ion_freq, sigma_He_he2
+    use cgsphotoconstants, only: sigma_HeII_at_ion_freq,sigma_He_he2,sigma_H_he2
+
+    real(kind=dp),intent(in) :: NHI ! H0 column density
+    real(kind=dp),intent(in) :: NHeI ! He column densities
+    real(kind=dp),intent(in) :: NHeII ! He column densities
+
+    real(kind=dp),intent(out) :: yfrac,zfrac
+    real(kind=dp),intent(out) :: y2afrac,y2bfrac
+ 
+    real(kind=dp) :: tau_H_heth
+    real(kind=dp) :: tau_He_heth
+    real(kind=dp) :: tau_H_heLya
+    real(kind=dp) :: tau_He_heLya 
+    real(kind=dp) :: tau_He2_he2th
+    real(kind=dp) :: tau_He_he2th
+    real(kind=dp) :: tau_H_he2th
+
+    tau_H_heth  = NHI*sigma_H_heth ! opt depth of HI at HeI ion threshold
+    tau_He_heth = NHeI*sigma_HeI_at_ion_freq ! opt depth of HeI at HeI ion threshold
+    tau_H_heLya = NHI*sigma_H_heLya ! opt depth of H  at he+Lya (40.817eV)
+    tau_He_heLya= NHeI*sigma_He_heLya ! opt depth of He at he+Lya (40.817eV) 
+    tau_H_he2th = NHI*sigma_H_he2 ! opt depth of H at HeII ion threshold
+    tau_He_he2th = NHeI*sigma_He_he2 ! opt depth of HeI at HeII ion threshold
+    tau_He2_he2th = NHeII*sigma_HeII_at_ion_freq ! opt depth of HeII at HeII ion threshold
+    
+    ! Ratios of these optical depths needed in doric
+    yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
+    zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
+    y2afrac=  tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+    y2bfrac=  tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+    
+  end subroutine prepare_doric_factors
 
 end module evolve

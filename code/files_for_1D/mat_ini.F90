@@ -111,15 +111,13 @@ contains
 
     integer,intent(out) :: restart !< will be /= 0 if a restart is intended
 
-    integer :: i,n ! loop counters
+    integer :: i ! loop counter
     real(kind=dp) :: dens_val
     real(kind=dp) :: temper_val
-    real(kind=dp) :: alpha
+    real(kind=dp) :: alpha=0.0
     character(len=1) :: answer
 
     real(kind=dp),dimension(3) :: xions
-
-    type(ionstates) :: ion
 
     ! restart
     restart=0 ! no restart by default
