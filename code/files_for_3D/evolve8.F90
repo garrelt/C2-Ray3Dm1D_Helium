@@ -230,8 +230,10 @@ contains
        ! n sources will affect at least n cells on the first pass.
        ! We need to give them another iteration to allow them to
        ! work together.
+       ! GM/130819: We additionally force to do at least two iterations by
+       ! testing for niter.
 
-       if (conv_flag < conv_criterion) then
+       if (conv_flag < conv_criterion .and. niter > 1) then
           xh(:,:,:,:)=xh_intermed(:,:,:,:)
           xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
           call set_final_temperature_point
@@ -993,7 +995,7 @@ contains
     ! Loop through boxes of increasing size
     ! NOTE: make this limit on the photon_loss a fraction of
     ! a source flux loss_fraction*NormFlux(ns)*S_star)
-    do while (all(photon_loss_src(:) > 1e-6*total_source_flux) &
+    do while (all(photon_loss_src(:) > 1e-10*total_source_flux) &
     !do while (all(photon_loss_src(:) /= 0.0) &
          .and. last_r(3) < lastpos_r(3) &
          .and. last_l(3) > lastpos_l(3))
@@ -1956,7 +1958,8 @@ contains
           !phi%photo_cell_HeII=phihe_cell(1)
           !phi%heat=phihv_cell
 
-          ! initialize the collisional ionization rates (temperature dependent)
+          ! initialize the collisional ionization and recombinations rates 
+          ! (temperature dependent)
           if (.not.isothermal) call ini_rec_colion_factors(avg_temper) 
           
           ! Add photon losses to the photo-ionization rates
