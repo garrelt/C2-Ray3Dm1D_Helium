@@ -184,7 +184,7 @@ contains
        open(unit=51,file=file1,form='formatted',status='unknown')
    
        do i=1,mesh(1)
-          write(51,'(8(1pe11.4,1x))') x(i),xh(i,0),xh(i,1), temper(i),ndens(i,1,1), &
+          write(51,'(8(es11.4,1x))') x(i),xh(i,0),xh(i,1), temper(i),ndens(i,1,1), &
        xhe(i,0), xhe(i,1),xhe(i,2)
        enddo
     endif
@@ -223,7 +223,7 @@ contains
           total_ion=total_ion!+photon_loss
           grtotal_ion=grtotal_ion+total_ion-totcollisions
           if (time > 0.0) then
-             write(90,'(7(1pe13.5))') &
+             write(90,'(7(es13.5))') &
  !                  real(time)/end_time, &
  !                 (total_ion-totcollisions)/(s_star*dt), &
  !                  total_ion, &
@@ -279,7 +279,7 @@ contains
 !          call calc_num_front(num_front2,0.9d0)
 !          if (num_front == 0.0) num_front=1.0
 !          if (ana_front == 0.0) ana_front=1.0
-!          write(91,'(6(1pe10.3,1x))') time,num_front, &
+!          write(91,'(6(es10.3,1x))') time,num_front, &
 !               ana_front, &
 !               (num_front-ana_front)/ana_front, &
 !               (num_front1-num_front2)/num_front, &

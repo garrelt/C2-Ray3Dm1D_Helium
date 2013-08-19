@@ -204,7 +204,7 @@ contains
     totalsrc=s_star*dt
     photcons=(total_ion-totcollisions)/totalsrc
     if (rank == 0) then
-       write(logf,"(7(1pe10.3))") &
+       write(logf,"(7(es10.3))") &
             total_ion, totalsrc, &
             photcons, &
             dh0/total_ion, &

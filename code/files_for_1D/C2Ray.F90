@@ -151,7 +151,7 @@ Program C2Ray
 
 !     nstep=nstep+1
      ! Report time and time step
-     write(logf,'(A,2(1pe10.3,1x),A)') 'Time, dt:', &
+     write(logf,'(A,2(es10.3,1x),A)') 'Time, dt:', &
           sim_time/YEAR,actual_dt/YEAR,' (years)'
 !     write(48,*) '0', nstep 
      ! For cosmological simulations evolve proper quantities

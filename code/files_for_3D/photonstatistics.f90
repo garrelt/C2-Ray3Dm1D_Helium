@@ -273,7 +273,7 @@ contains
          sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
     photcons=(total_ion-totcollisions-recomions)/(totalsrc)
     if (rank == 0) then
-       write(90,"(9(1pe10.3))") &
+       write(90,"(9(es10.3))") &
             total_ion, totalsrc, &          ! # of new ionizations (after-before) | # of emitted photons
             recomions, total_photon_loss, &                  ! # number of ionizations due to He recombination ! # photon loss  
             totrec, totcollisions, &                       ! recombinations that don't ionize;  

@@ -247,8 +247,8 @@ contains
     ! Report density field properties
     if (rank == 0) then
        write(logf,*) "Raw density diagnostics (cm^-3)"
-       write(logf,"(A,1pe10.3,A)") "Average density = ",avg_dens," cm^-3"
-       write(logf,"(A,1pe10.3,A)") "(at z=0 : ", &
+       write(logf,"(A,es10.3,A)") "Average density = ",avg_dens," cm^-3"
+       write(logf,"(A,es10.3,A)") "(at z=0 : ", &
             rho_crit_0*Omega_B/(mu*m_p), &
             " cm^-3)"
     endif

@@ -277,7 +277,7 @@ contains
     endif
     
     ! Report recombination time scale (in case of screen input)
-    if (.not.file_input) write(*,'(A,1pe10.3,A)') 'Recombination time scale: ', &
+    if (.not.file_input) write(*,'(A,es10.3,A)') 'Recombination time scale: ', &
          1.0/(dens_val*clumping*bh00*YEAR),' years'
 
     

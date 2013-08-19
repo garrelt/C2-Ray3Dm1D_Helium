@@ -520,10 +520,10 @@ contains
     if (rank == 0) then
        if (sourcetype == 'B' .or. sourcetype == " " .or. sourcetype == "A") then
           write(logf,'(/a)')           'Using a black body with'
-          write(logf,'(a,1pe10.3,a)')   ' Teff =       ', T_eff, ' K'
-          write(logf,'(a,1pe10.3,a)')   ' Radius =     ', R_star/r_solar, ' R_solar'
-          write(logf,'(a,1pe10.3,a)')   ' Luminosity = ', L_star/l_solar, ' L_solar'
-          write(logf,'(a,1pe10.3,a)')   ' Ionzing photon rate = ', S_star, ' s^-1'
+          write(logf,'(a,es10.3,a)')   ' Teff =       ', T_eff, ' K'
+          write(logf,'(a,es10.3,a)')   ' Radius =     ', R_star/r_solar, ' R_solar'
+          write(logf,'(a,es10.3,a)')   ' Luminosity = ', L_star/l_solar, ' L_solar'
+          write(logf,'(a,es10.3,a)')   ' Ionzing photon rate = ', S_star, ' s^-1'
        endif
     endif
 
@@ -553,10 +553,10 @@ contains
     if (rank == 0) then
        if (sourcetype == 'P' .or. sourcetype == " " .or. sourcetype == "A") then
           write(logf,'(/a)')           'Using a power law source with'
-          write(logf,'(a,1pe10.3)')   ' Power law index = ', pl_index
-          write(logf,'(a,1pe10.3)')   ' Efficiency parameter = ', Edd_Efficiency
-          write(logf,'(a,1pe10.3)')   ' Ionizing photon rate = ', pl_S_star
-          write(logf,'(a,1pe10.3)')   ' Ionizing luminosity = ', pl_ionizing_luminosity
+          write(logf,'(a,es10.3)')   ' Power law index = ', pl_index
+          write(logf,'(a,es10.3)')   ' Efficiency parameter = ', Edd_Efficiency
+          write(logf,'(a,es10.3)')   ' Ionizing photon rate = ', pl_S_star
+          write(logf,'(a,es10.3)')   ' Ionizing luminosity = ', pl_ionizing_luminosity
           write(logf,'(a,2f8.3,a)')   ' between energies ', &
                pl_MinFreq/(1e3*ev2fr),pl_MaxFreq/(1e3*ev2fr),' kEv'
        endif
@@ -573,16 +573,16 @@ contains
 
        ! Report back to the log file
        if (rank == 0) then
-          write(logf,'(/A,(1PE12.5),A//)') &
+          write(logf,'(/A,(ES12.5),A//)') &
                ' Number of BB photons in band 1: ', &
                bb_S_star_band1, ' s^-1'
-          write(logf,'(A,(1PE12.5),A//)') &
+          write(logf,'(A,(ES12.5),A//)') &
                ' Number of BB photons in band 2: ', &
                bb_S_star_band2, ' s^-1'
-          write(logf,'(A,(1PE12.5),A//)') &
+          write(logf,'(A,(ES12.5),A//)') &
                ' Number of BB photons in band 3: ', &
                bb_S_star_band3, ' s^-1'
-          write(logf,'(A,(1PE12.5),A//)') &
+          write(logf,'(A,(ES12.5),A//)') &
                ' Total number of ionizing photons (BB): ', &
                bb_S_star_band1+bb_S_star_band2+bb_S_star_band3, 's^-1'
        endif
@@ -599,13 +599,13 @@ contains
        
        ! Report back to the log file
        if (rank == 0) then
-          write(logf,'(A,(1PE12.5),A//)') ' Number of PL photons in band 1: ', &
+          write(logf,'(A,(ES12.5),A//)') ' Number of PL photons in band 1: ', &
                pl_S_star_band1, ' s^-1'
-          write(logf,'(A,(1PE12.5),A//)') ' Number of PL photons in band 2: ', &
+          write(logf,'(A,(ES12.5),A//)') ' Number of PL photons in band 2: ', &
                pl_S_star_band2, ' s^-1'
-          write(logf,'(A,(1PE12.5),A//)') ' Number of PL photons in band 3: ', &
+          write(logf,'(A,(ES12.5),A//)') ' Number of PL photons in band 3: ', &
             pl_S_star_band3, ' s^-1'
-          write(logf,'(A,(1PE12.5),A//)') &
+          write(logf,'(A,(ES12.5),A//)') &
                ' Total number of ionizing photons (PL): ', &
                pl_S_star_band1+pl_S_star_band2+pl_S_star_band3, 's^-1'
        endif

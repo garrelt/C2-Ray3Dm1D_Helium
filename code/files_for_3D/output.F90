@@ -215,7 +215,7 @@ contains
           ! Write data
           if (.not.isothermal) then
              do i=1,mesh(1)
-                write(51,"(7(1pe10.3,1x))")  &
+                write(51,"(7(es10.3,1x))")  &
                      xh(i,srcpos(2,1),srcpos(3,1),0), &
                      xh(i,srcpos(2,1),srcpos(3,1),1), &
                      ndens(i,srcpos(2,1),srcpos(3,1)), &
@@ -226,7 +226,7 @@ contains
              enddo
           else
              do i=1,mesh(1)
-                write(51,"(7(1pe10.3,1x))")  &
+                write(51,"(7(es10.3,1x))")  &
                      xh(i,srcpos(2,1),srcpos(3,1),0), &
                      xh(i,srcpos(2,1),srcpos(3,1),1), &
                      ndens(i,srcpos(2,1),srcpos(3,1)), &
@@ -526,7 +526,7 @@ contains
           !              Number of (ionizations + recombinations) / photons 
           !                   since t=0
           if (time > 0.0) then
-             !write(90,"(f6.3,8(1pe10.3))") &
+             !write(90,"(f6.3,8(es10.3))") &
              !     zred_now, &
              !     total_ion, totalsrc, &
              !     photcons, &
@@ -543,7 +543,7 @@ contains
           massfrac(0)=sum(xh(:,:,:,1)*ndens(:,:,:) ) /sum(real(ndens,dp))
           massfrac(1)=sum(xhe(:,:,:,1)*ndens(:,:,:) ) /sum(real(ndens,dp))
           massfrac(2)=sum(xhe(:,:,:,2)*ndens(:,:,:) ) /sum(real(ndens,dp))
-          write(95,"(f6.3,8(1pe10.3))") zred_now,totions,grtotal_src, &
+          write(95,"(f6.3,8(es10.3))") zred_now,totions,grtotal_src, &
                volfrac,massfrac
 
 !*** for the moment, I turn that off, until I checked, how I calculate those quantities.
@@ -553,7 +553,7 @@ contains
               !    total_photon_loss/totalsrc < (1.0-photcons) ) then
               !  photcons_flag=1
                 ! Report photon conservation
-              !  write(logf,"(A,2(1pe10.3,x))") &
+              !  write(logf,"(A,2(es10.3,x))") &
                   !   "Photon conservation problem: ", &
                     ! photcons, total_photon_loss/totalsrc
 
