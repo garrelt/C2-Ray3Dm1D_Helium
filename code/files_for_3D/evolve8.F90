@@ -94,8 +94,8 @@ module evolve
   !> Photon loss from the grid
   real(kind=dp) :: photon_loss_all(1:NumFreqBnd)
   !> Photon loss from one source
-  real(kind=dp),dimension(:,:),allocatable :: photon_loss_src_thread
-  real(kind=dp) :: photon_loss_src(1:NumFreqBnd)
+  real(kind=dp),dimension(:),allocatable :: photon_loss_src_thread
+  real(kind=dp) :: photon_loss_src
 
   ! mesh positions of end points for RT
   integer,dimension(Ndim) :: lastpos_l !< mesh position of left end point for RT
@@ -136,7 +136,7 @@ contains
     allocate(coldenshe_out(mesh(1),mesh(2),mesh(3),0:1))
 
     allocate(buffer(mesh(1),mesh(2),mesh(3)))
-    allocate(photon_loss_src_thread(1:NumFreqBnd,nthreads))
+    allocate(photon_loss_src_thread(nthreads))
   !   allocate(photon_loss_src_thread(1:NumFreqBnd,1))   
 
   end subroutine evolve_ini
@@ -944,8 +944,9 @@ contains
     integer :: ns
     integer :: k
     integer :: nbox
-    integer ::nnt
-    
+    integer :: nnt
+    integer :: logf1
+
     ! Total ionizing photon rate of all contributions to the source
     real(kind=dp) :: total_source_flux
 
@@ -988,20 +989,20 @@ contains
     nbox=0 ! subbox counter
     total_source_flux=NormFlux(ns)*S_star+ &
          NormFluxPL(ns)*pl_S_star
-    photon_loss_src(:)=total_source_flux !-1.0 ! to pass the first while test
+    photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
     last_r(:)=srcpos(:,ns) ! to pass the first while test
     last_l(:)=srcpos(:,ns) ! to pass the first while test
 
     ! Loop through boxes of increasing size
     ! NOTE: make this limit on the photon_loss a fraction of
     ! a source flux loss_fraction*NormFlux(ns)*S_star)
-    do while (all(photon_loss_src(:) > 1e-10*total_source_flux) &
+    do while (photon_loss_src > 1e-10*total_source_flux &
     !do while (all(photon_loss_src(:) /= 0.0) &
          .and. last_r(3) < lastpos_r(3) &
          .and. last_l(3) > lastpos_l(3))
        nbox=nbox+1 ! increase subbox counter
-       photon_loss_src(:) = 0.0 ! reset photon_loss_src to zero
-       photon_loss_src_thread(:,:) = 0.0 ! reset photon_loss_src to zero
+       photon_loss_src = 0.0 ! reset photon_loss_src to zero
+       photon_loss_src_thread(:) = 0.0 ! reset photon_loss_src to zero
        last_r(:)=min(srcpos(:,ns)+subboxsize*nbox,lastpos_r(:))
        last_l(:)=max(srcpos(:,ns)-subboxsize*nbox,lastpos_l(:))
 
@@ -1051,8 +1052,8 @@ contains
           !$omp end parallel
           ! Collect photon losses for each thread
           do nnt=1,nthreads
-             photon_loss_src(:)=photon_loss_src(:) + &
-                  photon_loss_src_thread(:,nnt)
+             photon_loss_src=photon_loss_src + &
+                  photon_loss_src_thread(nnt)
           enddo
 
        else ! No OpenMP parallelization
@@ -1075,14 +1076,24 @@ contains
           ! the variable tn set to 1 if we were not running OpenMP.
           ! This led to non-photon-conservations (and should have
           ! led to memory errors...)
-          photon_loss_src(:)=photon_loss_src_thread(:,1)
+          photon_loss_src=photon_loss_src_thread(1)
 
        endif
+
+       ! Report photon losses from subbox
+       logf1=logf+rank
+       write(logf1,"(2(A,I4))") "Photon loss from subbox ", nbox, &
+            " for source ",ns
+       write(logf1,"(G10.3,A)") photon_loss_src," photons/s"
+       write(logf1,"(A,G10.3,A)") "This is ", &
+            photon_loss_src/total_source_flux, &
+            " of total source rate."
+
     enddo
 
     ! Record the final photon loss, this is the photon loss that leaves
     ! the grid.
-    photon_loss(:)=photon_loss(:) + photon_loss_src(:)
+    photon_loss(1)=photon_loss(1) + photon_loss_src
 
     ! Sum the total number of subboxes used for reporting later
     sum_nbox=sum_nbox+nbox
@@ -1714,7 +1725,7 @@ contains
        ! Note: This is only the H0 photo-ionization rate
        if ( (any(rtpos(:) == last_l(:))) .or. &
             (any(rtpos(:) == last_r(:))) ) then
-          photon_loss_src_thread(1,tn)=photon_loss_src_thread(1,tn) + &
+          photon_loss_src_thread(tn)=photon_loss_src_thread(tn) + &
                phi%photo_out*vol/vol_ph
           !photon_loss_src(1,tn)=photon_loss_src(1,tn) + phi%h_out*vol/vol_ph
        endif
