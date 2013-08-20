@@ -24,7 +24,9 @@ module photonstatistics
   use material, only: ndens, clumping, clumping_point
   use tped, only: electrondens
   use sourceprops, only: NormFlux, NormFluxPL, NumSrc
-  use radiation, only: S_star, pl_S_star, NumFreqBnd
+  !use radiation, only: S_star, pl_S_star, NumFreqBnd
+  use radiation_sizes, only: NumFreqBnd
+  use radiation_sed_parameters, only: S_star, pl_S_star
   use c2ray_parameters, only: type_of_clumping
   use abundances, only: abu_he
 

@@ -60,7 +60,7 @@ MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
 #IFORTFLAGS = -DMPILOG -O0 -g -u -fpe0 -DIFORT -shared-intel -check all -traceback -fpp  #!<
-IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
+IFORTFLAGS = -fpp -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
 #IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
 #F90FLAGS1 = $(IFORTFLAGS)  #!<
@@ -142,14 +142,18 @@ CONSTANTS1_TEST4 = ../mathconstants.o ../cgsconstants.o  ../cgsphotoconstants.o 
 CONSTANTS2_TEST4 = mathconstants.o cgsconstants.o  cgsphotoconstants.o  cgsastroconstants.o c2ray_parameters_TEST4.o cosmoparms.o abundances.o atomic.o
 
 
+#RADIATION1 = ../radiation.o
+#RADIATION2 = radiation.o
+RADIATION1 = ../radiation_sizes.o ../radiation_sed_parameters.o ../radiation_tables.o ../radiation_photoionrates.o
+RADIATION2 = radiation_sizes.o radiation_sed_parameters.o radiation_tables.o radiation_photoionrates.o
 
 GENERAL1=../cosmology.o  ../cooling_h.o ../radiation_including_pls_new.o   ../thermal.o ../time_ini.o ../doric.o photonstatistics.o evolve8.o output.o
 
 GENERAL2=cosmology.o  cooling_h.o radiation_including_pls_new.o   thermal.o time_ini.o doric.o photonstatistics.o evolve8.o output.o
 
-GENERAL1_KYL=../cosmology.o  ../cooling_h.o ../radiation.o   ../thermal.o ../time_ini.o ../doric.o photonstatistics.o evolve8.o output.o
+GENERAL1_KYL=../cosmology.o  ../cooling_h.o $(RADIATION1)   ../thermal.o ../time_ini.o ../doric.o photonstatistics.o evolve8.o output.o
 
-GENERAL2_KYL=cosmology.o  cooling_h.o radiation.o   thermal.o time_ini.o doric.o photonstatistics.o evolve8.o output.o
+GENERAL2_KYL=cosmology.o  cooling_h.o $(RADIATION2) thermal.o time_ini.o doric.o photonstatistics.o evolve8.o output.o
 
 TEST= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test.o
 
@@ -191,6 +195,11 @@ C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
 C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
 C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
+
+C2Ray_3D_test_kyl_periodic_omp_mpi: F90=$(MPIFC)
+C2Ray_3D_test_kyl_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)  $(MPI_FLAGS)
+C2Ray_3D_test_kyl_periodic_omp_mpi: $(UTILS1) sizes.o $(CONSTANTS1) ../mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_periodic_mpi: F90=$(MPIFC)
 C2Ray_3D_test_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)

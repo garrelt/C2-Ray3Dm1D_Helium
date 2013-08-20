@@ -38,9 +38,12 @@ module evolve
   use material, only: ionstates
   use material, only: protect_ionization_fractions
   use sourceprops, only: NumSrc, srcpos, NormFlux, NormFluxPL !SrcSeries
-  use radiation, only: NumFreqBnd
-  use radiation, only: photrates
-  use radiation, only: S_star, pl_S_star
+  !use radiation, only: NumFreqBnd
+  !use radiation, only: photrates
+  !use radiation, only: S_star, pl_S_star
+  use radiation_sizes, only: NumFreqBnd
+  use radiation_photoionrates, only: photrates
+  use radiation_sed_parameters, only: S_star, pl_S_star
   use photonstatistics, only: state_before, calculate_photon_statistics, &
        photon_loss, LLS_loss, report_photonstatistics, state_after, total_rates, &
        total_ionizations, update_grandtotal_photonstatistics
@@ -1084,8 +1087,8 @@ contains
        logf1=logf+rank
        write(logf1,"(2(A,I4))") "Photon loss from subbox ", nbox, &
             " for source ",ns
-       write(logf1,"(G10.3,A)") photon_loss_src," photons/s"
-       write(logf1,"(A,G10.3,A)") "This is ", &
+       write(logf1,"(ES10.3,A)") photon_loss_src," photons/s"
+       write(logf1,"(A,ES10.3,A)") "This is ", &
             photon_loss_src/total_source_flux, &
             " of total source rate."
 
@@ -1495,7 +1498,8 @@ contains
     use cgsconstants
     use tped, only: electrondens
     use doric_module, only: doric, coldens
-    use radiation, only: photoion_rates
+    !use radiation, only: photoion_rates
+    use radiation_photoionrates, only: photoion_rates
     use material, only: clumping_point
     use c2ray_parameters, only: type_of_clumping, use_LLS,type_of_LLS
     use mathconstants, only: pi
@@ -1867,7 +1871,8 @@ contains
     use tped, only: electrondens
     use doric_module, only: doric, coldens
     use material, only: clumping_point
-    use radiation, only: photoion_rates
+    !use radiation, only: photoion_rates
+    use radiation_photoionrates, only: photoion_rates
 
     real(kind=dp),intent(in) :: dt !< time step
     real(kind=dp),intent(in) :: ndens_p
@@ -2122,7 +2127,8 @@ contains
   ! Refer to the H-only version to see another way to process photon_losses
   subroutine distribute_photon_losses(ion,phi,ndens_p,vol)
 
-    use radiation, only: scale_int2,scale_int3
+    !use radiation, only: scale_int2,scale_int3
+    use radiation_photoionrates, only: scale_int2,scale_int3
 
     type(ionstates),intent(in) :: ion
     type(photrates),intent(inout) :: phi

@@ -29,7 +29,8 @@ module output_module
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
   use photonstatistics, only: photon_loss, grtotal_src
   use photonstatistics, only: initialize_photonstatistics
-  use radiation, only: T_eff,R_star,L_star,S_star, pl_S_star
+  !use radiation, only: T_eff,R_star,L_star,S_star, pl_S_star
+  use radiation_sed_parameters, only: T_eff,R_star,L_star,S_star, pl_S_star
 
 
   implicit none

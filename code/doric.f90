@@ -56,7 +56,8 @@ contains
     use file_admin, only: stdinput
     use material, only: clumping, ionstates
     use abundances, only: abu_he
-    use radiation, only: photrates
+    !use radiation, only: photrates
+    use radiation_photoionrates, only: photrates
     use tped, only: electrondens ! should this really be used inside doric?
     use c2ray_parameters, only: epsilon
     real(kind=dp),intent(in)    :: dt     !< time step
@@ -340,7 +341,8 @@ contains
     ! Sets the boundary condition for the hydrogen column density
 
     use cgsphotoconstants, only: sigma_HI_at_ion_freq,sigma_HeI_at_ion_freq,sigma_HeII_at_ion_freq
-    use radiation, only: boundary_tauHI
+    !use radiation, only: boundary_tauHI
+    use radiation_sizes, only: boundary_tauHI
 
     real(kind=dp):: coldens_bndry_HI
 
@@ -352,14 +354,16 @@ contains
 
   function coldens_bndry_HeI()
     use cgsphotoconstants, only: sigma_HeI_at_ion_freq
-    use radiation, only: boundary_tauHeI
+    !use radiation, only: boundary_tauHeI
+    use radiation_sizes, only: boundary_tauHeI
     real(kind=dp):: coldens_bndry_HeI  
     coldens_bndry_HeI=boundary_tauHeI/sigma_HeI_at_ion_freq
   end function coldens_bndry_HeI
 
   function coldens_bndry_HeII()
     use cgsphotoconstants, only: sigma_HeII_at_ion_freq
-    use radiation, only: boundary_tauHeII
+    !use radiation, only: boundary_tauHeII
+    use radiation_sizes, only: boundary_tauHeII
     real(kind=dp):: coldens_bndry_HeII  
     coldens_bndry_HeII=boundary_tauHeII/sigma_HeII_at_ion_freq
   end function coldens_bndry_HeII

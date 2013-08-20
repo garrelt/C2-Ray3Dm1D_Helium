@@ -46,7 +46,8 @@ Program C2Ray
   use my_mpi !, only: mpi_setup, mpi_end, rank
   use output_module, only: setup_output,output,close_down
   use grid, only: grid_ini
-  use radiation, only: rad_ini
+  !use radiation, only: rad_ini
+  use radiation_tables, only: rad_ini
   use nbody, only: nbody_type, nbody_ini, NumZred, zred_array, snap
   use cosmology, only: cosmology_init, redshift_evol, cosmo_evol, &
        time2zred, zred2time, zred
