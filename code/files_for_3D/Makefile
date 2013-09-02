@@ -60,7 +60,7 @@ MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
 #IFORTFLAGS = -DMPILOG -O0 -g -u -fpe0 -DIFORT -shared-intel -check all -traceback -fpp  #!<
-IFORTFLAGS = -fpp -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback
+IFORTFLAGS = -fpp -O3 -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback -vec_report
 #IFORTFLAGS = -O3 -vec_report -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
 #F90FLAGS1 = $(IFORTFLAGS)  #!<
@@ -68,6 +68,8 @@ IFORTFLAGS = -fpp -O3 -vec_report -u -fpe0 -ipo -DIFORT -shared-intel -check all
 F90FLAGS1 = -xO $(IFORTFLAGS) 
 #F90FLAGS1 = -xT $(IFORTFLAGS) # Laptop 
 #F90FLAGS1 = -xB $(IFORTFLAGS)
+#F90FLAGS1 = -xAVX $(IFORTFLAGS) # Curie thin nodes
+#F90FLAGS1 = -xHost $(IFORTFLAGS) # Curie xlarge nodes 
 
 # These flags should be added to the F90FLAGS1 depending on the executable
 # made. Specify this below on a per executable basis.
