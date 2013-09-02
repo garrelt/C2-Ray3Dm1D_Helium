@@ -10,7 +10,8 @@ module thermalevolution
   use cgsconstants
   use atomic
   use cosmology
-  use radiation, only: photrates
+  !use radiation, only: photrates
+  use radiation_photoionrates, only: photrates
   use material, only: ionstates
 
   implicit none
