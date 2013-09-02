@@ -279,7 +279,8 @@ contains
   function read_table(table,tablesize,table_position,i_subband,i_subband2)
     
     integer,intent(in) :: tablesize
-    real(kind=dp),dimension(0:NumTau, 1:tablesize),intent(in) :: table
+    real(kind=dp), pointer, dimension(:,:),intent(in) :: table
+    !real(kind=dp),dimension(0:NumTau, 1:tablesize),intent(in) :: table
     type(tablepos),intent(in) :: table_position
     integer,intent(in) :: i_subband
     integer,intent(in) :: i_subband2
