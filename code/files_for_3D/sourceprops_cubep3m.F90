@@ -211,7 +211,13 @@ contains
        NumSupprbleSrc = 0
        NumSupprsdSrc = 0
        do ns0=1,NumSrc0
-          read(50,*) srcpos0(1),srcpos0(2),srcpos0(3),SrcMass00,SrcMass01
+          ! If you change the following lines, also change it below in          
+          ! read_in_sources                                                     
+          read(50,*) srclist(1:ncolumns_srcfile)
+          srcpos0(1:3)=int(srclist(1:3))
+          srcMass00=srclist(4) !massive sources (HMACHs)                        
+          srcMass01=srclist(5) !low-mass sources (LMACHs)                       
+          !read(50,*) srcpos0(1),srcpos0(2),srcpos0(3),SrcMass00,SrcMass01
           ! Massive sources are never suppressed.
           if (SrcMass00 /= 0.0) then
              NumSrc=NumSrc+1
@@ -265,8 +271,12 @@ contains
        ! Read in source positions and mass
        ns=0
        do ns0=1,NumSrc0
-          read(50,*) srcpos0(1),srcpos0(2),srcpos0(3), &
-               SrcMass00,SrcMass01
+          read(50,*) srclist(1:ncolumns_srcfile)
+          srcpos0(1:3)=int(srclist(1:3))
+          srcMass00=srclist(4) !massive sources (HMACHs)                       
+          srcMass01=srclist(5) !low-mass sources (LMACHs)                       
+          !read(50,*) srcpos0(1),srcpos0(2),srcpos0(3), &
+          !     SrcMass00,SrcMass01
           
           if (xh(srcpos0(1),srcpos0(2),srcpos0(3),1) < StillNeutral) then
              if (UV_Model == "Iliev et al" .or. SrcMass00 > 0.0d0) then
