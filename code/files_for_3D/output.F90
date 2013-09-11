@@ -23,7 +23,8 @@ module output_module
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
-  use evolve, only: phih_grid, phiheat
+  !use evolve, only: phih_grid, phiheat
+  use evolve_data, only: phih_grid, phiheat
   use sourceprops, only: srcpos, NormFlux, NormFluxPL, NumSrc
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion

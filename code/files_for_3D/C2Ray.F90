@@ -55,7 +55,9 @@ Program C2Ray
        set_LLS
   use times, only: time_ini, set_timesteps
   use sourceprops, only: source_properties_ini, source_properties, NumSrc
-  use evolve, only: evolve_ini,evolve3D
+  !use evolve, only: evolve_ini,evolve3D
+  use evolve_data, only: evolve_ini
+  use evolve, only: evolve3D
   use material,only: isothermal ! NB: in some versions set in c2ray_parameters
   use radiative_cooling, only: setup_cool
 #ifdef XLF
