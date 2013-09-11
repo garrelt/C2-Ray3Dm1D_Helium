@@ -312,6 +312,44 @@ contains
     return
   end subroutine doric
 
+  ! ===========================================================================
+
+  subroutine prepare_doric_factors(NH,NHe,yfrac,zfrac,y2afrac,y2bfrac)
+
+    use cgsphotoconstants, only: sigma_H_heth, sigma_H_heLya,sigma_He_heLya
+    use cgsphotoconstants, only: sigma_HeI_at_ion_freq, sigma_He_he2
+    use cgsphotoconstants, only: sigma_HeII_at_ion_freq,sigma_He_he2,sigma_H_he2
+
+    real(kind=dp),intent(in) :: NH ! H0 column density
+    real(kind=dp),dimension(0:1),intent(in) :: NHe ! He column densities
+
+    real(kind=dp),intent(out) :: yfrac,zfrac
+    real(kind=dp),intent(out) :: y2afrac,y2bfrac
+ 
+    real(kind=dp) :: tau_H_heth
+    real(kind=dp) :: tau_He_heth
+    real(kind=dp) :: tau_H_heLya
+    real(kind=dp) :: tau_He_heLya 
+    real(kind=dp) :: tau_He2_he2th
+    real(kind=dp) :: tau_He_he2th
+    real(kind=dp) :: tau_H_he2th
+
+    tau_H_heth  = NH*sigma_H_heth ! opt depth of HI at HeI ion threshold
+    tau_He_heth = NHe(0)*sigma_HeI_at_ion_freq ! opt depth of HeI at HeI ion threshold
+    tau_H_heLya = NH*sigma_H_heLya ! opt depth of H  at he+Lya (40.817eV)
+    tau_He_heLya= NHe(0)*sigma_He_heLya ! opt depth of He at he+Lya (40.817eV) 
+    tau_H_he2th = NH*sigma_H_he2 ! opt depth of H at HeII ion threshold
+    tau_He_he2th = NHe(0)*sigma_He_he2 ! opt depth of HeI at HeII ion threshold
+    tau_He2_he2th = NHe(1)*sigma_HeII_at_ion_freq ! opt depth of HeII at HeII ion threshold
+    
+    ! Ratios of these optical depths needed in doric
+    yfrac= tau_H_heth /(tau_H_heth +tau_He_heth)
+    zfrac= tau_H_heLya/(tau_H_heLya+tau_He_heLya)
+    y2afrac=  tau_He2_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+    y2bfrac=  tau_He_he2th /(tau_He2_he2th +tau_He_he2th+tau_H_he2th)
+    
+  end subroutine prepare_doric_factors
+
   ! =======================================================================
 
   !> Calculates the column density (of hydrogen)
