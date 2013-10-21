@@ -1,3 +1,7 @@
+# This Makefile should only be used to make the TableWrite executable,
+# a program to write the photo-ionization tables to files.
+# All C2-Ray codes should be build using the  Makefiles in either
+# the files_for_1d or files_for_3d directories
 # MAKROS----------------------------------------------------
 # F90 compiler
 
