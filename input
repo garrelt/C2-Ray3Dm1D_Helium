@@ -1,0 +1,5 @@
+5e4          ! source temperature
+1e4          ! IGM temperature
+1            !number of timesteps per density/source slice
+1            !number of outputs per density/source slice
+

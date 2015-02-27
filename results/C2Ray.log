@@ -1,0 +1,25 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!                                                                 !!
+!!                   Log file for C2-Ray run                       !!
+!!                                                                 !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+ Beginning of mpi setup
+ Number of MPI processors used:            1
+ Running in OpenMP mode
+ Number of OpenMP threads per processor:            8
+ Running on processor named apollon
+ Thread number            1  of processor            0  reporting
+ Thread number            6  of processor            0  reporting
+ Thread number            8  of processor            0  reporting
+ Thread number            5  of processor            0  reporting
+ Thread number            3  of processor            0  reporting
+ Thread number            4  of processor            0  reporting
+ Thread number            2  of processor            0  reporting
+ Thread number            7  of processor            0  reporting
+ End of mpi setup
+
+ Beginning of input setup
+ Reading input from command line
+ End of input setup
+

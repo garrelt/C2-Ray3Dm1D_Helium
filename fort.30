@@ -1,0 +1,9 @@
+ Running in OpenMP mode
+ Number of OpenMP threads per processor:            4
+ Running on processor named apollon
+ Thread number            1  of processor            0  reporting
+ Thread number            4  of processor            0  reporting
+ Thread number            2  of processor            0  reporting
+ Thread number            3  of processor            0  reporting
+ End of mpi setup
+

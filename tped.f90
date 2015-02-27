@@ -1,0 +1,116 @@
+!>
+!! \brief This module contains routines having to do with the calculation of
+!!  temperature and electron density.
+!!
+!! Module for Capreole / C2-Ray (f90)
+!!
+!! \b Author: Garrelt Mellema
+!!
+!! \b Date: 2010-Mar-08 (but older)
+!!
+!! \b Doxygen \b note: This module contains "elemental" functions (i.e.
+!! functions without side effects working on scalars). Doxygen does not
+!! recognize these as functions, and therefore does not list them.
+!!
+!! The elemental functions in this module are:
+!! - temper2pressr (calculates pressure from temperature, density and electron density).
+!! - pressr2temper (calculates temperature from pressure, density and electron density).
+!! - rho2n (calculates number density from mass density)
+!! - n2rho (calculates mass density from number density)
+!!
+module tped
+
+  ! This file contains routines having to do with the calculation of
+  ! temperature and electron density.
+
+  ! - temper2pressr : find temperature from pressure
+  ! - pressr2temper : find pressure from temperature
+  ! - electrondens:   find electron density
+
+  use precision, only: dp
+  use cgsconstants, only: k_B, m_p
+  use abundances, only: abu_c, mu, abu_he
+
+  implicit none
+
+contains
+
+  !=======================================================================
+
+  !> find temperature from pressure
+  elemental function temper2pressr (temper,ndens,eldens) result(pressr)
+    
+    real(kind=dp),intent(in) :: ndens !< number density
+    real(kind=dp),intent(in) :: temper !< temperature
+    real(kind=dp),intent(in) :: eldens !< electron density
+    
+    real(kind=dp) :: pressr !< pressure
+
+    pressr=(ndens+eldens)*k_B*temper
+
+    !temper2pressr=pressr
+
+  end function temper2pressr
+
+  ! =======================================================================
+
+  !> find pressure from temperature
+  elemental function pressr2temper (pressr,ndens,eldens) result(temper)
+
+    real(kind=dp),intent(in) :: pressr !< pressure
+    real(kind=dp),intent(in) :: ndens !< number density
+    real(kind=dp),intent(in) :: eldens !< electron density
+    
+    real(kind=dp) :: temper !< temperature
+
+    temper=pressr/(k_B*(ndens+eldens))
+    
+    !pressr2temper=temper
+    
+  end function pressr2temper
+      
+  ! =======================================================================
+
+  !> find electron density
+  function electrondens(ndens,xHII,xHeII,xHeIII)
+     
+    real(kind=dp) :: electrondens 
+    real(kind=dp),intent(in) :: ndens !< number density
+    real(kind=dp),intent(in) :: xHII
+    real(kind=dp),intent(in) :: xHeII
+    real(kind=dp),intent(in) :: xHeIII
+
+    electrondens=ndens*(xHII*(1.0-abu_he)+abu_c+abu_he*(xHeII+2.0*xHeIII))
+
+  end function electrondens
+
+  ! =======================================================================
+
+  !> Find number density from mass density
+  elemental function rho2n(rho)
+      
+    ! Calculates number density from mass density
+    
+    real(kind=dp) :: rho2n
+    real(kind=dp),intent(in) :: rho !< mass density
+
+    rho2n=rho/(mu*m_p)
+
+  end function rho2n
+
+  ! =======================================================================
+
+  !> Find mass density from number density
+  elemental function n2rho(ndens)
+      
+    ! Calculates number density from mass density
+
+    real(kind=dp) :: n2rho
+    real(kind=dp),intent(in) :: ndens !< number density
+    
+    n2rho=ndens*m_p*mu
+
+  end function n2rho
+
+
+end module tped

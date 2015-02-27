@@ -1,0 +1,478 @@
+Program C2Ray
+
+  use my_mpi
+  use precision, only: dp
+  use clocks, only: setup_clocks, update_clocks, report_clocks, &
+                    timestamp_wallclock, report_simulation_time
+  use input, only: setup_input,input_data
+
+  use file_admin, only: stdinput, logf, timefile, file_input, &
+       flag_for_file_input
+  use c2ray_parameters, only: cosmological, &
+       use_LLS, type_of_LLS,stop_on_photon_violation
+  use astroconstants, only: YEAR
+  use my_mpi
+  use scaling_factor, only: scaling_factor_initialization
+  use nominal_source, only: nominal_source_initialization
+  use photo_table, only: photo_table_initialization
+  use material_array, only: material_array_initialization
+  use temperature, only: temperature_initialization
+  use xfrac, only: xfrac_initialization
+  use density, only: density_initialization
+  use redshift, only: redshift_initialization
+  use clumping, only: clumping_evolution
+  use output_module, only: setup_output,output,close_down
+  use grid, only: grid_initialization
+  use romberg, only: romberg_initialization          
+  use cosmology, only: cosmology_initialization, redshift_evolution, cosmological_evolution, &
+       time_to_redshift, redshift_to_time
+  use time, only: set_timesteps
+  use sourceprops, only: source_initialization
+  use total_photo_rate, only: total_photo_rate_from_all_sources
+  use parameter, only: number_of_source,do_LTE, sim_time, next_output_time, do_constant
+  use evolve_array, only: evolve_array_initialization
+  use cooling, only: cooling_initialization
+  use parameter, only: number_of_redshift,min_numproc_master_slave,actual_dt,adaptive_dt
+  use array, only: redshift_array
+  use column_density_and_photo_rate, only: processor_get_column_density_and_photo_rate,&
+                                           master_distributing_job_to_slaves,&
+                                           slave_get_column_density_and_photo_rate
+  use array, only: dt_array
+
+  use parameter, only: LTE_size_of_m,LTE_non_evolved_cells_exist,output_time_dt,end_time
+
+  use AT_array, only: AT_array_initialization_1, AT_array_initialization_2, &
+                      AT_dt_array_destruction, AT_triangular_array_destruction, &
+                      AT_general_array_destruction
+  use AT_ifront, only: AT_Ifront_around_the_source, AT_Ifront_array_creation
+  use AT_transformation, only: AT_global_to_source_grid_transformation
+  use AT_octant_grid, only: AT_octant_grid_creation
+  use AT_triangular_grid, only: AT_triangular_grid_initialization
+  use AT_ray, only: AT_ray_pass_through_octant
+  use AT_photoionization, only: AT_get_photoionization_rate
+  use AT_time_calculation, only: AT_time_equation, AT_find_adaptive_timestep 
+
+  use ADP_array, only: ADP_array_initialization_1,ADP_reset_photo_array,ADP_array_destruction
+  use ADP_convergence, only: ADP_convergence_test
+  use ADP_copy, only: ADP_copy_final_answer
+  use ADP_evolution, only: ADP_evolve
+
+  use LTE_array, only: LTE_array_initialization_1, LTE_array_initialization_2, &
+                       LTE_reset_evolved_LTE_field, LTE_array_destruction1,LTE_array_destruction2
+  use LTE_field, only: LTE_global_LTE_field_generator, LTE_global_evolved_LTE_field_generator,&
+                       LTE_non_evolved_cells_finder
+  use LTE_FOF, only: LTE_equivalent_class_finder, LTE_source_class_index_finder
+  use LTE_evolution, only: LTE_evolve
+  use LTE_copy, only: LTE_copy_final_answer
+  use LTE_convergence, only: LTE_convergence_test
+
+  use photonstatistics, only: photonstatistics_initialization, PS_array_initialization, &
+                              PS_array_destruction, PS_photon_loss_total, PS_reset, &
+                              PS_ionization_state_before, PS_ionization_state_after, PS_summary, &
+                              PS_update_source_photons, PS_recombination_collisional               
+  use array, only: photoionization_HI_array, heating_array
+
+  implicit none
+
+  integer :: restart=0 !< restart flag
+  integer :: i_redshift !< loop counter for loop over redshift list
+  integer :: nz0 !< index of starting redshift from redshift list
+  integer :: photcons_flag=0 !< photon conservation flag, non-zero if photon conservation is violated. This stops the simulation
+  real(kind=dp) :: constant_dt !< calculated time step
+  real(kind=dp) :: zred_interm !< intermediate redshift (for restart)
+  real(kind=dp) :: interm_zred !< calculated intermediate redshift (for restart)
+  real(kind=dp) :: zred
+  logical :: converged
+  logical :: iterated
+  integer :: i_source
+  logical :: bubble
+  logical :: ADP_help_do_LTE_ray_tracing
+  logical :: LTE_do_evolution_in_this_round
+#ifdef MPI
+  integer :: mympierror
+#endif
+
+  ! Input file
+  character(len=512) :: inputfile 
+  character(len=1) :: answer 
+
+  ! Initialize clocks (cpu and wall)
+  call setup_clocks
+
+  ! Set up MPI structure
+  call mpi_setup()
+
+  ! ask for input filename
+  call setup_input()
+ 
+  ! read data from an input file
+  call input_data()
+
+  ! Initialize output
+  call setup_output()
+
+  ! Initialize grid
+  call grid_initialization()
+
+  ! Initialize integration routines                                                        !
+  call romberg_initialization() 
+
+  call scaling_factor_initialization()
+
+  call nominal_source_initialization()
+
+  call photo_table_initialization()
+
+  call cooling_initialization()
+
+  call material_array_initialization()
+
+  call temperature_initialization()
+
+  call xfrac_initialization()
+
+  call redshift_initialization()
+
+  call evolve_array_initialization()
+
+  call cosmology_initialization()
+
+! on99 just put it here first
+!call LTE_reset_evolved_LTE_field()
+
+
+  ! Set time to zero
+  sim_time=0.0
+
+  ! Loop over redshifts
+  do i_redshift = 1,number_of_redshift-1 ! nz0,number_of_redshift-1
+
+    ! Initialize time parameters
+    call set_timesteps(redshift_array(i_redshift),redshift_array(i_redshift+1),end_time,constant_dt,output_time_dt)
+
+    call source_initialization()
+
+     ! Initialize photonstatistics array
+    call PS_array_initialization()
+
+    ! Initialize density field
+    call density_initialization(redshift_array(i_redshift))
+
+    call clumping_evolution()
+
+    next_output_time = sim_time+output_time_dt
+
+    ! Loop until end time is reached
+    do
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ADAPTIVE TIMESTEP (AT) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+       ! initialize the fraction partition and timestep array
+       call AT_array_initialization_1()
+
+       ! do it source by source
+       ! I suggest use also MPI here parallelizing among sources
+       ! I find that the photo rates of all sources are not added
+       ! I will solve this problem later
+       do i_source = 1,number_of_source
+
+         ! initialize the major AT arrays
+         !call AT_array_initialization_2()
+         call AT_array_initialization_2(i_source)
+
+         ! check if the source has ionized its cell
+         call AT_Ifront_around_the_source(bubble,i_source)
+
+         ! if the source cell is already in LTE
+         if (bubble .eqv. .true.) then
+
+           ! create I-front array
+           call AT_Ifront_array_creation()
+
+           ! grid transformation (from global frame to source frame)
+           call AT_global_to_source_grid_transformation(i_source)
+
+           ! establish eight octant arrays using I-front array
+           call AT_octant_grid_creation()
+
+           ! create twenty four triangular arrays using the octant arrays
+           call AT_triangular_grid_initialization()
+
+           ! find out the Ifront cells reached by one source
+           call AT_ray_pass_through_octant(i_source)
+
+           ! obtain photoionization rate of the whole grid by one source
+           call AT_get_photoionization_rate(i_source)
+
+           ! destroy the triangular arrays
+           call AT_triangular_array_destruction()
+
+         ! if the source cell is not in LTE
+         else
+
+           ! obtain photoionization rate of the whole grid by one source
+           call AT_get_photoionization_rate(i_source)
+
+         endif
+
+         ! solve and obtain the timestep required to ionize one cell by one source
+         call AT_time_equation()
+
+         ! find the minimum timestep of one source and update the timestep array
+         call AT_find_adaptive_timestep(dt_array(i_source))
+
+         ! destroy some AT arrays
+         call AT_general_array_destruction()
+
+       enddo
+
+       ! find the minimum timestep among all the sources
+       adaptive_dt = minval(dt_array)
+
+       ! destroy the timestep array
+       call AT_dt_array_destruction()
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      ! Make sure you produce output at the correct time
+      if (do_constant) then
+        actual_dt = min(next_output_time-sim_time,constant_dt)
+      else
+        actual_dt = min(next_output_time-sim_time,adaptive_dt)
+        if (abs(actual_dt-next_output_time+sim_time)/(next_output_time-sim_time) .le. 1.0e-4) then
+          ADP_help_do_LTE_ray_tracing = .true.
+          LTE_do_evolution_in_this_round = .true.
+          !write(*,*) 'ADP_help_do_LTE_ray_tracing is true'
+          !write(*,*) 'LTE_do_evolution_in_this_round is true'
+        else
+          ADP_help_do_LTE_ray_tracing = .false.
+          LTE_do_evolution_in_this_round = .false.
+        endif
+      endif
+
+      if (rank.eq.0 ) write(*,*) 'Time-step is ',actual_dt/(3.15576E+13),' Myr'
+
+      ! update the current redshift
+      call redshift_evolution(sim_time+0.5*actual_dt)
+      ! update the grid size
+      call cosmological_evolution()
+      ! update the clumping factor
+      call clumping_evolution()
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!! LTE evolution (LTE) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      ! evolution (either LTE or ADP) is performed only when there are sources
+      if (number_of_source .gt. 0 .and. do_LTE .eqv. .true.) then
+
+         ! create the LTE field with simulation time
+         call LTE_global_LTE_field_generator(next_output_time-sim_time)
+
+       endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!! ADP evolution (ADP) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+      ! Take one time step
+      if (number_of_source .gt. 0) then
+
+        ! initialize some ADP arrays
+        call ADP_array_initialization_1() ! not complete yet
+
+        ! calculate the total HI/HII number inside the ADP region before evolution
+        call PS_ionization_state_before('A')
+
+        do
+
+          call ADP_convergence_test(converged,iterated)
+
+          if (converged .or. iterated) then
+
+            call ADP_copy_final_answer()
+
+            ! calculate the total HI/HII number inside the ADP region after evolution
+            call PS_ionization_state_after('A')
+
+            ! update the photon statistics parameters
+            call PS_summary('A')
+
+            call ADP_array_destruction()
+ADP_help_do_LTE_ray_tracing = .false.
+!write(*,*) 'ADP finish, photo rate is ',photoionization_HI_array(5,5,5)
+            exit
+
+          endif
+
+          call ADP_reset_photo_array()
+
+          if (nprocs > min_numproc_master_slave) then
+            if (rank .eq. 0) then
+              call master_distributing_job_to_slaves()
+            else
+              call slave_get_column_density_and_photo_rate('A',ADP_help_do_LTE_ray_tracing)
+            endif
+          else
+            call processor_get_column_density_and_photo_rate('A',ADP_help_do_LTE_ray_tracing)
+          endif
+write(*,*) 'ADP get jor heating rate, ',heating_array(5,5,5)
+          !if (ADP_help_do_LTE_ray_tracing .eqv. .true.) then
+            !ADP_help_do_LTE_ray_tracing = .false.
+            !write(*,*) 'ADP_help_do_LTE_ray_tracing becomes ',ADP_help_do_LTE_ray_tracing
+            !write(*,*) 'but LTE_do_evolution_in_this_round is still ',LTE_do_evolution_in_this_round
+          !endif
+           ! to add up all the rates from the sources
+           call total_photo_rate_from_all_sources()
+
+           ! calculate the photon escaped out of boundary and the background radiation field
+           call PS_photon_loss_total('A')
+
+          ! evolve the non LTE cells using adaptive timestep
+          call ADP_evolve(actual_dt)
+
+        enddo
+
+      endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+       ! Update time
+       sim_time = sim_time + actual_dt
+
+       ! Write output
+       if (abs(sim_time-next_output_time) .le. 1e-6*sim_time) then
+
+         if (number_of_source .gt. 0) then
+
+!!!!!!!!!!!!!!!!!!!!!!! do LTE evolution here !!!!!!!!!!!!!!!!!!!!!!! 
+
+           if (do_LTE .eqv. .true. .and. LTE_do_evolution_in_this_round .eqv. .true.) then
+
+             ! initialize some LTE arrays
+             call LTE_array_initialization_1()
+
+             ! initialize LTE arrays which are related to the LTE field
+             !call LTE_non_evolved_cells_finder()
+
+             !if (LTE_non_evolved_cells_exist .eqv. .true.) then
+              !if (ADP_help_do_LTE_ray_tracing .eqv. .true.) then              
+
+               call LTE_array_initialization_2()
+
+               ! identify the connected regions
+               !call LTE_equivalent_class_finder()
+
+               ! find the equivalent class index for each source
+               !call LTE_source_class_index_finder()
+
+               ! Calculate photo rates of all sources
+               ! if large number of processor
+               !if (nprocs .gt. min_numproc_master_slave) then
+
+               !  if (rank .eq. 0) then
+                   ! master processor allocates jobs to slaves source by source 
+               !    call master_distributing_job_to_slaves()
+               !  else
+                   ! slave processor calculates column density and photo rate due to one source
+               !    call slave_get_column_density_and_photo_rate('L',.false.)
+               !  endif
+
+               ! if small number of processor
+               !else
+
+                 ! every processor calculates column density and photo rate due to one source
+               !  call processor_get_column_density_and_photo_rate('L',.false.)
+
+               !endif
+
+               ! to add up all the rates from the sources
+               !call total_photo_rate_from_all_sources()
+
+               ! calculate the photon escaped out of boundary and the background radiation field
+               call PS_photon_loss_total('L')
+
+               ! calculate the total HI/HII number inside the LTE region before evolution
+               call PS_ionization_state_before('L')
+
+               ! evolve the non-evolved LTE cells until the next output time
+               call LTE_evolve()
+
+               call LTE_copy_final_answer()
+
+               ! calculate the total HI/HII number inside the LTE region after evolution
+               call PS_ionization_state_after('L')
+
+               ! calculates total number of recombinations and collisions inside the LTE region
+               call PS_recombination_collisional('L')
+
+               ! update the photon statistics parameters
+               call PS_summary('L')
+
+               call LTE_array_destruction2()
+
+             !endif
+
+             ! update the evolved LTE field
+             call LTE_global_evolved_LTE_field_generator()
+
+             call LTE_array_destruction1()
+      
+           endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+           ! calculate the total number of photons emitted by the sources during the output timestep
+           call PS_update_source_photons()
+
+           ! reset a PS parameter here
+           call PS_reset()
+
+           call LTE_reset_evolved_LTE_field()
+
+           call output(time_to_redshift(sim_time),sim_time,actual_dt, photcons_flag)
+
+         endif
+
+         next_output_time = next_output_time+output_time_dt
+
+       endif
+
+       ! end time for this redshift interval reached
+       if (abs(sim_time-end_time) .le. 1e-6*end_time) exit
+
+     enddo
+
+     ! destroy some PS arrays
+     call PS_array_destruction()
+
+     ! Scale to the current redshift
+     if (cosmological) then
+
+        call redshift_evolution(sim_time)
+
+        call cosmological_evolution()
+
+     endif
+
+     ! Update clock counters (cpu + wall, to avoid overflowing the counter)
+     call update_clocks ()
+
+  enddo
+
+  ! End output streams
+  call close_down ()
+
+  ! Report clocks (cpu and wall)
+  call report_clocks ()
+
+  ! End the run
+  call mpi_end ()
+
+end Program C2Ray
