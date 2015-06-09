@@ -36,6 +36,8 @@ module radiation_photoionrates
   implicit none
 
   ! Variables connected to secondary ionizations.
+  logical,parameter :: do_secondary_ionizations=.true.
+
   ! in general, I'm following Ricotti et al 2002
   real(kind=dp), dimension(1:3) :: CR1=(/0.3908_dp, 0.0554_dp, 1.0_dp/)
   real(kind=dp), dimension(1:3) :: bR1=(/0.4092_dp, 0.4614_dp, 0.2663_dp/)
@@ -506,11 +508,13 @@ contains
     df_heat=0.0
 
     ! Set parameters for secondary ionizations (following Ricotti et al. 2002)
-    do i=1,3
-       y1R(i)= CR1(i)*(1.0_dp-i_state**bR1(i))**dR1(i)
-       xeb=1.0_dp-i_state**bR2(i) 
-       y2R(i)= CR2(i)*i_state**aR2(i)*xeb*xeb
-    enddo
+    if (do_secondary_ionizations) then
+       do i=1,3
+          y1R(i)= CR1(i)*(1.0_dp-i_state**bR1(i))**dR1(i)
+          xeb=1.0_dp-i_state**bR2(i) 
+          y2R(i)= CR2(i)*i_state**aR2(i)*xeb*xeb
+       enddo
+    endif
     !if (tau_in_all(1) == 0.0) write(logf,*) "sec ion parms: ",y1R,xeb,y2R
 
     ! Current cell individual heating rates of HI, HeI, HeII
@@ -597,21 +601,25 @@ contains
 
           endif ! Optical depth test
           
-          ! Band 2, secondary ionizations
-          fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+ &
-               f1ion_HeI(i_subband)*phi_heat_HeI
-          fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+ &
-               f2ion_HeI(i_subband)*phi_heat_HeI
-          fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+ &
-               f1heat_HeI(i_subband)*phi_heat_HeI
-          fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+ &
-               f2heat_HeI(i_subband)*phi_heat_HeI
+          ! Collect contribution from Band 2
+          df_heat = phi_heat_HI+phi_heat_HeI
+
+          if (do_secondary_ionizations) then
+             ! Band 2, secondary ionizations
+             fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+ &
+                  f1ion_HeI(i_subband)*phi_heat_HeI
+             fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+ &
+                  f2ion_HeI(i_subband)*phi_heat_HeI
+             fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+ &
+                  f1heat_HeI(i_subband)*phi_heat_HeI
+             fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+ &
+                  f2heat_HeI(i_subband)*phi_heat_HeI
           
-          ! Collect contribution from this band
-          df_ion_HeI = y1R(2)*fra_sum1-y2R(2)*fra_sum2  
-          df_ion_HI = y1R(1)*fra_sum1-y2R(1)*fra_sum2
-          df_heat = phi_heat_HI+phi_heat_HeI &
-               -y1R(3)*fra_sum3+y2R(3)*fra_sum4 
+             ! Collect contribution from this band
+             df_ion_HeI = y1R(2)*fra_sum1-y2R(2)*fra_sum2  
+             df_ion_HI = y1R(1)*fra_sum1-y2R(1)*fra_sum2
+             df_heat = df_heat-y1R(3)*fra_sum3+y2R(3)*fra_sum4 
+          endif
           
           ! band 3   
        case (NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+NumBndin3)
@@ -676,28 +684,32 @@ contains
 
           endif
           
-          ! Band 3, secondary ionizations
-          fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+ &
-               f1ion_HeI(i_subband)*phi_heat_HeI+ &
-               f1ion_HeII(i_subband)*phi_heat_HeII
-          fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+ &
-               f2ion_HeI(i_subband)*phi_heat_HeI+ &
-               f2ion_HeII(i_subband)*phi_heat_HeII
-          fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+ &
-               f1heat_HeI(i_subband)*phi_heat_HeI+ &
-               f1heat_HeII(i_subband)*phi_heat_HeII
-          fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+ &
-               f2heat_HeI(i_subband)*phi_heat_HeI+ &
-               f2heat_HeII(i_subband)*phi_heat_HeII
-          
-!          if (i_subband == 40) then
-!          endif
           ! Collect the total contributions to the ionization
           ! and heating rates for this subband
-          df_ion_HeI = y1R(2)*fra_sum1-y2R(2)*fra_sum2
-          df_ion_HI = y1R(1)*fra_sum1-y2R(1)*fra_sum2
-          df_heat=phi_heat_HI+phi_heat_HeI+phi_heat_HeII &
-               -y1R(3)*fra_sum3+y2R(3)*fra_sum4
+          df_heat=phi_heat_HI+phi_heat_HeI+phi_heat_HeII
+
+          ! Apply effect of secondary ionizations if parameter set
+          if (do_secondary_ionizations) then
+             ! Band 3, secondary ionizations
+             fra_sum1 = f1ion_HI(i_subband)*phi_heat_HI+ &
+                  f1ion_HeI(i_subband)*phi_heat_HeI+ &
+                  f1ion_HeII(i_subband)*phi_heat_HeII
+             fra_sum2 = f2ion_HI(i_subband)*phi_heat_HI+ &
+                  f2ion_HeI(i_subband)*phi_heat_HeI+ &
+                  f2ion_HeII(i_subband)*phi_heat_HeII
+             fra_sum3 = f1heat_HI(i_subband)*phi_heat_HI+ &
+                  f1heat_HeI(i_subband)*phi_heat_HeI+ &
+                  f1heat_HeII(i_subband)*phi_heat_HeII
+             fra_sum4 = f2heat_HI(i_subband)*phi_heat_HI+ &
+                  f2heat_HeI(i_subband)*phi_heat_HeI+ &
+                  f2heat_HeII(i_subband)*phi_heat_HeII
+             
+             !          if (i_subband == 40) then
+             !          endif
+             df_ion_HeI = y1R(2)*fra_sum1-y2R(2)*fra_sum2
+             df_ion_HI = y1R(1)*fra_sum1-y2R(1)*fra_sum2
+             df_heat=df_heat-y1R(3)*fra_sum3+y2R(3)*fra_sum4
+          endif
           
        end select
        
