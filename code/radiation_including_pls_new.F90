@@ -1163,6 +1163,10 @@ enddo    !(sub intervals)
     real(kind=dp), dimension(NumFreqBnd) :: delta_tau_out
     real(kind=dp), dimension(NumFreqBnd) :: delta_tau_in
     !real(kind=dp), dimension(NumheatBin) :: delt_tau_o
+    real(kind=dp), dimension(NumFreqBnd) :: tau_cell_HI
+    real(kind=dp), dimension(NumFreqBnd) :: tau_cell_HeI
+    real(kind=dp), dimension(NumFreqBnd) :: tau_cell_HeII
+
     real(kind=dp) :: NFlux
     real(kind=dp) :: volweight
 
@@ -1264,8 +1268,8 @@ enddo    !(sub intervals)
 
        do i=1,NumFreqBnd
           tau_cell_HI(i)=hcolum_cell*intm1(i)
-          tau_cell_HeI(i_subband) = hecolum_cell(0)*intm2(i)
-          tau_cell_HeII(i_subband) = hecolum_cell(1)*intm3(i)
+          tau_cell_HeI(i) = hecolum_cell(0)*intm2(i)
+          tau_cell_HeII(i) = hecolum_cell(1)*intm3(i)
        enddo
        
        ! This stuff is for deciding if opt thin/thick if not isothermal
