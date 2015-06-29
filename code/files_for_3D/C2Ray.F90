@@ -289,15 +289,18 @@ Program C2Ray
      else
         next_output_time=sim_time+output_time
      endif
-     ! Reset restart flag now that everything has been dealt with
-     restart=0
 
 #ifdef MPILOG     
      write(logf,*) 'First output'
 #endif 
-     ! If start of simulation output
-     if (NumSrc > 0 .and. sim_time == 0.0) call output(time2zred(sim_time),sim_time,dt, &
-          photcons_flag)
+     ! If start of simulation output (and not a restart)
+     !if (NumSrc > 0 .and. sim_time == 0.0) call output(time2zred(sim_time),sim_time,dt, &
+     !     photcons_flag)
+     if (sim_time == 0.0 .and. restart == 0) &
+          call output(time2zred(sim_time),sim_time,dt,photcons_flag)
+
+     ! Reset restart flag now that everything has been dealt with
+     restart=0
 
 #ifdef MPILOG     
      write(logf,*) 'Start of loop'
@@ -316,8 +319,8 @@ Program C2Ray
              sim_time/YEAR,actual_dt/YEAR," (years)"
 
         ! For cosmological simulations evolve proper quantities
+        call redshift_evol(sim_time+0.5*actual_dt)
         if (cosmological) then
-           call redshift_evol(sim_time+0.5*actual_dt)
            call cosmo_evol()
         endif
 
@@ -328,7 +331,8 @@ Program C2Ray
         if (use_LLS .and. type_of_LLS /= 2) call set_LLS(zred)
 
         ! Take one time step
-        if (NumSrc > 0) call evolve3D(sim_time,actual_dt,iter_restart)
+        !if (NumSrc > 0) call evolve3D(sim_time,actual_dt,iter_restart)
+        call evolve3D(sim_time,actual_dt,iter_restart)
 
         ! Reset flag for restart from iteration 
         ! (evolve3D is the last routine affected by this)
@@ -339,7 +343,9 @@ Program C2Ray
             
         ! Write output
         if (abs(sim_time-next_output_time) <= 1e-6*sim_time) then
-           if (NumSrc > 0) call output(time2zred(sim_time),sim_time,actual_dt, &
+           !if (NumSrc > 0) call output(time2zred(sim_time),sim_time,actual_dt, &
+           !photcons_flag)
+           call output(time2zred(sim_time),sim_time,actual_dt, &
                 photcons_flag)
            next_output_time=next_output_time+output_time
            if (photcons_flag /= 0 .and. stop_on_photon_violation) then
@@ -366,8 +372,8 @@ Program C2Ray
      if (stop_on_photon_violation .and. photcons_flag /= 0) exit ! photon conservation violated
 
      ! Scale to the current redshift
+     call redshift_evol(sim_time)
      if (cosmological) then
-        call redshift_evol(sim_time)
         call cosmo_evol()
      endif
 
