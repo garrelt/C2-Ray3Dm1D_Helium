@@ -391,7 +391,7 @@ contains
 
     ! I think instead of calling here twice get_temp, it is perhaps better to pass t_new
     ! and t_old as arguments from/to do_chemistry. (?)
-    call do_chemistry (dt, ndens_p, ion, phi,0.0_dp, &
+    call do_chemistry (dt, ndens_p, ion, phi, 0.0_dp, &
          dummy,  1.0_dp, 0.0_dp, pos, 0 , local=.false.)
     
     ! Test for global convergence using the time-averaged neutral fraction.
@@ -442,7 +442,7 @@ contains
   ! ===========================================================================
 
   subroutine do_chemistry (dt, ndens_p, ion, &
-       phi, coldensh_in,coldenshe_in, path, vol_ph, pos, ns, local)
+       phi, coldensh_in, coldenshe_in, path, vol_ph, pos, ns, local)
 
     real(kind=dp),intent(in) :: dt !< time step
     real(kind=dp),intent(in) :: ndens_p
@@ -670,62 +670,64 @@ contains
     real(kind=dp) :: fHe0_3a,fHe0_3b,fHe0_3c,fHe0_3d
     real(kind=dp) :: fHe1_3a,fHe1_3b,fHe1_3c,fHe1_3d
 
-    Nhe0= abu_he*ion%he(0)              ! *** probably use average fractions
-    Nhe1= abu_he*ion%he(1)              ! *** probably use average fractions
-    Nh0 = (1.0-abu_he)*ion%h(0)
-    N_He0_ov_H0         = max(epsilon,Nhe0)/max(epsilon,Nh0)
-    N_He0_ov_He1        = max(epsilon,Nhe0)/max(epsilon,Nhe1)
-    N_H0_ov_He0         = max(epsilon,Nh0)  /max(epsilon,Nhe0)
-    N_H0_ov_He1         = max(epsilon,Nh0)  /max(epsilon,Nhe1)
-    N_He1_ov_He0        = max(epsilon,Nhe1)/max(epsilon,Nhe0)
-    N_He1_ov_H0         = max(epsilon,Nhe1)/max(epsilon,Nh0)
-    !call scale_int3(fH_3a,fHe0_3a,fHe1_3a, &
-    !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
-    !1,2,3)
-    !call scale_int3(fH_3b,fHe0_3b,fHe1_3b, &
-    !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
-    !4,5,6)
-    !call scale_int3(fH_3c,fHe0_3c,fHe1_3c, &
-    !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
-    !7,8,9)
-    !call scale_int3(fH_3d,fHe0_3d,fHe1_3d, &
-    !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
-    !10,11,12)
-    !call scale_int2(fH_2a,fHe0_2a,N_He0_ov_H0,1,2)
-    !call scale_int2(fH_2b,fHe0_2b,N_He0_ov_H0,3,4)
-    !*** it is not so clear to me if I should first scale the photon loss in every interval with the amount of 
-    !*** "neutral" ions those photons could possibly ionize, or if I should first sclae them and ascribe them to 
-    !*** either H, He0 or He+ and then scale them with only the species in question. 
-    !*** for now, I'll just take the first option (scale and then devide)
-    ovtotneutral= 1.0_dp/(vol*ion%h_av(0)*ndens_p*(1.0-abu_he))
-    photon_loss(1)=photon_loss(1)*ovtotneutral
-    ovtotneutral=1.0_dp/(vol*ndens_p*((1.0-abu_he)*ion%h_av(0)+abu_he*ion%he_av(0)))
-    photon_loss(2)=photon_loss(2)*ovtotneutral
-    photon_loss(3)=photon_loss(3)*ovtotneutral
-    ovtotneutral= 1.0_dp/(vol*ndens_p*((1.0-abu_he)*ion%h_av(0)+abu_he*(ion%he_av(0)+ion%he_av(1))))
-    photon_loss(4)=photon_loss(4)*ovtotneutral
-    photon_loss(5)=photon_loss(5)*ovtotneutral
-    photon_loss(6)=photon_loss(6)*ovtotneutral
-    photon_loss(7)=photon_loss(7)*ovtotneutral
-    phi%photo_cell_HI  = phi%photo_cell_HI   + &
-         (photon_loss(1) +photon_loss(2)* fH_2a  + &
-         photon_loss(4)*fH_3a+photon_loss(5)*fH_3b + & 
-         photon_loss(3)* fH_2b  + &
-         photon_loss(6)*fH_3c + &
-         photon_loss(7)*fH_3d) 
-    phi%photo_cell_HeI= phi%photo_cell_HeI + &
-         (photon_loss(2)*fHe0_2a  + &
-         photon_loss(4)* fHe0_3a + &
-         photon_loss(5)* fHe0_3b + &
-         photon_loss(3)*fHe0_2b + &
-         photon_loss(6)* fHe0_3c + &
-         photon_loss(7)* fHe0_3d)
-    phi%photo_cell_HeII= phi%photo_cell_HeII + &
-         (photon_loss(4)*fHe1_3a + &
-         photon_loss(5)*fHe1_3b + &
-         photon_loss(6)*fHe1_3c + &
-         photon_loss(7)*fHe1_3d)
+    if (sum(photon_loss) /= 0.0) then
+       Nhe0= abu_he*ion%he(0)              ! *** probably use average fractions
+       Nhe1= abu_he*ion%he(1)              ! *** probably use average fractions
+       Nh0 = (1.0-abu_he)*ion%h(0)
+       N_He0_ov_H0         = max(epsilon,Nhe0)/max(epsilon,Nh0)
+       N_He0_ov_He1        = max(epsilon,Nhe0)/max(epsilon,Nhe1)
+       N_H0_ov_He0         = max(epsilon,Nh0)  /max(epsilon,Nhe0)
+       N_H0_ov_He1         = max(epsilon,Nh0)  /max(epsilon,Nhe1)
+       N_He1_ov_He0        = max(epsilon,Nhe1)/max(epsilon,Nhe0)
+       N_He1_ov_H0         = max(epsilon,Nhe1)/max(epsilon,Nh0)
+       !call scale_int3(fH_3a,fHe0_3a,fHe1_3a, &
+       !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
+       !1,2,3)
+       !call scale_int3(fH_3b,fHe0_3b,fHe1_3b, &
+       !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
+       !4,5,6)
+       !call scale_int3(fH_3c,fHe0_3c,fHe1_3c, &
+       !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
+       !7,8,9)
+       !call scale_int3(fH_3d,fHe0_3d,fHe1_3d, &
+       !N_H0_ov_He0,N_He0_ov_H0,N_H0_ov_He1,N_He1_ov_H0,N_He0_ov_He1,N_He1_ov_He0, &
+       !10,11,12)
+       !call scale_int2(fH_2a,fHe0_2a,N_He0_ov_H0,1,2)
+       !call scale_int2(fH_2b,fHe0_2b,N_He0_ov_H0,3,4)
+       !*** it is not so clear to me if I should first scale the photon loss in every interval with the amount of 
+       !*** "neutral" ions those photons could possibly ionize, or if I should first sclae them and ascribe them to 
+       !*** either H, He0 or He+ and then scale them with only the species in question. 
+       !*** for now, I'll just take the first option (scale and then devide)
+       ovtotneutral= 1.0_dp/(vol*ion%h_av(0)*ndens_p*(1.0-abu_he))
+       photon_loss(1)=photon_loss(1)*ovtotneutral
+       ovtotneutral=1.0_dp/(vol*ndens_p*((1.0-abu_he)*ion%h_av(0)+abu_he*ion%he_av(0)))
+       photon_loss(2)=photon_loss(2)*ovtotneutral
+       photon_loss(3)=photon_loss(3)*ovtotneutral
+       ovtotneutral= 1.0_dp/(vol*ndens_p*((1.0-abu_he)*ion%h_av(0)+abu_he*(ion%he_av(0)+ion%he_av(1))))
+       photon_loss(4)=photon_loss(4)*ovtotneutral
+       photon_loss(5)=photon_loss(5)*ovtotneutral
+       photon_loss(6)=photon_loss(6)*ovtotneutral
+       photon_loss(7)=photon_loss(7)*ovtotneutral
+       phi%photo_cell_HI  = phi%photo_cell_HI   + &
+            (photon_loss(1) +photon_loss(2)* fH_2a  + &
+            photon_loss(4)*fH_3a+photon_loss(5)*fH_3b + & 
+            photon_loss(3)* fH_2b  + &
+            photon_loss(6)*fH_3c + &
+            photon_loss(7)*fH_3d) 
+       phi%photo_cell_HeI= phi%photo_cell_HeI + &
+            (photon_loss(2)*fHe0_2a  + &
+            photon_loss(4)* fHe0_3a + &
+            photon_loss(5)* fHe0_3b + &
+            photon_loss(3)*fHe0_2b + &
+            photon_loss(6)* fHe0_3c + &
+            photon_loss(7)* fHe0_3d)
+       phi%photo_cell_HeII= phi%photo_cell_HeII + &
+            (photon_loss(4)*fHe1_3a + &
+            photon_loss(5)*fHe1_3b + &
+            photon_loss(6)*fHe1_3c + &
+            photon_loss(7)*fHe1_3d)
+    endif
     
   end subroutine distribute_photon_losses
-
+  
 end module evolve_point

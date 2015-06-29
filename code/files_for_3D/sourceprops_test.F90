@@ -13,7 +13,7 @@ module sourceprops
   
   use precision, only: dp
   use my_mpi
-  use file_admin, only: logf
+  use file_admin, only: logf,sourcefile
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR, YEAR
   use cosmology_parameters, only: Omega_B, Omega0
@@ -74,10 +74,12 @@ contains
     if (rank == 0) then
        ! Construct the file names
        sourcelistfile=trim(adjustl(dir_src))//"test_sources.dat"
-       open(unit=50,file=sourcelistfile,status="old")
+       open(unit=sourcefile,file=sourcelistfile,status="old")
 
        ! Establish number of sources
-       read(50,*) NumSrc
+       read(sourcefile,*) NumSrc
+
+       write(*,*)  "Number of sources: ",NumSrc
 
     endif ! end of rank 0 test
     
@@ -92,6 +94,7 @@ contains
 
     ! Allocate arrays for this NumSrc
     if (NumSrc > 0) then
+       write(*,*)  "Reading number of sources: ",NumSrc
        allocate(srcpos(3,NumSrc))
        allocate(NormFlux(0:NumSrc)) ! 0 will hold lost photons
        allocate(NormFluxPL(NumSrc))
@@ -100,12 +103,11 @@ contains
        ! Fill in the source arrays
        if (rank == 0) then
           do ns=1,NumSrc
-             read(50,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
+             read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
                   NormFlux(ns),NormFluxPL(ns)
              NormFlux(ns)=NormFlux(ns)/S_star_nominal
              NormFluxPL(ns)=NormFluxPL(ns)/pl_S_star_nominal
           enddo
-          close(50)
           
           ! STANDARD TEST
           ! Source positions in file start at 1!
@@ -157,6 +159,9 @@ contains
        
     endif
 
+    ! close the source file if you are rank 0
+    if (rank == 0) close(sourcefile)
+
   end subroutine source_properties
   
   ! =======================================================================
@@ -166,4 +171,5 @@ contains
   !! I'm using it now for the 1D-code
   subroutine source_properties_ini ()
   end subroutine source_properties_ini
+
 end module sourceprops
