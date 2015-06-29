@@ -268,21 +268,39 @@ contains
 
     real(kind=dp) :: totalsrc,photcons,total_photon_loss,total_LLS_loss
 
-    total_photon_loss=sum(photon_loss)*dt* &
-         real(mesh(1))*real(mesh(2))*real(mesh(3))
-    total_LLS_loss = LLS_loss*dt         
-    totalsrc=(sum(NormFlux(1:NumSrc))*S_star + &
-         sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
-    photcons=(total_ion-totcollisions-recomions)/(totalsrc)
-    if (rank == 0) then
-       write(90,"(9(es10.3))") &
-            total_ion, totalsrc, &          ! # of new ionizations (after-before) | # of emitted photons
-            recomions, total_photon_loss, &                  ! # number of ionizations due to He recombination ! # photon loss  
-            totrec, totcollisions, &                       ! recombinations that don't ionize;  
-            totrec/total_ion, &             !  fraction of recombinations 
-            total_photon_loss/totalsrc, &   ! lost photon fraction
-            totcollisions/total_ion         ! fraction of collisions
-       !write(logf,*) h1_before,h1_after
+    if (NumSrc > 0) then
+       total_photon_loss=sum(photon_loss)*dt* &
+            real(mesh(1))*real(mesh(2))*real(mesh(3))
+       total_LLS_loss = LLS_loss*dt         
+       totalsrc=(sum(NormFlux(1:NumSrc))*S_star + &
+            sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
+       photcons=(total_ion-totcollisions-recomions)/(totalsrc)
+
+       if (rank == 0) then
+          write(90,"(9(es10.3))") &
+               total_ion, totalsrc, &          ! # of new ionizations (after-before) | # of emitted photons
+               recomions, total_photon_loss, &                  ! # number of ionizations due to He recombination ! # photon loss  
+               totrec, totcollisions, &                       ! recombinations that don't ionize;  
+               totrec/total_ion, &             !  fraction of recombinations 
+               total_photon_loss/totalsrc, &   ! lost photon fraction
+               totcollisions/total_ion         ! fraction of collisions
+          !write(logf,*) h1_before,h1_after
+       endif
+    else
+       total_photon_loss=0.0
+       total_LLS_loss=0.0
+       totalsrc=0.0
+       photcons=0.0
+       if (rank == 0) then
+          write(90,"(9(es10.3))") &
+               total_ion, totalsrc, &          ! # of new ionizations (after-before) | # of emitted photons
+               recomions, total_photon_loss, &                  ! # number of ionizations due to He recombination ! # photon loss  
+               totrec, totcollisions, &                       ! recombinations that don't ionize;  
+               totrec/total_ion, &             !  fraction of recombinations 
+               0.0, &   ! lost photon fraction
+               totcollisions/total_ion         ! fraction of collisions
+          !write(logf,*) h1_before,h1_after
+       endif
     endif
     
   end subroutine report_photonstatistics
@@ -294,7 +312,8 @@ contains
 
     real(kind=dp),intent(in) :: dt !< time step
 
-    grtotal_src=grtotal_src+(sum(NormFlux(1:NumSrc))*S_star + &
+    if (NumSrc > 0.0) &
+         grtotal_src=grtotal_src+(sum(NormFlux(1:NumSrc))*S_star + &
          sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
     grtotal_ion=grtotal_ion+total_ion-totcollisions
 
