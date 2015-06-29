@@ -20,6 +20,7 @@ module material
   use abundances, only: mu
   use c2ray_parameters, only: type_of_clumping, clumping_factor, epsilon
   use c2ray_parameters, only: type_of_LLS
+  use c2ray_parameters, only: cosmological
 
   implicit none
 
@@ -234,8 +235,16 @@ contains
     real(kind=dp) :: avg_dens
     integer :: m1,m2,m3
 
-    ! Assign density to the grid (average density at this redshift)
-    avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3
+    ! Calculate average density
+    if (cosmological) then
+       ! average density at this redshift
+       avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3
+    else
+       ! average density at the initial redshift (z=zred_array(1) )
+       avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_array(1))**3
+    endif
+
+    ! Assign density to the grid
     do k=1,mesh(3)
        do j=1,mesh(2)
           do i=1,mesh(1)
