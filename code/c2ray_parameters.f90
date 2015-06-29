@@ -38,7 +38,7 @@ module c2ray_parameters
   !> Convergence criterion for global calculation (evolve0d)
   real(kind=dp),parameter :: convergence2 = 1.0e-2
   real(kind=dp),parameter :: LTE_fractional_change = 1.0e-0
-  real(kind=dp),parameter :: minium_fraction_of_photons = 1.0e-3
+  real(kind=dp),parameter :: minimum_fraction_of_photons = 1.0e-3
 
   !> Convergence criterion for neutral fraction (evolve4_periodic)
   real(kind=dp),parameter :: minimum_fraction_of_atoms=1.0e-8
