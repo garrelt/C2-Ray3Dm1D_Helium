@@ -179,28 +179,36 @@ contains
        ! Iteration loop counter
        niter=niter+1
 
-       call pass_all_sources (niter,dt)
+       ! Set all photo-ionization rates to zero
+       call set_rates_to_zero
 
-       ! Report subbox statistics
-       if (rank == 0) &
-            write(logf,*) "Average number of subboxes: ", &
-	    real(sum_nbox_all)/real(NumSrc)
+       ! Pass over all sources
+       if (NumSrc > 0) then
+          call pass_all_sources (niter,dt)
 
-       if (rank == 0) then
-          call system_clock(wallclock2,countspersec)
-          ! Write iteration dump if more than 15 minutes have passed.
-          ! system_clock starts counting at 0 when it reaches
-          ! a max value. To catch this, test also for negative
-          ! values of wallclock2-wallclock1
-          write(logf,*) "Time and limit are: ", &
-               wallclock2-wallclock1, 15.0*60.0*countspersec
-          if (wallclock2-wallclock1 > 15*60*countspersec .or. &
-               wallclock2-wallclock1 < 0 ) then
-             call write_iteration_dump(niter)
-             wallclock1=wallclock2
+          ! Report subbox statistics
+          if (rank == 0) &
+               write(logf,*) "Average number of subboxes: ", &
+               real(sum_nbox_all)/real(NumSrc)
+
+          if (rank == 0) then
+             call system_clock(wallclock2,countspersec)
+             ! Write iteration dump if more than 15 minutes have passed.
+             ! system_clock starts counting at 0 when it reaches
+             ! a max value. To catch this, test also for negative
+             ! values of wallclock2-wallclock1
+             write(logf,*) "Time and limit are: ", &
+                  wallclock2-wallclock1, 15.0*60.0*countspersec
+             if (wallclock2-wallclock1 > 15*60*countspersec .or. &
+                  wallclock2-wallclock1 < 0 ) then
+                call write_iteration_dump(niter)
+                wallclock1=wallclock2
+             endif
           endif
+          
        endif
 
+       ! Do a global pass applying all the rates
        call global_pass (conv_flag,dt)
 
        ! Report time
@@ -358,6 +366,20 @@ contains
   end subroutine start_from_dump
 
   ! ===========================================================================
+  
+  subroutine set_rates_to_zero
+    
+    ! reset global rates to zero for this iteration
+    phih_grid(:,:,:)=0.0
+    phihe_grid(:,:,:,:)=0.0    
+    phiheat(:,:,:)=0.0
+    ! reset photon loss counters
+    photon_loss(:)=0.0
+    LLS_loss = 0.0 ! make this a NumFreqBnd vector if needed later (GM/101129)
+
+  end subroutine set_rates_to_zero
+
+  ! ===========================================================================
 
   subroutine pass_all_sources(niter,dt)
     
@@ -375,13 +397,6 @@ contains
 #endif
 
     if (rank == 0) write(logf,*) 'Doing all sources '
-    ! reset global rates to zero for this iteration
-    phih_grid(:,:,:)=0.0
-    phihe_grid(:,:,:,:)=0.0    
-    phiheat(:,:,:)=0.0
-    ! reset photon loss counters
-    photon_loss(:)=0.0
-    LLS_loss = 0.0 ! make this a NumFreqBnd vector if needed later (GM/101129)
 
     ! Reset sum of subboxes counter
     sum_nbox=0
