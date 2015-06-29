@@ -13,7 +13,7 @@ module sourceprops
 
   use precision, only: dp
   use my_mpi
-  use file_admin, only: stdinput, logf, file_input
+  use file_admin, only: stdinput, logf, file_input, sourcefile
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR, YEAR
   use cosmology_parameters, only: Omega_B, Omega0
@@ -196,9 +196,9 @@ contains
     integer :: ns
 
     if (restart == 0 .or. restart == 1) then
-       open(unit=50,file=sourcelistfile,status='old')
+       open(unit=sourcefile,file=sourcelistfile,status='old')
        ! Number of sources
-       read(50,*) NumSrc0
+       read(sourcefile,*) NumSrc0
        
        ! Report
        write(logf,*) "Total number of source locations, no suppression: ", &
@@ -213,11 +213,11 @@ contains
        do ns0=1,NumSrc0
           ! If you change the following lines, also change it below in          
           ! read_in_sources                                                     
-          read(50,*) srclist(1:ncolumns_srcfile)
+          read(sourcefile,*) srclist(1:ncolumns_srcfile)
           srcpos0(1:3)=int(srclist(1:3))
           srcMass00=srclist(4) !massive sources (HMACHs)                        
           srcMass01=srclist(5) !low-mass sources (LMACHs)                       
-          !read(50,*) srcpos0(1),srcpos0(2),srcpos0(3),SrcMass00,SrcMass01
+          !read(sourcefile,*) srcpos0(1),srcpos0(2),srcpos0(3),SrcMass00,SrcMass01
           ! Massive sources are never suppressed.
           if (SrcMass00 /= 0.0) then
              NumSrc=NumSrc+1
@@ -237,7 +237,7 @@ contains
                UV_Model /= "Iliev et al") NumSupprsdSrc=NumSupprsdSrc+1
           endif
        enddo
-       close(50)
+       close(sourcefile)
        write(logf,*) "Number of suppressable sources: ",NumSupprbleSrc
        write(logf,*) "Number of suppressed sources: ",NumSupprsdSrc
        write(logf,*) "Number of massive sources: ",NumMassiveSrc
@@ -265,17 +265,17 @@ contains
     integer :: ns0
 
     if (restart == 0 .or. restart == 1) then
-       open(unit=50,file=sourcelistfile,status='old')
+       open(unit=sourcefile,file=sourcelistfile,status='old')
        ! Number of sources
-       read(50,*) NumSrc0
+       read(sourcefile,*) NumSrc0
        ! Read in source positions and mass
        ns=0
        do ns0=1,NumSrc0
-          read(50,*) srclist(1:ncolumns_srcfile)
+          read(sourcefile,*) srclist(1:ncolumns_srcfile)
           srcpos0(1:3)=int(srclist(1:3))
           srcMass00=srclist(4) !massive sources (HMACHs)                       
           srcMass01=srclist(5) !low-mass sources (LMACHs)                       
-          !read(50,*) srcpos0(1),srcpos0(2),srcpos0(3), &
+          !read(sourcefile,*) srcpos0(1),srcpos0(2),srcpos0(3), &
           !     SrcMass00,SrcMass01
           
           if (xh(srcpos0(1),srcpos0(2),srcpos0(3),1) < StillNeutral) then

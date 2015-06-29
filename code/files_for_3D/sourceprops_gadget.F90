@@ -2,7 +2,7 @@ module sourceprops
 
   use precision, only: dp
   use my_mpi
-  use file_admin, only: logf
+  use file_admin, only: logf, sourcefile
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR
   use cosmology_parameters, only: Omega_B, Omega0
@@ -63,15 +63,15 @@ contains
        write(zred_str,'(f6.3)') zred_now
        sourcelistfile=trim(adjustl(zred_str))//"_gadget_sources.dat"
       
-       open(unit=50,file=sourcelistfile,status='old')
+       open(unit=sourcefile,file=sourcelistfile,status='old')
       
        ! Number of sources
-       read(50,*) NumSrc0
+       read(sourcefile,*) NumSrc0
        NumSrc=NumSrc0 ! no suppression
 
        ! Report
        write(logf,*) 'Number of sources: ',NumSrc0
-       close(50)
+       close(sourcefile)
     endif
 #ifdef MPI
     call MPI_BCAST(NumSrc0,1,MPI_INTEGER,0,MPI_COMM_NEW,ierror)
@@ -86,13 +86,13 @@ contains
     allocate(SrcSeries(NumSrc))
 
     if (rank == 0) then
-       open(unit=50,file=sourcelistfile,status='old')
+       open(unit=sourcefile,file=sourcelistfile,status='old')
        ! Number of sources
-       read(50,*) NumSrc0
+       read(sourcefile,*) NumSrc0
        ! Read in source positions and mass
        ns=0
        do ns0=1,NumSrc0
-          read(50,*) srcpos0(1),srcpos0(2),srcpos0(3),NormFlux(ns0)
+          read(sourcefile,*) srcpos0(1),srcpos0(2),srcpos0(3),NormFlux(ns0)
           ns=ns0
           ! Source positions in file start at zero!
           srcpos(1,ns)=srcpos0(1)

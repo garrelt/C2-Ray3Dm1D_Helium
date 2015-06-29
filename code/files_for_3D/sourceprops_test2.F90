@@ -2,7 +2,7 @@ module sourceprops
 
   use precision, only: dp
   use my_mpi
-  use file_admin, only: logf
+  use file_admin, only: logf, sourcefile
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR, YEAR
   use cosmology_parameters, only: Omega_B, Omega0
@@ -59,9 +59,9 @@ contains
        ! Construct the file names
        sourcelistfile=trim(adjustl(dir_src))//"test_sources.dat"
 
-  !***     open(unit=50,file=sourcelistfile,status="old")
+  !***     open(unit=sourcefile,file=sourcelistfile,status="old")
        ! Number of sources
-  !***     read(50,*) NumSrc
+  !***     read(sourcefile,*) NumSrc
          NumSrc=1 !***
     endif ! end of rank 0 test
     
@@ -80,10 +80,10 @@ contains
        ! Fill in the source arrays
        if (rank == 0) then
    !***       do ns=1,NumSrc
-   !***          read(50,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns),NormFlux(ns)
+   !***          read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns),NormFlux(ns)
    !***          NormFlux(ns)=NormFlux(ns)/S_star_nominal
    !***      enddo
-   !***       close(50)
+   !***       close(sourcefile)
           
           ! STANDARD TEST
           ! Source positions in file start at 1!
