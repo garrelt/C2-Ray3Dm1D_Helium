@@ -23,12 +23,19 @@ module photonstatistics
   use grid, only: vol
   use material, only: ndens, clumping, clumping_point
   use tped, only: electrondens
-  use sourceprops, only: NormFlux, NormFluxPL, NumSrc
-  !use radiation, only: S_star, pl_S_star, NumFreqBnd
+  use sourceprops, only: NormFlux, NumSrc
   use radiation_sizes, only: NumFreqBnd
-  use radiation_sed_parameters, only: S_star, pl_S_star
+  use radiation_sed_parameters, only: S_star
   use c2ray_parameters, only: type_of_clumping
   use abundances, only: abu_he
+#ifdef PL
+  use radiation_sed_parameters, only: pl_S_star
+  use sourceprops, only: NormFluxPL
+#endif
+#ifdef QUASARS
+  use radiation_sed_parameters, only: qpl_S_star
+  use sourceprops, only: NormFluxQPL
+#endif
 
   implicit none
 
@@ -268,12 +275,17 @@ contains
 
     real(kind=dp) :: totalsrc,photcons,total_photon_loss,total_LLS_loss
 
-    if (NumSrc > 0) then
+    if (NumSrc > 0) then ! avoid dividing by zero
        total_photon_loss=sum(photon_loss)*dt* &
             real(mesh(1))*real(mesh(2))*real(mesh(3))
        total_LLS_loss = LLS_loss*dt         
-       totalsrc=(sum(NormFlux(1:NumSrc))*S_star + &
-            sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
+       totalsrc=sum(NormFlux(1:NumSrc))*S_star*dt
+#ifdef PL
+       totalsrc =totalsrc+sum(NormFluxPL(1:NumSrc))*pl_S_star*dt   
+#endif
+#ifdef QUASARS
+       totalsrc =totalsrc+sum(NormFluxQPL(1:NumSrc))*qpl_S_star*dt
+#endif
        photcons=(total_ion-totcollisions-recomions)/(totalsrc)
 
        if (rank == 0) then
@@ -312,11 +324,17 @@ contains
 
     real(kind=dp),intent(in) :: dt !< time step
 
-    if (NumSrc > 0.0) &
-         grtotal_src=grtotal_src+(sum(NormFlux(1:NumSrc))*S_star + &
-         sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
+    if (NumSrc > 0.0) then
+       grtotal_src=grtotal_src+sum(NormFlux(1:NumSrc))*S_star*dt 
+#ifdef PL
+       grtotal_src=grtotal_src+sum(NormFluxPL(1:NumSrc))*pl_S_star*dt
+#endif 
+#ifdef QUASARS
+       grtotal_src=grtotal_src+sum(NormFluxQPL(1:NumSrc))*qpl_S_star*dt
+#endif
+    endif
     grtotal_ion=grtotal_ion+total_ion-totcollisions
-
+    
   end subroutine update_grandtotal_photonstatistics
 
 end module photonstatistics

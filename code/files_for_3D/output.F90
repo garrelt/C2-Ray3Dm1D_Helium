@@ -23,16 +23,12 @@ module output_module
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
-  !use evolve, only: phih_grid, phiheat
   use evolve_data, only: phih_grid, phiheat
-  use sourceprops, only: srcpos, NormFlux, NormFluxPL, NumSrc
+  use sourceprops, only: srcpos
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
   use photonstatistics, only: photon_loss, grtotal_src
   use photonstatistics, only: initialize_photonstatistics
-  !use radiation, only: T_eff,R_star,L_star,S_star, pl_S_star
-  use radiation_sed_parameters, only: T_eff,R_star,L_star,S_star, pl_S_star
-
 
   implicit none
   
@@ -507,37 +503,11 @@ contains
     if (rank == 0) then
        ! Check if we are tracking photon conservation
        if (do_photonstatistics) then
-          ! Photon Statistics
-          ! total_ion is the total number of new ionization, plus
-          ! the total number of recombinations, and here is also
-          ! added the number of photons lost from the grid. Since
-          ! this number was divided by the number of cells, we
-          ! multiply by this again.
-          total_photon_loss=sum(photon_loss)*dt* &
-               real(mesh(1))*real(mesh(2))*real(mesh(3))
-          !total_ion=total_ion + total_photon_loss
-          totalsrc=(sum(NormFlux(1:NumSrc))*S_star + &
-               sum(NormFluxPL(1:NumSrc))*pl_S_star)*dt
-          photcons=(total_ion-totcollisions)/totalsrc
-          !PhotonCounts: time
-          !              Number of (ionizations + recombinations) / photons 
-          !                   during time step
-          !              Number of ionizations /(ionizations + recombinations)
-          !              Number of recombinations /(ionizations + recombinations)
-          !              Number of (ionizations + recombinations) / photons 
-          !              Number of (ionizations + recombinations) / photons 
-          !                   since t=0
-          if (time > 0.0) then
-             !write(90,"(f6.3,8(es10.3))") &
-             !     zred_now, &
-             !     total_ion, totalsrc, &
-             !     photcons, &
-             !     (dh0+dhe0+dhe2)/total_ion, &
-             !     totrec/total_ion, &
-             !     total_photon_loss/totalsrc, &
-             !     totcollisions/total_ion, &
-             !     grtotal_ion/grtotal_src
-          endif
+          ! Before we were calculating photon conservation here
+          ! and writing to the PhotonCounts.out file. This is
+          ! now done in the photonstatistics module.
+          ! Here we only report average ionization fractions
+
           totions=sum(ndens(:,:,:)*(xhe(:,:,:,2)*2.0_dp+xhe(:,:,:,1)+xh(:,:,:,1)))*vol
           volfrac(0)=sum(xh(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3))
           volfrac(1)=sum(xhe(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3))

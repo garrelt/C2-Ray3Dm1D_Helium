@@ -149,7 +149,6 @@ CONSTANTS2_TEST4 = mathconstants.o cgsconstants.o  cgsphotoconstants.o  cgsastro
 RADIATION1 = ../radiation_sizes.o ../radiation_sed_parameters.o ../radiation_tables.o ../radiation_photoionrates.o
 RADIATION2 = radiation_sizes.o radiation_sed_parameters.o radiation_tables.o radiation_photoionrates.o
 
-#EVOLVE = evolve8.o
 EVOLVE = evolve_data.o column_density.o evolve_point.o evolve_source.o master_slave.o evolve.o
 
 GENERAL1=../cosmology.o  ../cooling_h.o ../radiation_including_pls_new.o   ../thermal.o ../time_ini.o ../doric.o photonstatistics.o $(EVOLVE) output.o
