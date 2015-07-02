@@ -30,23 +30,28 @@ module evolve
   use my_mpi ! supplies all the MPI and OpenMP definitions and variables
   use file_admin, only: logf, timefile, iterdump, results_dir, dump_dir
   use clocks, only: timestamp_wallclock
-  use c2ray_parameters, only: convergence_fraction
+  use c2ray_parameters, only: convergence_fraction, use_LLS
   use sizes, only: Ndim, mesh
 
   use material, only: ndens
   use material, only: xh,xhe
   use material, only: isothermal
   use material, only: set_final_temperature_point
+  use material, only: protect_ionization_fractions
   use sourceprops, only: NumSrc
   use photonstatistics, only: photon_loss, LLS_loss
   use photonstatistics, only: state_before
   use photonstatistics, only: calculate_photon_statistics
   use photonstatistics, only: report_photonstatistics
   use photonstatistics, only: update_grandtotal_photonstatistics
-
+  use radiation_sizes, only: NumFreqBnd
+ 
   use evolve_data, only: phih_grid, phihe_grid, phiheat
   use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
   use evolve_data, only: photon_loss_all
+#ifdef MPI
+  use evolve_data, only: buffer
+#endif
   use evolve_point, only: local_chemistry
   use evolve_source, only: sum_nbox,sum_nbox_all
 
@@ -60,6 +65,10 @@ module evolve
   private
 
   public :: evolve3D
+
+#ifdef MPI
+    integer :: mympierror
+#endif
 
 contains
 
@@ -108,10 +117,6 @@ contains
 
     ! Minimum number of cells which are allowed to be non-converged
     integer :: conv_criterion 
-
-#ifdef MPI
-    integer :: mympierror
-#endif
 
     ! End of declarations
 
@@ -280,10 +285,6 @@ contains
 
     character(len=20) :: iterfile
 
-#ifdef MPI
-    integer :: mympierror
-#endif
-
     if (restart == 0) then
        if (rank == 0) &
             write(logf,*) "Warning: start_from_dump called incorrectly"
@@ -385,16 +386,9 @@ contains
     
     ! For random permutation of sources:
     use  m_ctrper, only: ctrper
-    use c2ray_parameters, only: use_LLS
 
     integer,intent(in) :: niter  ! iteration counter
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
-
-    real(kind=dp) :: LLS_loss_all
-    
-#ifdef MPI
-    integer :: mympierror
-#endif
 
     if (rank == 0) write(logf,*) 'Doing all sources '
 
@@ -448,10 +442,6 @@ contains
 
     ! Mesh position of the cell being treated
     integer,dimension(Ndim) :: pos
-
-#ifdef MPI
-    integer :: mympierror
-#endif
 
     ! Report photon losses over grid boundary 
     ! if (rank == 0) write(logf,*) 'photon loss counter: ',photon_loss_all(:) 
@@ -513,10 +503,8 @@ contains
   ! ===========================================================================
 
   subroutine mpi_accumulate_grid_quantities
-
-#ifdef MPI
-    integer :: mympierror
-#endif
+    
+    real(kind=dp) :: LLS_loss_all
     
 #ifdef MPI
     ! accumulate (sum) the MPI distributed photon losses
