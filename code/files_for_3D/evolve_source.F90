@@ -21,8 +21,16 @@ module evolve_source
   use abundances, only: abu_he
   use c2ray_parameters, only: subboxsize, max_subbox
   use sizes, only: Ndim, mesh
-  use sourceprops, only: NumSrc, srcpos, NormFlux, NormFluxPL !SrcSeries
-  use radiation_sed_parameters, only: S_star, pl_S_star
+  use sourceprops, only: NumSrc, srcpos, NormFlux !SrcSeries
+  use radiation_sed_parameters, only: S_star
+#ifdef PL
+  use radiation_sed_parameters, only: pl_S_star
+  use sourceprops, only: NormFluxPL
+#endif
+#ifdef QUASARS
+  use radiation_sed_parameters, only: qpl_S_star
+  use sourceprops, only: NormFluxQPL
+#endif
   use photonstatistics, only: photon_loss
 
   use evolve_data, only: periodic_bc
@@ -111,8 +119,13 @@ contains
     ! photons are leaving this subbox and we need to do another
     ! one. We also stop once we have done the whole grid.
     nbox=0 ! subbox counter
-    total_source_flux=NormFlux(ns)*S_star+ &
-         NormFluxPL(ns)*pl_S_star
+    total_source_flux=NormFlux(ns)*S_star
+#ifdef PL    
+    total_source_flux=total_source_flux + NormFluxPL(ns)*pl_S_star
+#endif
+#ifdef QUASARS
+    total_source_flux=total_source_flux+NormFluxQPL(ns)*qpl_S_star 
+#endif     
     photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
     last_r(:)=srcpos(:,ns) ! to pass the first while test
     last_l(:)=srcpos(:,ns) ! to pass the first while test
@@ -204,14 +217,14 @@ contains
 
        endif
 
-       ! Report photon losses from subbox
-       logf1=logf+rank
-       write(logf1,"(2(A,I4))") "Photon loss from subbox ", nbox, &
-            " for source ",ns
-       write(logf1,"(ES10.3,A)") photon_loss_src," photons/s"
-       write(logf1,"(A,ES10.3,A)") "This is ", &
-            photon_loss_src/total_source_flux, &
-            " of total source rate."
+       ! Report photon losses from subbox (diagnostic)
+       !logf1=logf+rank
+       !write(logf1,"(2(A,I4))") "Photon loss from subbox ", nbox, &
+       !     " for source ",ns
+       !write(logf1,"(ES10.3,A)") photon_loss_src," photons/s"
+       !write(logf1,"(A,ES10.3,A)") "This is ", &
+       !     photon_loss_src/total_source_flux, &
+       !     " of total source rate."
 
     enddo
 

@@ -66,8 +66,6 @@ contains
     real(kind=dp) :: w1,w2,w3,w4,w1He0,w2He0,w3He0,w4He0,w1He1,w2He1,w3He1,w4He1
     real(kind=dp) :: di,dj,dk
 
-
-    !DEC$ ATTRIBUTES FORCEINLINE :: weightf
     ! map to local variables (should be pointers ;)
     i=pos(1)
     j=pos(2)
