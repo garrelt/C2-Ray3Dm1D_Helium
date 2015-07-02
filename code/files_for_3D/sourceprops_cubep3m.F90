@@ -101,6 +101,10 @@ module sourceprops
 
   character(len=512),private :: sourcelistfile,sourcelistfilesuppress
 
+#ifdef MPI
+    integer :: mympierror
+#endif
+ 
 contains
   
   ! =======================================================================
@@ -116,10 +120,6 @@ contains
     integer,intent(in) :: restart
     
     integer :: ns,ns0
-    
-#ifdef MPI
-    integer :: mympierror
-#endif
     
 #ifdef MPILOG     
     write(logf,*) "Check sourceprops: ",zred_now,nz,lifetime2,restart
@@ -720,10 +720,6 @@ contains
     real(kind=dp) :: z_in, N_source_nosupp, N_source_supp, N_gamma_nosupp
     character(len=180) :: uv_file ! name of file with uv model for redshifts
     integer :: nz
-
-#ifdef MPI
-    integer :: mympierror
-#endif
 
     ! Ask for redshift file
     if (rank == 0) then
