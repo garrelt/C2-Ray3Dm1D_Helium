@@ -307,7 +307,7 @@ C2Ray_3D_cubep3m_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CU
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_kyl_periodic: F90=$(FC)
-C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DPL
+C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DQUASARS -DPL
 C2Ray_3D_cubep3m_kyl_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
 
@@ -327,7 +327,7 @@ C2Ray_3D_cubep3m_periodic_omp_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../mpi.o $
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_kyl_periodic_omp_mpi: F90=$(MPIFC)
-C2Ray_3D_cubep3m_kyl_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) $(MPI_FLAGS)  -DPL
+C2Ray_3D_cubep3m_kyl_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) $(MPI_FLAGS) -DQUASARS -DPL
 C2Ray_3D_cubep3m_kyl_periodic_omp_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
 
