@@ -88,7 +88,9 @@ contains
     allocate(coldensh_out(mesh(1),mesh(2),mesh(3)))
     allocate(coldenshe_out(mesh(1),mesh(2),mesh(3),0:1))
 
+#ifdef MPI
     allocate(buffer(mesh(1),mesh(2),mesh(3)))
+#endif
     allocate(photon_loss_src_thread(nthreads))
   !   allocate(photon_loss_src_thread(1:NumFreqBnd,1))   
 

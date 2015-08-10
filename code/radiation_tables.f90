@@ -33,17 +33,28 @@ module radiation_tables
   use radiation_sizes, only: Numheatbin
   use radiation_sizes, only: freq_min,freq_max,delta_freq
   use radiation_sizes, only: NumTau
-  use radiation_sizes, only: pl_index_cross_section_HI
-  use radiation_sizes, only: pl_index_cross_section_HeI
-  use radiation_sizes, only: pl_index_cross_section_HeII
   use radiation_sizes, only: setup_scalingfactors
 
   use radiation_sed_parameters, only: sourcetype
   use radiation_sed_parameters, only: T_eff, R_star, R_star2, h_over_kT
+  use radiation_sed_parameters, only: spectrum_parms, spec_diag
+
+#ifdef PL
   use radiation_sed_parameters, only: pl_index, pl_scaling
   use radiation_sed_parameters, only: pl_minfreq, pl_maxfreq
-  use radiation_sed_parameters, only: spectrum_parms, spec_diag
-  
+
+  use radiation_sizes, only: pl_index_cross_section_HI
+  use radiation_sizes, only: pl_index_cross_section_HeI
+  use radiation_sizes, only: pl_index_cross_section_HeII
+#endif
+#ifdef QUASARS
+  use radiation_sed_parameters, only: qpl_index, qpl_scaling
+  use radiation_sed_parameters, only: qpl_minfreq, qpl_maxfreq
+
+  use radiation_sizes, only: qpl_index_cross_section_HI
+  use radiation_sizes, only: qpl_index_cross_section_HeI
+  use radiation_sizes, only: qpl_index_cross_section_HeII
+#endif  
   implicit none
 
   ! Parameters defining the optical depth entries in the table.
@@ -57,26 +68,53 @@ module radiation_tables
   ! The lowest and highest frequency subbands used for the bb and pl source
   integer :: bb_FreqBnd_LowerLimit=1
   integer :: bb_FreqBnd_UpperLimit=NumFreqBnd
-  integer :: pl_FreqBnd_LowerLimit
-  integer :: pl_FreqBnd_UpperLimit
-
+  
   ! Integrands ( frequency, optical depth )
   real(kind=dp),dimension(:,:), allocatable :: bb_photo_thick_integrand
   real(kind=dp),dimension(:,:), allocatable :: bb_photo_thin_integrand
-  real(kind=dp),dimension(:,:), allocatable :: pl_photo_thick_integrand
-  real(kind=dp),dimension(:,:), allocatable :: pl_photo_thin_integrand
   real(kind=dp),dimension(:,:), allocatable :: bb_heat_thick_integrand_HI
   real(kind=dp),dimension(:,:), allocatable :: bb_heat_thick_integrand_HeI
   real(kind=dp),dimension(:,:), allocatable :: bb_heat_thick_integrand_HeII
   real(kind=dp),dimension(:,:), allocatable :: bb_heat_thin_integrand_HI
   real(kind=dp),dimension(:,:), allocatable :: bb_heat_thin_integrand_HeI
   real(kind=dp),dimension(:,:), allocatable :: bb_heat_thin_integrand_HeII
+
+#ifdef PL
+  integer :: pl_FreqBnd_LowerLimit
+  integer :: pl_FreqBnd_UpperLimit
+ 
+  real(kind=dp),dimension(:,:), allocatable :: pl_photo_thick_integrand
+  real(kind=dp),dimension(:,:), allocatable :: pl_photo_thin_integrand
   real(kind=dp),dimension(:,:), allocatable :: pl_heat_thick_integrand_HI
   real(kind=dp),dimension(:,:), allocatable :: pl_heat_thick_integrand_HeI
   real(kind=dp),dimension(:,:), allocatable :: pl_heat_thick_integrand_HeII
   real(kind=dp),dimension(:,:), allocatable :: pl_heat_thin_integrand_HI
   real(kind=dp),dimension(:,:), allocatable :: pl_heat_thin_integrand_HeI
   real(kind=dp),dimension(:,:), allocatable :: pl_heat_thin_integrand_HeII
+
+  real(kind=dp),dimension(:,:), target, allocatable :: pl_photo_thick_table
+  real(kind=dp),dimension(:,:), target, allocatable :: pl_photo_thin_table
+  real(kind=dp),dimension(:,:), target, allocatable :: pl_heat_thick_table
+  real(kind=dp),dimension(:,:), target, allocatable :: pl_heat_thin_table
+#endif
+#ifdef QUASARS
+  integer :: qpl_FreqBnd_LowerLimit
+  integer :: qpl_FreqBnd_UpperLimit
+
+  real(kind=dp),dimension(:,:), allocatable :: qpl_photo_thick_integrand
+  real(kind=dp),dimension(:,:), allocatable :: qpl_photo_thin_integrand
+  real(kind=dp),dimension(:,:), allocatable :: qpl_heat_thick_integrand_HI
+  real(kind=dp),dimension(:,:), allocatable :: qpl_heat_thick_integrand_HeI
+  real(kind=dp),dimension(:,:), allocatable :: qpl_heat_thick_integrand_HeII
+  real(kind=dp),dimension(:,:), allocatable :: qpl_heat_thin_integrand_HI
+  real(kind=dp),dimension(:,:), allocatable :: qpl_heat_thin_integrand_HeI
+  real(kind=dp),dimension(:,:), allocatable :: qpl_heat_thin_integrand_HeII
+
+  real(kind=dp),dimension(:,:), target, allocatable :: qpl_photo_thick_table
+  real(kind=dp),dimension(:,:), target, allocatable :: qpl_photo_thin_table
+  real(kind=dp),dimension(:,:), target, allocatable :: qpl_heat_thick_table
+  real(kind=dp),dimension(:,:), target, allocatable :: qpl_heat_thin_table
+#endif
 
   ! Frequency dependence of cross section (subband dependent)
   real(kind=dp), dimension(0:NumFreq) :: cross_section_freq_dependence
@@ -93,12 +131,8 @@ module radiation_tables
   ! Integration table ( optical depth, sub-bin )
   real(kind=dp),dimension(:,:), target, allocatable :: bb_photo_thick_table  
   real(kind=dp),dimension(:,:), target, allocatable :: bb_photo_thin_table
-  real(kind=dp),dimension(:,:), target, allocatable :: pl_photo_thick_table 
-  real(kind=dp),dimension(:,:), target, allocatable :: pl_photo_thin_table
   real(kind=dp),dimension(:,:), target, allocatable :: bb_heat_thick_table  
   real(kind=dp),dimension(:,:), target, allocatable :: bb_heat_thin_table
-  real(kind=dp),dimension(:,:), target, allocatable :: pl_heat_thick_table  
-  real(kind=dp),dimension(:,:), target, allocatable :: pl_heat_thin_table
 
 #ifdef MPI       
     integer,private :: mympierror
@@ -173,6 +207,7 @@ contains
             freq_min(bb_FreqBnd_UpperLimit+1)/ev2fr," eV"
     endif
 
+#ifdef PL
     ! Find out how far to follow the PL SED (used in lookuptable routines)
     pl_FreqBnd_UpperLimit=NumFreqBnd
     do i_subband=1,NumFreqBnd
@@ -196,7 +231,32 @@ contains
             (freq_min(pl_FreqBnd_UpperLimit)+ &
             delta_freq(pl_FreqBnd_UpperLimit)*real(NumFreq))/ev2fr," eV"
     endif
-
+#endif
+#ifdef QUASARS
+    ! Find out how far to follow the Q SED (used in lookuptable routines)
+    qpl_FreqBnd_UpperLimit=NumFreqBnd
+    do i_subband=1,NumFreqBnd
+       if (freq_min(i_subband) > qpl_MaxFreq) then
+          qpl_FreqBnd_UpperLimit=i_subband-1
+          exit
+       endif
+    enddo
+    qpl_FreqBnd_LowerLimit=1
+    do i_subband=NumFreqBnd,1,-1
+       if (freq_min(i_subband) < qpl_MinFreq) then
+          qpl_FreqBnd_LowerLimit=i_subband
+          exit
+       endif
+    enddo
+    if (rank == 0) then
+       write(logf,"(2(A,I3))") "Using Q from frequency band ", &
+            qpl_FreqBnd_LowerLimit," to ",qpl_FreqBnd_UpperLimit
+       write(logf,"(A,2(F10.2,A))") "  these are energies ", &
+            freq_min(qpl_FreqBnd_LowerLimit)/ev2fr," and ", &
+            (freq_min(qpl_FreqBnd_UpperLimit)+ &
+            delta_freq(qpl_FreqBnd_UpperLimit)*real(NumFreq))/ev2fr," eV"
+    endif
+#endif
 #ifdef MPILOG
     write(logf,*) 'Band 1'
 #endif
@@ -208,11 +268,16 @@ contains
        
        ! Fill frequency array
        call set_frequency_array(i_subband)
-       
+#ifdef PL       
        ! Set frequency dependence of cross section
        call set_cross_section_freq_dependence(i_subband, &
             pl_index_cross_section_HI(i_subband),grey)
-       
+#endif       
+#ifdef QUASARS
+       ! Set frequency dependence of cross section
+       call set_cross_section_freq_dependence(i_subband, &
+            qpl_index_cross_section_HI(i_subband),grey)
+#endif
        ! Make photo integrands
        call fill_photo_integrands(i_subband)
        
@@ -245,11 +310,16 @@ contains
        
        ! Fill frequency array
        call set_frequency_array(i_subband)
-       
+#ifdef PL       
        ! Set frequency dependence of cross section
        call set_cross_section_freq_dependence(i_subband, &
             pl_index_cross_section_HeI(i_subband),grey)
-       
+#endif       
+#ifdef QUASARS
+       ! Set frequency dependence of cross section
+       call set_cross_section_freq_dependence(i_subband, &
+            qpl_index_cross_section_HeI(i_subband),grey)
+#endif
        ! Make photo integrands
        call fill_photo_integrands(i_subband)
        
@@ -288,11 +358,16 @@ contains
        
        ! Fill frequency array
        call set_frequency_array(i_subband)
-       
+#ifdef PL       
        ! Set frequency dependence of cross section
        call set_cross_section_freq_dependence(i_subband, &
             pl_index_cross_section_HeII(i_subband),grey)
-       
+#endif       
+#ifdef QUASARS
+       ! Set frequency dependence of cross section
+       call set_cross_section_freq_dependence(i_subband, &
+            qpl_index_cross_section_HeII(i_subband),grey)
+#endif
        ! Make photo integrands
        call fill_photo_integrands(i_subband)
        
@@ -362,9 +437,16 @@ contains
     ! Photoionization integrand as a function of frequency and tau
     allocate(bb_photo_thick_integrand(0:NumFreq, 0:NumTau))    
     allocate(bb_photo_thin_integrand(0:NumFreq, 0:NumTau)) 
-    allocate(pl_photo_thick_integrand(0:NumFreq, 0:NumTau))    
-    allocate(pl_photo_thin_integrand(0:NumFreq, 0:NumTau)) 
 
+#ifdef PL
+       allocate(pl_photo_thick_integrand(0:NumFreq, 0:NumTau))
+       allocate(pl_photo_thin_integrand(0:NumFreq, 0:NumTau))
+#endif
+
+#ifdef QUASARS
+       allocate(qpl_photo_thick_integrand(0:NumFreq, 0:NumTau))
+       allocate(qpl_photo_thin_integrand(0:NumFreq, 0:NumTau))
+#endif
     ! Heating integrand as a function of frequency and tau
     if (.not.isothermal) then
        allocate(bb_heat_thick_integrand_HI(0:NumFreq, 0:NumTau))  
@@ -373,12 +455,22 @@ contains
        allocate(bb_heat_thin_integrand_HI(0:NumFreq, 0:NumTau))   
        allocate(bb_heat_thin_integrand_HeI(0:NumFreq, 0:NumTau))   
        allocate(bb_heat_thin_integrand_HeII(0:NumFreq, 0:NumTau))   
+#ifdef PL
        allocate(pl_heat_thick_integrand_HI(0:NumFreq, 0:NumTau))   
        allocate(pl_heat_thick_integrand_HeI(0:NumFreq, 0:NumTau))   
        allocate(pl_heat_thick_integrand_HeII(0:NumFreq, 0:NumTau))      
        allocate(pl_heat_thin_integrand_HI(0:NumFreq, 0:NumTau))   
        allocate(pl_heat_thin_integrand_HeI(0:NumFreq, 0:NumTau))   
        allocate(pl_heat_thin_integrand_HeII(0:NumFreq, 0:NumTau))   
+#endif
+#ifdef QUASARS
+       allocate(qpl_heat_thick_integrand_HI(0:NumFreq, 0:NumTau))
+       allocate(qpl_heat_thick_integrand_HeI(0:NumFreq, 0:NumTau))
+       allocate(qpl_heat_thick_integrand_HeII(0:NumFreq, 0:NumTau))
+       allocate(qpl_heat_thin_integrand_HI(0:NumFreq, 0:NumTau))
+       allocate(qpl_heat_thin_integrand_HeI(0:NumFreq, 0:NumTau))
+       allocate(qpl_heat_thin_integrand_HeII(0:NumFreq, 0:NumTau))
+#endif
     endif
 
   end subroutine allocate_integrand_arrays
@@ -389,9 +481,14 @@ contains
     
     deallocate(bb_photo_thick_integrand)
     deallocate(bb_photo_thin_integrand)
+#ifdef PL
     deallocate(pl_photo_thick_integrand)
     deallocate(pl_photo_thin_integrand)
-    
+#endif
+#ifdef QUASARS
+    deallocate(qpl_photo_thick_integrand)
+    deallocate(qpl_photo_thin_integrand)
+#endif
     ! deallocate the useless heating integrand
     if (.not.isothermal) then
        deallocate(bb_heat_thick_integrand_HI)
@@ -400,12 +497,22 @@ contains
        deallocate(bb_heat_thin_integrand_HI)
        deallocate(bb_heat_thin_integrand_HeI)
        deallocate(bb_heat_thin_integrand_HeII)
+#ifdef PL     
        deallocate(pl_heat_thick_integrand_HI)
        deallocate(pl_heat_thick_integrand_HeI)
        deallocate(pl_heat_thick_integrand_HeII)
        deallocate(pl_heat_thin_integrand_HI)
        deallocate(pl_heat_thin_integrand_HeI)
        deallocate(pl_heat_thin_integrand_HeII)
+#endif
+#ifdef QUASARS
+       deallocate(qpl_heat_thick_integrand_HI)
+       deallocate(qpl_heat_thick_integrand_HeI)
+       deallocate(qpl_heat_thick_integrand_HeII)
+       deallocate(qpl_heat_thin_integrand_HI)
+       deallocate(qpl_heat_thin_integrand_HeI)
+       deallocate(qpl_heat_thin_integrand_HeII)
+#endif
     endif
     
   end subroutine deallocate_integrand_arrays
@@ -419,15 +526,26 @@ contains
     ! Photoionization table as a function of photo sub-bin and tau
     allocate(bb_photo_thick_table(0:NumTau, 1:NumFreqBnd))
     allocate(bb_photo_thin_table(0:NumTau, 1:NumFreqBnd))
+#ifdef PL
     allocate(pl_photo_thick_table(0:NumTau, 1:NumFreqBnd))
     allocate(pl_photo_thin_table(0:NumTau, 1:NumFreqBnd))
-    
+#endif    
+#ifdef QUASARS
+    allocate(qpl_photo_thick_table(0:NumTau, 1:NumFreqBnd))
+    allocate(qpl_photo_thin_table(0:NumTau, 1:NumFreqBnd))
+#endif
     ! Heating table as a function of heating sub-bin and tau
     if (.not.isothermal) then
        allocate(bb_heat_thick_table(0:NumTau, 1:NumheatBin))
        allocate(bb_heat_thin_table(0:NumTau, 1:NumheatBin))
+#ifdef PL      
        allocate(pl_heat_thick_table(0:NumTau, 1:NumheatBin))
        allocate(pl_heat_thin_table(0:NumTau, 1:NumheatBin))
+#endif
+#ifdef QUASARS
+       allocate(qpl_heat_thick_table(0:NumTau, 1:NumheatBin))
+       allocate(qpl_heat_thin_table(0:NumTau, 1:NumheatBin))
+#endif
     endif
     
   end subroutine allocate_table_arrays
@@ -448,11 +566,10 @@ contains
   end subroutine set_frequency_array
 
 !---------------------------------------------------------------------------
-
-  subroutine set_cross_section_freq_dependence(i_subband,pl_index,grey)
+  subroutine set_cross_section_freq_dependence(i_subband,pl_index_crosssection,grey)
 
     integer,intent(in) :: i_subband
-    real(kind=dp),intent(in) :: pl_index
+    real(kind=dp),intent(in) :: pl_index_crosssection
     logical,intent(in) :: grey
     
     integer :: i_freq
@@ -464,13 +581,14 @@ contains
     else
        do i_freq=0,NumFreq
           cross_section_freq_dependence(i_freq) = &
-               (frequency(i_freq)/freq_min(i_subband))**(-pl_index)        
+               (frequency(i_freq)/freq_min(i_subband))**(-pl_index_crosssection)        
        enddo
     endif
     
   end subroutine set_cross_section_freq_dependence
-    
 !---------------------------------------------------------------------------
+! Hannah Ross: May need new set_cross_section_freq_dependence for quasars
+
 
   subroutine fill_photo_integrands(i_subband)
 
@@ -505,18 +623,35 @@ contains
                 bb_photo_thick_integrand(i_freq,i_tau) = 0.0
                 bb_photo_thin_integrand(i_freq,i_tau) = 0.0
              endif
+#ifdef PL
              pl_photo_thick_integrand(i_freq,i_tau) = &
                   pl_scaling*frequency(i_freq)**(-pl_index)* &
                   exp(-tau(i_tau)*cross_section_freq_dependence(i_freq))
-             pl_photo_thin_integrand(i_freq,i_tau) = &
-                  pl_scaling*frequency(i_freq)**(-pl_index)* &
+             pl_photo_thin_integrand(i_freq,i_tau) =&
+                  pl_scaling*frequency(i_freq)**(-pl_index)* & !this is the part that needs to be replaced for double power law
                   cross_section_freq_dependence(i_freq)* &
                   exp(-tau(i_tau)*cross_section_freq_dependence(i_freq))
+#endif
+#ifdef QUASARS
+             qpl_photo_thick_integrand(i_freq,i_tau) = &
+                  qpl_scaling*frequency(i_freq)**(-qpl_index)* &
+                  exp(-tau(i_tau)*cross_section_freq_dependence(i_freq))
+             qpl_photo_thin_integrand(i_freq,i_tau) = &
+                  qpl_scaling*frequency(i_freq)**(-qpl_index)* & 
+                  cross_section_freq_dependence(i_freq)* &
+                  exp(-tau(i_tau)*cross_section_freq_dependence(i_freq))
+#endif
           else
              bb_photo_thick_integrand(i_freq,i_tau) = 0.0
              bb_photo_thin_integrand(i_freq,i_tau) = 0.0
+#ifdef PL
              pl_photo_thick_integrand(i_freq,i_tau) = 0.0
              pl_photo_thin_integrand(i_freq,i_tau) = 0.0
+#endif
+#ifdef QUASARS
+             qpl_photo_thick_integrand(i_freq,i_tau) = 0.0
+             qpl_photo_thin_integrand(i_freq,i_tau) = 0.0
+#endif
           endif
           
        enddo
@@ -543,13 +678,22 @@ contains
           bb_heat_thin_integrand_HI(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HI)* &
                bb_photo_thin_integrand(i_freq,i_tau)
+#ifdef PL
           pl_heat_thick_integrand_HI(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HI)* &
                pl_photo_thick_integrand(i_freq,i_tau)
           pl_heat_thin_integrand_HI(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HI)* &
                pl_photo_thin_integrand(i_freq,i_tau)
-          
+#endif        
+#ifdef QUASARS
+          qpl_heat_thick_integrand_HI(i_freq,i_tau) = &
+               hplanck*(frequency(i_freq)-ion_freq_HI)* &
+               qpl_photo_thick_integrand(i_freq,i_tau)
+          qpl_heat_thin_integrand_HI(i_freq,i_tau) = &
+               hplanck*(frequency(i_freq)-ion_freq_HI)* &
+               qpl_photo_thin_integrand(i_freq,i_tau)
+#endif  
        enddo
        
     enddo
@@ -575,12 +719,22 @@ contains
           bb_heat_thin_integrand_HeI(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HeI)* &
                bb_photo_thin_integrand(i_freq,i_tau)
+#ifdef PL      
           pl_heat_thick_integrand_HeI(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HeI)* &
                pl_photo_thick_integrand(i_freq,i_tau)
           pl_heat_thin_integrand_HeI(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HeI)* &
                pl_photo_thin_integrand(i_freq,i_tau)
+#endif
+#ifdef QUASARS
+          qpl_heat_thick_integrand_HeI(i_freq,i_tau) = &
+               hplanck*(frequency(i_freq)-ion_freq_HeI)* &
+               qpl_photo_thick_integrand(i_freq,i_tau)
+          qpl_heat_thin_integrand_HeI(i_freq,i_tau) = &
+               hplanck*(frequency(i_freq)-ion_freq_HeI)* &
+               qpl_photo_thin_integrand(i_freq,i_tau)
+#endif
        enddo
        
     enddo
@@ -606,12 +760,22 @@ contains
           bb_heat_thin_integrand_HeII(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HeII)* &
                bb_photo_thin_integrand(i_freq,i_tau)
+#ifdef PL      
           pl_heat_thick_integrand_HeII(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HeII)* &
                pl_photo_thick_integrand(i_freq,i_tau)
           pl_heat_thin_integrand_HeII(i_freq,i_tau) = &
                hplanck*(frequency(i_freq)-ion_freq_HeII)* &
                pl_photo_thin_integrand(i_freq,i_tau)
+#endif
+#ifdef QUASARS
+          qpl_heat_thick_integrand_HeII(i_freq,i_tau) = &
+               hplanck*(frequency(i_freq)-ion_freq_HeII)* &
+               qpl_photo_thick_integrand(i_freq,i_tau)
+          qpl_heat_thin_integrand_HeII(i_freq,i_tau) = &
+               hplanck*(frequency(i_freq)-ion_freq_HeII)* &
+               qpl_photo_thin_integrand(i_freq,i_tau)
+#endif
        enddo
        
     enddo
@@ -642,11 +806,18 @@ contains
     bb_photo_thick_table(:,i_subband) = answer
     call vector_romberg (bb_photo_thin_integrand,vector_weight,NumFreq,NumFreq,NumTau,answer)
     bb_photo_thin_table(:,i_subband) = answer
+#ifdef PL
     call vector_romberg (pl_photo_thick_integrand,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_photo_thick_table(:,i_subband) = answer
     call vector_romberg (pl_photo_thin_integrand,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_photo_thin_table(:,i_subband) = answer  
-
+#endif
+#ifdef QUASARS
+    call vector_romberg(qpl_photo_thick_integrand,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_photo_thick_table(:,i_subband) = answer
+    call vector_romberg (qpl_photo_thin_integrand,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_photo_thin_table(:,i_subband) = answer
+#endif
   end subroutine make_photo_tables
 
 !---------------------------------------------------------------------------
@@ -661,11 +832,12 @@ contains
     bb_heat_thick_table(:,table_position) = answer
     call vector_romberg (bb_heat_thin_integrand_HI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     bb_heat_thin_table(:,table_position) = answer
+#ifdef PL
     call vector_romberg (pl_heat_thick_integrand_HI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thick_table(:,table_position) = answer
     call vector_romberg (pl_heat_thin_integrand_HI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thin_table(:,table_position) = answer
-    
+#endif    
   end subroutine make_heat_tables_HI
   
 !---------------------------------------------------------------------------
@@ -680,11 +852,18 @@ contains
     bb_heat_thick_table(:,table_position) = answer
     call vector_romberg (bb_heat_thin_integrand_HeI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     bb_heat_thin_table(:,table_position) = answer
+#ifdef PL
     call vector_romberg (pl_heat_thick_integrand_HeI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thick_table(:,table_position) = answer
     call vector_romberg (pl_heat_thin_integrand_HeI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thin_table(:,table_position) = answer
-    
+#endif    
+#ifdef QUASARS
+    call vector_romberg(qpl_heat_thick_integrand_HeI,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_heat_thick_table(:,table_position) = answer
+    call vector_romberg(qpl_heat_thin_integrand_HeI,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_heat_thin_table(:,table_position) = answer
+#endif  
   end subroutine make_heat_tables_HeI
 
 !---------------------------------------------------------------------------
@@ -699,11 +878,18 @@ contains
     bb_heat_thick_table(:,table_position) = answer
     call vector_romberg (bb_heat_thin_integrand_HeII,vector_weight,NumFreq,NumFreq,NumTau,answer)
     bb_heat_thin_table(:,table_position) = answer
+#ifdef PL
     call vector_romberg (pl_heat_thick_integrand_HeII,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thick_table(:,table_position) = answer
     call vector_romberg (pl_heat_thin_integrand_HeII,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thin_table(:,table_position) = answer
-    
+#endif    
+#ifdef QUASARS
+    call vector_romberg(qpl_heat_thick_integrand_HeII,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_heat_thick_table(:,table_position) = answer
+    call vector_romberg(qpl_heat_thin_integrand_HeII,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_heat_thin_table(:,table_position) = answer
+#endif
   end subroutine make_heat_tables_HeII
 
 end module radiation_tables

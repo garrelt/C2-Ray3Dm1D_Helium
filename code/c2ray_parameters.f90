@@ -65,6 +65,7 @@ module c2ray_parameters
   !> Number of ionizing photons / second
   real(kind=dp),parameter :: S_star_nominal=1e48_dp
 
+#ifdef PL
   !> nominal Eddington efficiency
   real(kind=dp),parameter :: EddLeff_nominal=1.0_dp
   !> nominal power law index (for photon number)
@@ -78,6 +79,28 @@ module c2ray_parameters
   !> nominal minimum and maximum frequency for power law source
   real(kind=dp),parameter :: pl_MinFreq_nominal=0.3*1e3*ev2fr
   real(kind=dp),parameter :: pl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
+  !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
+  !! 0.02 as their nominal value. Note that this depends on your integration
+  !! limits. Mesinger et al. use 300 eV as lowest energy.
+  real,parameter :: xray_phot_per_atom = 0.02
+  !real,parameter :: xray_phot_per_atom = 0.1
+#endif
+
+#ifdef QUASARS
+  !> nominal quasar Eddington efficiency
+  real(kind=dp),parameter :: qEddLeff_nominal=1.0_dp
+  !> nominal quasar index (for photon number)
+  real(kind=dp),parameter :: qpl_index_nominal=0.8_dp
+  !> nominal quasar black hole mass for Eddington luminosity (M0)
+  real(kind=dp),parameter :: qmass_nominal=1.0e6_dp
+  !> Eddington luminosity per qmass_nominal solar mass (erg/s)
+  real(kind=dp),parameter :: qEddLum=1.38e38*qmass_nominal
+  !> Number of ionizing photons / second for quasars
+  real(kind=dp),parameter :: qpl_S_star_nominal=1e48_dp
+  !> nominal minimum and maximum frequency for quasar source
+  real(kind=dp),parameter :: qpl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: qpl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
+#endif
 
   !> Subgrid clumping\n
   !! 1: constant clumping (with clumping_factor)\n
@@ -109,15 +132,12 @@ module c2ray_parameters
   !> Thermal: fraction of the cooling time step below which no iteration is done
   real(kind=dp),parameter :: relative_denergy=0.1
 
-  !> Source properties: Number of different sources
+  !> Source properties: Number of different stellar source types 
   integer,parameter :: Number_Sourcetypes=2
   !> Source properties: Photon per atom for different source types (high to low mass)
   real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 /)
   !real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 , 0.0 /)
-  !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
-  !! 0.02 as their nominal value. Note that this depends on your integration
-  !! limits. Mesinger et al. use 300 eV as lowest energy.
-  real,parameter :: xray_phot_per_atom = 0.02
+
   !> Source properties: Life time of sources (if set at compile time)
   real,parameter :: lifetime=20e6*YEAR
   !> Source properties: Smallest number of particles that makes a reliable halo

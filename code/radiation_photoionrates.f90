@@ -27,12 +27,19 @@ module radiation_photoionrates
   
   use radiation_tables, only: minlogtau, dlogtau
   use radiation_tables, only: bb_photo_thick_table, bb_photo_thin_table 
-  use radiation_tables, only: pl_photo_thick_table, pl_photo_thin_table 
   use radiation_tables, only: bb_heat_thick_table, bb_heat_thin_table 
-  use radiation_tables, only: pl_heat_thick_table, pl_heat_thin_table 
   use radiation_tables, only: bb_FreqBnd_UpperLimit, bb_FreqBnd_LowerLimit
-  use radiation_tables, only: pl_FreqBnd_UpperLimit, pl_FreqBnd_LowerLimit
 
+#ifdef PL
+  use radiation_tables, only: pl_photo_thick_table, pl_photo_thin_table
+  use radiation_tables, only: pl_heat_thick_table, pl_heat_thin_table 
+  use radiation_tables, only: pl_FreqBnd_UpperLimit, pl_FreqBnd_LowerLimit
+#endif
+#ifdef QUASARS
+  use radiation_tables, only: qpl_photo_thick_table, qpl_photo_thin_table
+  use radiation_tables, only: qpl_heat_thick_table, qpl_heat_thin_table
+  use radiation_tables, only: qpl_FreqBnd_UpperLimit, qpl_FreqBnd_LowerLimit
+#endif
   implicit none
 
   ! Variables connected to secondary ionizations.
@@ -103,7 +110,13 @@ contains
        colum_in_HeII,colum_out_HeII, &
        vol,nsrc,i_state)
 
-    use sourceprops, only: NormFlux,NormFluxPL
+    use sourceprops, only: NormFlux
+#ifdef PL
+    use sourceprops, only: NormFluxPL
+#endif
+#ifdef QUASARS
+    use sourceprops, only: NormFluxQPL
+#endif
     !use cgsphotoconstants
 
     ! Function type
@@ -199,12 +212,20 @@ contains
     !if (colum_in_HI == 0.0) write(logf,*) "After photolookup: ", &
     !     phi%photo_cell_HI, phi%photo_cell_HeI, &
     !              phi%photo_cell_HeII, phi%heat
+#ifdef PL
     if (NormFluxPL(nsrc) > 0.0) &  
          phi = phi + photo_lookuptable(tau_pos_in,tau_pos_out, &
          tau_in_all,tau_out_all, &
          NormFluxPL(nsrc),"P",vol, &
          scaling_HI,scaling_HeI,scaling_HeII)
-    
+#endif    
+#ifdef QUASARS
+    if (NormFluxQPL(nsrc) > 0.0) &
+         phi = phi + photo_lookuptable(tau_pos_in,tau_pos_out, &
+         tau_in_all,tau_out_all, &
+         NormFluxQPL(nsrc),"Q",vol, &
+         scaling_HI,scaling_HeI,scaling_HeII)
+#endif
     ! Find the heating rates rates by looking up the values in
     ! the (appropriate) photo-ionization tables and using the
     ! secondary ionization. Add them to the rates.
@@ -232,14 +253,22 @@ contains
        !if (colum_in_HI == 0.0) write(logf,*) "After heatlookup: ", &
        !     phi%photo_cell_HI, phi%photo_cell_HeI, &
        !     phi%photo_cell_HeII, phi%heat
-
+#ifdef PL
        if (NormFluxPL(nsrc) > 0.0) &  
             phi = phi + heat_lookuptable(tau_pos_in,tau_pos_out, &
             tau_in_all,tau_out_all, &
             tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFluxPL(nsrc),"P", &
             vol,i_state, &
             scaling_HI,scaling_HeI,scaling_HeII)
-       
+#endif       
+#ifdef QUASARS
+       if (NormFluxQPL(nsrc) > 0.0) &
+            phi = phi + heat_lookuptable(tau_pos_in,tau_pos_out, &
+            tau_in_all,tau_out_all, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFluxQPL(nsrc),"Q", &
+            vol,i_state, &
+            scaling_HI,scaling_HeI,scaling_HeII)
+#endif
     endif
 
     ! Assign result of function
@@ -341,11 +370,20 @@ contains
        photo_thin_table => bb_photo_thin_table
        Minimum_FreqBnd=1
        Maximum_FreqBnd=bb_FreqBnd_UpperLimit
+#ifdef PL
     elseif (table_type == "P") then
        photo_thick_table => pl_photo_thick_table
        photo_thin_table => pl_photo_thin_table
        Minimum_FreqBnd=pl_FreqBnd_LowerLimit
        Maximum_FreqBnd=pl_FreqBnd_UpperLimit
+#endif
+#ifdef QUASARS
+    elseif (table_type == "Q") then
+       photo_thick_table => qpl_photo_thick_table
+       photo_thin_table => qpl_photo_thin_table
+       Minimum_FreqBnd=qpl_FreqBnd_LowerLimit
+       Maximum_FreqBnd=qpl_FreqBnd_UpperLimit
+#endif
     endif
     
     ! loop through the relevant frequency bands
@@ -483,11 +521,20 @@ contains
        heat_thin_table => bb_heat_thin_table
        Minimum_FreqBnd=1
        Maximum_FreqBnd=bb_FreqBnd_UpperLimit
+#ifdef PL
     elseif (table_type == "P") then
        heat_thick_table => pl_heat_thick_table
        heat_thin_table => pl_heat_thin_table
        Minimum_FreqBnd=pl_FreqBnd_LowerLimit
        Maximum_FreqBnd=pl_FreqBnd_UpperLimit
+#endif
+#ifdef QUASARS
+    elseif (table_type == "Q") then
+       heat_thick_table => qpl_heat_thick_table
+       heat_thin_table => qpl_heat_thin_table
+       Minimum_FreqBnd=qpl_FreqBnd_LowerLimit
+       Maximum_FreqBnd=qpl_FreqBnd_UpperLimit
+#endif
     endif
 
     ! initialization to zero of local cumulative variables
