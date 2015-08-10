@@ -67,7 +67,6 @@ contains
     real(kind=dp) :: di,dj,dk
 
 
-    !DEC$ ATTRIBUTES FORCEINLINE :: weightf
     ! map to local variables (should be pointers ;)
     i=pos(1)
     j=pos(2)
