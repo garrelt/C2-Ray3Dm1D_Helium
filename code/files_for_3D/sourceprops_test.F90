@@ -20,8 +20,17 @@ module sourceprops
   use nbody, only:  dir_src
   !use material, only: xh
   use grid, only: x,y,z
+#ifdef PL
+  use c2ray_parameters, only: xray_phot_per_atom, pl_S_star_nominal,&
+       EddLeff_nominal,mass_nominal,EddLum
+#endif
+#ifdef QUASARS
+  use c2ray_parameters, only: qpl_S_star_nominal,qEddLeff_nominal,&
+      qmass_nominal,qEddLum, qpl_index_nominal, qpl_MinFreq_nominal,&
+      qpl_MaxFreq_nominal
+#endif
   use c2ray_parameters, only: phot_per_atom, lifetime, &
-       S_star_nominal, pl_S_star_nominal,StillNeutral, Number_Sourcetypes
+       S_star_nominal, StillNeutral, Number_Sourcetypes
   
   implicit none
 
@@ -67,8 +76,10 @@ contains
     ! Deallocate source arrays
     if (allocated(srcpos)) deallocate(srcpos)
     if (allocated(NormFlux)) deallocate(NormFlux)
-    if (allocated(NormFluxPL)) deallocate(NormFluxPL)
     if (allocated(srcSeries)) deallocate(srcSeries)
+#ifdef PL
+    if (allocated(NormFluxPL)) deallocate(NormFluxPL)
+#endif
     
     ! Rank 0 reads in sources
     if (rank == 0) then
@@ -97,16 +108,23 @@ contains
        write(*,*)  "Reading number of sources: ",NumSrc
        allocate(srcpos(3,NumSrc))
        allocate(NormFlux(0:NumSrc)) ! 0 will hold lost photons
-       allocate(NormFluxPL(NumSrc))
        allocate(SrcSeries(NumSrc))
+#ifdef PL
+       allocate(NormFluxPL(NumSrc))
+#endif
 
        ! Fill in the source arrays
        if (rank == 0) then
           do ns=1,NumSrc
+#ifdef PL
              read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
                   NormFlux(ns),NormFluxPL(ns)
-             NormFlux(ns)=NormFlux(ns)/S_star_nominal
              NormFluxPL(ns)=NormFluxPL(ns)/pl_S_star_nominal
+#else
+             read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
+                  NormFlux(ns)
+#endif
+             NormFlux(ns)=NormFlux(ns)/S_star_nominal
           enddo
           
           ! STANDARD TEST
@@ -137,8 +155,10 @@ contains
           
           write(logf,*) 'Total photon rate (BB)= ', &
                sum(NormFlux)*S_star_nominal,' s^-1'
+#ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
                sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
+#endif
 
           ! Create array of source numbers for generating random order
           do ns=1,NumSrc
@@ -152,7 +172,9 @@ contains
        ! Distribute the source parameters to the other nodes
        call MPI_BCAST(srcpos,3*NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(NormFlux,NumSrc+1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#ifdef PL
        call MPI_BCAST(NormFluxPL,NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
        ! Distribute the source series to the other nodes
        call MPI_BCAST(SrcSeries,NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
