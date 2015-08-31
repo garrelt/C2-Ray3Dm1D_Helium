@@ -13,7 +13,7 @@ module sourceprops
 
   use precision, only: dp
   use my_mpi
-  use file_admin, only: stdinput, logf, file_input
+  use file_admin, only: stdinput, logf, file_input, sourcefile
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR, YEAR
   use cosmology_parameters, only: Omega_B, Omega0
@@ -172,7 +172,7 @@ contains
     integer :: srcpos1,srcpos2,srcpos3,sumnumhalo,ioflag
     real :: flux
 
-    open(unit=50,file=sourcelistfile,status='old')
+    open(unit=sourcefile,file=sourcelistfile,status='old')
     
     ! Count number of sources in the source file by looking for EOF
     NumSrc=0
@@ -180,7 +180,7 @@ contains
     sumnumhalo=0
     do while (ioflag >= 0) ! EOF gives a -1 here. Some of the files have
        ! other errors, which should be ignored.
-       read(50,*,iostat=ioflag) srcpos1,srcpos2,srcpos3,flux
+       read(sourcefile,*,iostat=ioflag) srcpos1,srcpos2,srcpos3,flux
        NumSrc=NumSrc+1
     enddo
     NumSrc=NumSrc-1 ! we counted one too many with the above procedure
@@ -189,7 +189,7 @@ contains
     write(logf,"(A,I6)") "Number of sources: ", NumSrc
     write(logf,*) "Flux of last source: ", flux   
     ! Now that we have counted the number of halos, close the file
-    close(unit=50)
+    close(unit=sourcefile)
 
   end subroutine establish_number_of_active_sources
   
@@ -201,19 +201,19 @@ contains
 
     integer :: ns
 
-    open(unit=50,file=sourcelistfile,status='old')
+    open(unit=sourcefile,file=sourcelistfile,status='old')
 
     ! Read in source positions and mass
     write(logf,*) 'NumSrc', NumSrc
     do ns=1,NumSrc
-       read(50,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns),NormFlux(ns),NormFluxPL(ns)
+       read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns),NormFlux(ns),NormFluxPL(ns)
 
        ! Source is always at cell centre!!
        rsrcpos(1,ns)=x(srcpos(1,ns))
        rsrcpos(2,ns)=y(srcpos(2,ns))
        rsrcpos(3,ns)=z(srcpos(3,ns))
     enddo
-    close(50)
+    close(sourcefile)
     write(logf,*) "Fluxes: ", NormFlux
   end subroutine read_in_sources
 

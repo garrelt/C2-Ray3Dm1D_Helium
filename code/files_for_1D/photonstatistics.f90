@@ -128,21 +128,21 @@ contains
        yhe(2)=xhe(i,2)
        ndens_p=ndens(i,1,1)
        totrec=totrec+vol(i)*ndens_p* electrondens(ndens_p,yh,yhe)*clumping* &
-          (xh(i,1)*(1.0_dp-abu_he)*  & 
-          1.0_dp/(1.0_dp/(bh00*(temper(i)/1e4)**albpow)+1.0_dp/(bh00*5.0_dp*(temper(i)/1e4)**(1.95_dp*albpow))) +&
-	  xhe(i,1)*abu_he*  &
-          (bhe00*(temper(i)/1e4)**alcpow) + &
-	  xhe(i,2)*abu_he*  &
-          1.0_dp/(1.0_dp/(bhe10*(temper(i)/1e4)**(0.95_dp*albpow))+1.0_dp/(bhe10*11.0_dp*(temper(i)/1e4)**(albpow*1.95_dp))))
+            (xh(i,1)*(1.0_dp-abu_he)*  & 
+            1.0_dp/(1.0_dp/(bh00*(temper(i)/1e4)**albpow)+1.0_dp/(bh00*5.0_dp*(temper(i)/1e4)**(1.95_dp*albpow))) +&
+            xhe(i,1)*abu_he*  &
+            (bhe00*(temper(i)/1e4)**alcpow) + &
+            xhe(i,2)*abu_he*  &
+            1.0_dp/(1.0_dp/(bhe10*(temper(i)/1e4)**(0.95_dp*albpow))+1.0_dp/(bhe10*11.0_dp*(temper(i)/1e4)**(albpow*1.95_dp))))
 
 
        totcollisions=totcollisions+vol(i)*ndens_p*(1.0_dp-abu_he)* &
             xh(i,0)*electrondens(ndens_p,yh,yhe)* &
             colh0*sqrt(temper(i))*exp(-temph0/temper(i))+ &
-	    vol(i)*ndens_p*abu_he*   &
+            vol(i)*ndens_p*abu_he*   &
             xhe(i,0)*electrondens(ndens_p,yh,yhe)* &
             colhe(0)*sqrt(temper(i))*exp(-temphe(0)/temper(i))+ &
-	    vol(i)*ndens_p*abu_he*   &
+            vol(i)*ndens_p*abu_he*   &
             xhe(i,1)*electrondens(ndens_p,yh,yhe)* &
             colhe(1)*sqrt(temper(i))*exp(-temphe(1)/temper(i))
     enddo
@@ -204,7 +204,7 @@ contains
     totalsrc=s_star*dt
     photcons=(total_ion-totcollisions)/totalsrc
     if (rank == 0) then
-       write(logf,"(7(1pe10.3))") &
+       write(logf,"(7(es10.3))") &
             total_ion, totalsrc, &
             photcons, &
             dh0/total_ion, &

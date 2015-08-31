@@ -66,8 +66,8 @@ contains
     
     ! Initialize lengths and volumes to proper units
     if (cosmological) then
-    	call redshift_evol(time)
-    	call cosmo_evol( )
+       call redshift_evol(time)
+       call cosmo_evol( )
     endif
     
   end subroutine cosmology_init
@@ -169,7 +169,7 @@ contains
 
     !use sizes
     use grid, only: x,y,z,dr,vol
-    use sourceprops, only: rsrcpos
+    !use sourceprops, only: rsrcpos
     use material, only: ndens, n_LLS, y_LLS
     
     real(kind=dp) :: zfactor3
@@ -186,7 +186,7 @@ contains
     vol=vol*zfactor3
 
     ! Source positions (multiple source version)
-    if (allocated(rsrcpos)) rsrcpos(:,:)=rsrcpos(:,:)*zfactor
+    !if (allocated(rsrcpos)) rsrcpos(:,:)=rsrcpos(:,:)*zfactor
 
     ! Change the densities
     ndens(:,:,:)=ndens(:,:,:)/zfactor3

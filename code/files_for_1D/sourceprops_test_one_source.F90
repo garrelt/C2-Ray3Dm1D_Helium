@@ -33,9 +33,14 @@ contains
     allocate(NormFlux(1))
     allocate(NormFluxPL(1))
     allocate(srcMass(1,1:3))
-    NormFlux(1)=1.0_dp
+    NormFlux(1)=0.0_dp
     NormFluxPL(1)=0.0_dp
-    if (sourcetype.eq.'P')    NormFluxPL(1)=1.0_dp
+    if (sourcetype == 'B') NormFlux(1)=1.0_dp
+    if (sourcetype == 'P') NormFluxPL(1)=1.0_dp
+    if (sourcetype == 'A') then
+       NormFluxPL(1)=1.0_dp
+       NormFlux(1)=1.0_dp
+    endif
 
     srcMass(1,:)=(/1.0_dp, 1.0_dp, 1.0_dp/)  !not needed?
   end subroutine source_properties_ini

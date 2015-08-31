@@ -13,7 +13,7 @@ module sourceprops
 
   use precision, only: dp
   use my_mpi
-  use file_admin, only: logf
+  use file_admin, only: logf, sourcefile
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR
   use cosmology_parameters, only: Omega_B, Omega0
@@ -92,9 +92,9 @@ contains
             "_sources_used_wfgamma.dat"
        
        if (restart == 0 .or. restart == 1) then
-          open(unit=50,file=sourcelistfile,status='old')
+          open(unit=sourcefile,file=sourcelistfile,status='old')
           ! Number of sources
-          read(50,*) NumSrc0
+          read(sourcefile,*) NumSrc0
           
           ! Report
           write(logf,*) "Total number of source locations, no suppression: ", &
@@ -107,7 +107,7 @@ contains
           NumSupprbleSrc = 0
           NumSupprsdSrc = 0
           do ns0=1,NumSrc0
-             read(50,*) srcpos0(1),srcpos0(2),srcpos0(3),SrcMass00,SrcMass01
+             read(sourcefile,*) srcpos0(1),srcpos0(2),srcpos0(3),SrcMass00,SrcMass01
              ! the cell is still neutral, no suppression
              if (SrcMass00 /= 0.0 .or. &
                   ionized_from_compr(xh_compr(srcpos0(1),srcpos0(2),srcpos0(3))) < StillNeutral) &
@@ -120,7 +120,7 @@ contains
                   ionized_from_compr(xh_compr(srcpos0(1),srcpos0(2),srcpos0(3))) >= StillNeutral) &
                   NumSupprsdSrc=NumSupprsdSrc+1
           enddo
-          close(50)
+          close(sourcefile)
           write(logf,*) "Number of suppressable sources: ",NumSupprbleSrc
           write(logf,*) "Number of suppressed sources: ",NumSupprsdSrc
           write(logf,*) "Number of massive sources: ",NumMassiveSrc
@@ -155,13 +155,13 @@ contains
     
     if (rank == 0) then
        if (restart == 0 .or. restart == 1) then
-          open(unit=50,file=sourcelistfile,status='old')
+          open(unit=sourcefile,file=sourcelistfile,status='old')
           ! Number of sources
-          read(50,*) NumSrc0
+          read(sourcefile,*) NumSrc0
           ! Read in source positions and mass
           ns=0
           do ns0=1,NumSrc0
-             read(50,*) srcpos0(1),srcpos0(2),srcpos0(3), &
+             read(sourcefile,*) srcpos0(1),srcpos0(2),srcpos0(3), &
                   SrcMass00,SrcMass01
              
              if (ionized_from_compr(xh_compr(srcpos0(1),srcpos0(2),srcpos0(3))) < StillNeutral) then

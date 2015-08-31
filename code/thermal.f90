@@ -1,195 +1,173 @@
-!>
-!! \brief This module contains routines having to do with the calculation of
-!! the thermal evolution of a single point/cell. 
-!!
-!! Module for Capreole / C2-Ray (f90)
-!!
-!! \b Author: Garrelt Mellema
-!!
-!! \b Date: 
-!!
+! This module contains routines having to do with the calculation of
+! the thermal evolution of a single point/cell. 
 
 module thermalevolution
 
-  ! This file contains routines having to do with the calculation of
-  ! the thermal evolution of a single point/cell.
-  ! It can used for Yguazu-a or non-hydro photo-ionization calculations.
-
-  ! - thermal : time dependent solution of the radiative heating/cooling
-
   use precision, only: dp
-  use c2ray_parameters, only: minitemp,relative_denergy
+  use c2ray_parameters, only: minitemp, relative_denergy
   use radiative_cooling, only: coolin
-  use tped, only: temper2pressr,pressr2temper,electrondens
+  use tped, only: temper2pressr, pressr2temper, electrondens
   use cgsconstants
   use atomic
   use cosmology
-  use radiation, only: photrates
+  !use radiation, only: photrates
+  use radiation_photoionrates, only: photrates
   use material, only: ionstates
 
   implicit none
 
 contains
 
-  !=======================================================================
+  ! calculates the thermal evolution of one grid point
+  subroutine thermal (dt,end_temper,avg_temper,ndens_electron,ndens_atom,ion,phi)!,pos)
 
-
-  subroutine thermal (dt,temper,avg_temper,rhe,rhh,ion,phi)
-
-
-    ! calculates the thermal evolution
-
-    ! Author: Garrelt Mellema
-    ! Date: 11-May-2005 (30 July 2004, 1 June 2004)
-
-    ! Version:
-    ! Simplified version for testing photon conservation.
-    ! - sub-timesteps
-    ! - H only, one frequency range
-    ! - Cooling curve
-
-    ! Changes
-    ! 30 Jul 2004: the initial value for the internal energy is
-    !              now calculated with the initial ionization
-    !              fractions (xh0). The final with the final (xh), 
-    !              and the intermediate temperatures with the average
-    !              value (xh_av).
-    ! 29 Jul 2004: call to electrondens was wrong. This function needs
-    !              density and ionization fraction.
-
-    !real(kind=dp),parameter :: minitemp=1.0_dp ! minimum temperature
-    ! fraction of the cooling time step below which no iteration is done
-    !real(kind=dp),parameter :: relative_denergy=0.1_dp    
-
-    real(kind=dp),intent(in) :: dt
-    real(kind=dp),intent(inout) :: temper
-    real(kind=dp),intent(out) :: avg_temper
-    real(kind=dp),intent(in) :: rhe,rhh !*,xh(0:1),xh_av(0:1),xh0(0:1)
-!*    real(kind=dp),intent(in) :: xhe(0:2),xhe_av(0:2),xhe0(0:2)
-
-    type(photrates),intent(in) :: phi
-!*TEST
+    ! The time step
+    real(kind=dp), intent(in) :: dt
+    ! end time temperature of the cell
+    real(kind=dp), intent(inout) :: end_temper
+    ! average temperature of the cell
+    real(kind=dp), intent(out) :: avg_temper
+    ! Electron density of the cell
+    real(kind=dp), intent(in) :: ndens_electron
+    ! Number density of atoms of the cell
+    real(kind=dp), intent(in) :: ndens_atom
+    ! Photoionization rate and heating rate
+    type(photrates), intent(in) :: phi
+    ! Ionized fraction of the cell
     type(ionstates), intent(in) :: ion
-!*****
+    ! mesh position of cell 
+    !integer, intent(in) :: pos
+ 
+    ! initial temperature
+    real(kind=dp) :: initial_temp
+    ! timestep taken to solve the ODE
+    real(kind=dp) :: dt_ODE
+    ! timestep related to thermal timescale
+    real(kind=dp) :: dt_thermal
+    ! record the time elapsed
+    real(kind=dp) :: cumulative_time
+    ! internal energy of the cell
+    real(kind=dp) :: internal_energy
+    ! thermal timescale, used to calculate the thermal timestep
+    real(kind=dp) :: thermal_timescale
+    ! heating rate
+    real(kind=dp) :: heating
+    ! cooling rate
+    real(kind=dp) :: cooling
+    ! difference of heating and cooling rate
+    real(kind=dp) :: thermal_rate
+    ! cosmological cooling rate
+    real(kind=dp) :: cosmo_cool_rate
+    ! Counter of number of thermal timesteps taken
+    integer :: i_heating
 
-    real(kind=dp) :: temper0
-    real(kind=dp) :: dt0,dt1,timestep,e_int,dt_thermal,eplus
-    real(kind=dp) :: emin,eplush,eplushe0,eplushe1,thermalrt,cosmo_cool_rate
-    integer :: nstep,nstepmax
-
-    ! Photo-ionization heating
-    ! GM/121115: This is the total heating rate including H, He0, He1 and
-    ! secondary heating. See radiation module,  subroutine  lookuptable
-    ! where the total heating variable fheat is defined and then put into
-    ! phi%hv_h. We should probably change this, or the variable names.
-    eplush=phi%hv_h
-
-    !eplushe0=phi%hv_he(0)
-    !eplushe1=phi%hv_he(1)
-
-    eplus=eplush ! +eplushe0+eplushe1  (3.4e-13)*(temp0/1e4).^-0.60
+    ! heating rate
+    heating = phi%heat
 
     ! Find initial internal energy
-!Change to the old here!
-    e_int=temper2pressr(temper,rhh,electrondens(rhh,ion%h_old, ion%he_old))/ &
-         (gamma1)
+    internal_energy = temper2pressr(end_temper,ndens_atom, &
+         electrondens(ndens_atom,ion%h_old,ion%he_old))/(gamma1)
+    !internal_energy = temper2pressr(end_temper,ndens_atom,electrondens(ndens_atom,ion%begin_HII, &
+    !                                ion%begin_HeII,ion%begin_HeIII))/(gamma1)
 
-     ! write(*,*) e_int,eplus,phi%h
-
-!    if (cosmological) then
+    ! Set the cosmological cooling rate
+    if (cosmological) then
        ! Disabled for testing
-!       cosmo_cool_rate=cosmo_cool(e_int)
-!    else
+       cosmo_cool_rate=cosmo_cool(internal_energy)
+    else
        cosmo_cool_rate=0.0
-!    endif
+    endif
 
-    ! Do nothing if temperature is below minitemp
+    ! Thermal process is only done if the temperature of the cell 
+    ! is larger than the minimum temperature requirement
+    if (end_temper.gt.minitemp) then
 
-    if (temper.gt.minitemp) then
-       !
-       ! Do the cooling/heating.
-       ! First figure out the cooling/heating rate (thermalrt) 
-       ! and corresponding time step (dt_thermal). Then take
-       ! a fraction relative_denergy of this time step if the real time step
-       ! is larger than this. Loop through this until we reach
-       ! the full time step (dt).
-       ! We are effectively following the cooling curve here.
-       ! Along the way we collect the temperatures passed so
-       ! that an average temperature (avg_temper) can be calculated.
-       !
-       dt0=dt          
-       dt1=dt
-       timestep=0.0    ! stores how much of time step is done
-       nstep=0         ! counter
-       avg_temper=0.0  ! initialize time averaged temperature
-       temper0=temper  ! initial temperature
+       ! stores the time elapsed is done
+       cumulative_time = 0.0 
+   
+       ! initialize the counter
+       i_heating = 0
+
+       ! initialize time averaged temperature
+       avg_temper = 0.0 
+
+       ! initial temperature
+       initial_temp = end_temper  
+
+       ! thermal process begins
        do
+
           ! update counter              
-          nstep=nstep+1 
+          i_heating = i_heating+1 
          
-          ! Find cooling rate (using average ionization fraction)
-          !emin=min(1d-50,1e-8*eplus)!
-
-          emin=coolin(rhh,rhe,ion%h_av, ion%he_av, temper)
-
-          emin=emin+cosmo_cool_rate
+          ! update cooling rate from cooling tables
+          cooling = coolin(ndens_atom,ndens_electron,ion%h_av,ion%he_av, &
+               end_temper)+cosmo_cool_rate
+          !cooling = coolin(ndens_atom,ndens_electron,ion%avg_HI,ion%avg_HII,ion%avg_HeI,ion%avg_HeII,&
+          !                 ion%avg_HeIII, end_temper)+cosmo_cool_rate
 
           ! Find total energy change rate
-          thermalrt=max(1d-50,abs(emin-eplus))
+          thermal_rate = max(1d-50,abs(cooling-heating))
 
-          ! Calculate thermal time
-          dt_thermal=e_int/abs(thermalrt)
+          ! Calculate thermal time scale
+          thermal_timescale = internal_energy/abs(thermal_rate)
+
           ! Calculate time step needed to limit energy change
           ! to a fraction relative_denergy
-          dt1=relative_denergy*dt_thermal
-          ! Time step to large, change it to dt1
+          dt_thermal = relative_denergy*thermal_timescale
+
+          ! Time step to large, change it to dt_thermal
           ! Make sure we do not integrate for longer than the
-          ! total time step dtcgs
-          dt0=min(dt1,dt-timestep)
+          ! total time step
+          dt_ODE = min(dt_thermal,dt-cumulative_time)
+
           ! Find new internal energy density
-          e_int=e_int+dt0*(eplus-emin)
-          ! Update avg_temper sum (first part of dt1 sub time step)
-          avg_temper=avg_temper+0.5*temper*dt0
+          internal_energy = internal_energy+dt_ODE*(heating-cooling)
+
+          ! Update avg_temper sum (first part of dt_thermal sub time step)
+          avg_temper = avg_temper+0.5*end_temper*dt_ODE
+
           ! Find new temperature from the internal energy density
-          temper=pressr2temper(e_int*gamma1,rhh,electrondens(rhh,ion%h_av, ion%he_av))
-          ! Update avg_temper sum (second part of dt1 sub time step)
-          avg_temper=avg_temper+0.5*temper*dt0
-          
-          
+          end_temper = pressr2temper(internal_energy*gamma1,ndens_atom, &
+               electrondens(ndens_atom,ion%h_av,ion%he_av))
+          !end_temper = pressr2temper(internal_energy*gamma1,ndens_atom,electrondens(ndens_atom,&
+          !                           ion%avg_HII,ion%avg_HeII,ion%avg_HeIII))
+
+          ! Update avg_temper sum (second part of dt_thermal sub time step)
+          avg_temper = avg_temper+0.5*end_temper*dt_ODE
+                    
           ! Take measures if temperature drops below minitemp
-          if (temper.lt.minitemp) then
-             e_int=temper2pressr(minitemp,rhh,electrondens(rhh,ion%h_av,ion%he_av))
-             temper=minitemp
+          if (end_temper.lt.minitemp) then
+             internal_energy = temper2pressr(minitemp,ndens_atom, &
+                  electrondens(ndens_atom,ion%h_av,ion%he_av))
+             !internal_energy = temper2pressr(minitemp,ndens_atom,electrondens(ndens_atom,ion%avg_HII,&
+             !                                ion%avg_HeII,ion%avg_HeIII))
+             end_temper = minitemp
           endif
                     
-          ! Update fractional timestep
-          timestep=timestep+dt0
+          ! Update fractional cumulative_time
+          cumulative_time = cumulative_time+dt_ODE
   
           ! Exit if we reach dt
-          ! Mind fp precision here, so check for nearness
-          if (timestep.ge.dt.or.abs(timestep-dt).lt.1e-6*dt) exit
-          	if (nstep.gt.10000)  then
-          	write(nstep) 
-          	exit
-          	endif
-          	
-     	
-       enddo
-       
+          if (cumulative_time.ge.dt.or.abs(cumulative_time-dt).lt.1e-6*dt) exit
 
-       
-       ! Calculate time averaged temperature
+          ! In case we spend too much time here, we exit
+          if (i_heating.gt.10000) exit
+        	     	
+       enddo
+              
+       ! Calculate the averaged temperature
        if (dt.gt.0.0) then
-          avg_temper=avg_temper/dt
+          avg_temper = avg_temper/dt
        else
-          avg_temper=temper0
+          avg_temper = initial_temp
        endif
        
-       !write(*,*) '--'
-       !write(*,*) e_int,rhh,gamma1
-       !pause
-       ! Calculate temperature with final ionization fractions
-       temper=pressr2temper(e_int*gamma1,rhh,electrondens(rhh,ion%h,ion%he))
+       ! Calculate the final temperature 
+       end_temper = pressr2temper(internal_energy*gamma1,ndens_atom, &
+            electrondens(ndens_atom,ion%h,ion%he))
+       !end_temper = pressr2temper(internal_energy*gamma1,ndens_atom,electrondens(ndens_atom,&
+       !                           ion%end_HII,ion%end_HeII,ion%end_HeIII))
        
     endif
     

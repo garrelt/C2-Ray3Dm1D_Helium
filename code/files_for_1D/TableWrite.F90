@@ -29,9 +29,13 @@ Program C2Ray
   use file_admin, only: stdinput, logf, file_input, flag_for_file_input
   use my_mpi !, only: mpi_setup, mpi_end, rank
   use radiation, only: rad_ini
-  use radiation, only: hphotint,hphotintthin,photint,photintthin
-  use radiation, only: pl_hphotint,pl_hphotintthin,pl_photint,pl_photintthin
-
+  !use radiation, only: hphotint,hphotintthin,photint,photintthin
+  !use radiation, only: pl_hphotint,pl_hphotintthin,pl_photint,pl_photintthin
+  use radiation, only: bb_photo_thick_table, bb_photo_thin_table
+  use radiation, only: pl_photo_thick_table, pl_photo_thin_table
+  use radiation, only: bb_heat_thick_table, bb_heat_thin_table
+  use radiation, only: pl_heat_thick_table, pl_heat_thin_table
+ 
 #ifdef XLF
   ! Place for xlf specific statements
 #endif
@@ -78,44 +82,65 @@ Program C2Ray
   call rad_ini ( )
 
   ! Write tables to file
-  open(unit=101,file="photint.bin",form="unformatted",status="new")
-  write(101) shape(photint)
-  write(101) photint
+  ! open(unit=101,file="photint.bin",form="unformatted",status="new")
+  ! write(101) shape(photint)
+  ! write(101) photint
+  ! close(101)
+
+  ! open(unit=101,file="hphotint.bin",form="unformatted",status="new")
+  ! write(101) shape(hphotint)
+  ! write(101) hphotint
+  ! close(101)
+
+  ! open(unit=101,file="photintthin.bin",form="unformatted",status="new")
+  ! write(101) shape(photintthin)
+  ! write(101) photintthin
+  ! close(101)
+
+  ! open(unit=101,file="hphotintthin.bin",form="unformatted",status="new")
+  ! write(101) shape(hphotintthin)
+  ! write(101) hphotintthin
+  ! close(101)
+
+  ! open(unit=101,file="pl_photint.bin",form="unformatted",status="new")
+  ! write(101) shape(pl_photint)
+  ! write(101) pl_photint
+  ! close(101)
+
+  ! open(unit=101,file="pl_hphotint.bin",form="unformatted",status="new")
+  ! write(101) shape(pl_hphotint)
+  ! write(101) pl_hphotint
+  ! close(101)
+
+  ! open(unit=101,file="pl_photintthin.bin",form="unformatted",status="new")
+  ! write(101) shape(pl_photintthin)
+  ! write(101) pl_photintthin
+  ! close(101)
+
+  ! open(unit=101,file="pl_hphotintthin.bin",form="unformatted",status="new")
+  ! write(101) shape(pl_hphotintthin)
+  ! write(101) pl_hphotintthin
+  ! close(101)
+
+  ! Write tables to file
+  open(unit=101,file="bb_photo_thin_table.bin",form="unformatted",status="new")
+  write(101) shape(bb_photo_thin_table)
+  write(101) bb_photo_thin_table
   close(101)
 
-  open(unit=101,file="hphotint.bin",form="unformatted",status="new")
-  write(101) shape(hphotint)
-  write(101) hphotint
+  open(unit=101,file="bb_photo_thick_table.bin",form="unformatted",status="new")
+  write(101) shape(bb_photo_thick_table)
+  write(101) bb_photo_thick_table
   close(101)
 
-  open(unit=101,file="photintthin.bin",form="unformatted",status="new")
-  write(101) shape(photintthin)
-  write(101) photintthin
+  open(unit=101,file="bb_heat_thin_table.bin",form="unformatted",status="new")
+  write(101) shape(bb_heat_thin_table)
+  write(101) bb_heat_thin_table
   close(101)
 
-  open(unit=101,file="hphotintthin.bin",form="unformatted",status="new")
-  write(101) shape(hphotintthin)
-  write(101) hphotintthin
-  close(101)
-
-  open(unit=101,file="pl_photint.bin",form="unformatted",status="new")
-  write(101) shape(pl_photint)
-  write(101) pl_photint
-  close(101)
-
-  open(unit=101,file="pl_hphotint.bin",form="unformatted",status="new")
-  write(101) shape(pl_hphotint)
-  write(101) pl_hphotint
-  close(101)
-
-  open(unit=101,file="pl_photintthin.bin",form="unformatted",status="new")
-  write(101) shape(pl_photintthin)
-  write(101) pl_photintthin
-  close(101)
-
-  open(unit=101,file="pl_hphotintthin.bin",form="unformatted",status="new")
-  write(101) shape(pl_hphotintthin)
-  write(101) pl_hphotintthin
+  open(unit=101,file="bb_heat_thick_table.bin",form="unformatted",status="new")
+  write(101) shape(bb_heat_thick_table)
+  write(101) bb_heat_thick_table
   close(101)
 
   ! Report clocks (cpu and wall)

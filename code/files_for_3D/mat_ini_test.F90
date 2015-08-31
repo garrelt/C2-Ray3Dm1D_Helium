@@ -12,7 +12,7 @@ module material
   use my_mpi
   use grid, only: dr,vol,sim_volume
   use cgsconstants, only: m_p,ini_rec_colion_factors, c
-  use cgsphotoconstants, only: sigh
+  use cgsphotoconstants, only: sigma_HI_at_ion_freq
   use astroconstants, only: M_solar, Mpc
   use cosmology_parameters, only: Omega_B, Omega0, rho_crit_0, h, H0
   use nbody, only: nbody_type, NumZred, Zred_array
@@ -20,6 +20,7 @@ module material
   use abundances, only: mu
   use c2ray_parameters, only: type_of_clumping, clumping_factor, epsilon
   use c2ray_parameters, only: type_of_LLS
+  use c2ray_parameters, only: cosmological
 
   implicit none
 
@@ -37,7 +38,7 @@ module material
     public :: set_clumping, clumping_point
   ! LLS data
   real(kind=dp),parameter :: opdepth_LL = 2.0 !< typical optical depth of LLS
-  real(kind=dp),parameter :: N_1 = opdepth_LL / sigh !< typical column density of LLS
+  real(kind=dp),parameter :: N_1 = opdepth_LL /  sigma_HI_at_ion_freq !< typical column density of LLS
   real(kind=dp),public :: n_LLS
   real(kind=dp),public :: coldensh_LLS = 0.0_dp ! Column density of LLSs per cell
   real(kind=dp),public :: mfp_LLS_pMpc
@@ -234,8 +235,16 @@ contains
     real(kind=dp) :: avg_dens
     integer :: m1,m2,m3
 
-    ! Assign density to the grid (average density at this redshift)
-    avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3
+    ! Calculate average density
+    if (cosmological) then
+       ! average density at this redshift
+       avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3
+    else
+       ! average density at the initial redshift (z=zred_array(1) )
+       avg_dens=rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_array(1))**3
+    endif
+
+    ! Assign density to the grid
     do k=1,mesh(3)
        do j=1,mesh(2)
           do i=1,mesh(1)
@@ -243,12 +252,12 @@ contains
           enddo
        enddo
     enddo
-    write(*,*) 'avgdens', avg_dens
+
     ! Report density field properties
     if (rank == 0) then
        write(logf,*) "Raw density diagnostics (cm^-3)"
-       write(logf,"(A,1pe10.3,A)") "Average density = ",avg_dens," cm^-3"
-       write(logf,"(A,1pe10.3,A)") "(at z=0 : ", &
+       write(logf,"(A,es10.3,A)") "Average density = ",avg_dens," cm^-3"
+       write(logf,"(A,es10.3,A)") "(at z=0 : ", &
             rho_crit_0*Omega_B/(mu*m_p), &
             " cm^-3)"
     endif
@@ -361,6 +370,42 @@ contains
   end subroutine xfrac_ini
 
   ! ===========================================================================
+  
+  subroutine protect_ionization_fractions(xfrac,lowfrac,highfrac,ifraction, &
+       name)
+
+    integer,intent(in) :: lowfrac
+    integer,intent(in) :: highfrac
+    integer,intent(in) :: ifraction
+    real(kind=dp),dimension(mesh(1),mesh(2),mesh(3),lowfrac:highfrac), &
+         intent(inout) :: xfrac
+    character(len=*) :: name
+
+    integer :: i,j,k
+
+    ! Check the fractions for negative values
+    do k=1,mesh(3)
+       do j=1,mesh(2)
+          do i=1,mesh(1)
+             if (xfrac(i,j,k,ifraction) < 0.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' < 0 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=0.0_dp
+             endif
+             if (xfrac(i,j,k,ifraction) > 1.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' > 1 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=1.0_dp
+             endif
+          enddo
+       enddo
+    enddo
+    
+  end subroutine protect_ionization_fractions
+
+  ! ===========================================================================
 
   subroutine temper_ini (zred_now)
 
@@ -385,7 +430,7 @@ contains
        if (rank == 0) then
           write(zred_str,"(f6.3)") zred_now
           temper_file= trim(adjustl(results_dir))// &
-               "temper3d_"//trim(adjustl(zred_str))//".bin"
+               "Temper3D_"//trim(adjustl(zred_str))//".bin"
           
           write(unit=logf,fmt="(2A)") "Reading temperature from ", &
                trim(temper_file)
@@ -398,9 +443,14 @@ contains
              write(logf,*) "WARNING: file with temperatures unusable, as"
              write(logf,*) "mesh found in file: ",m1,m2,m3
           else
-             read(20) temperature_grid
+             read(20) temperature_grid(:,:,:,0)
           endif
           
+          ! Fill the other parts of the temperature grid array
+          ! See evolve for their use
+          temperature_grid(:,:,:,1)=temperature_grid(:,:,:,0)
+          temperature_grid(:,:,:,2)=temperature_grid(:,:,:,0)
+
           ! close file
           close(20)
        endif
@@ -606,7 +656,7 @@ contains
 
     if (rank == 0) then
        write(logf,*) "Average optical depth per cell due to LLSs: ", &
-            coldensh_LLS*sigh,"(type ", type_of_LLS,")"
+            coldensh_LLS*sigma_HI_at_ion_freq,"(type ", type_of_LLS,")"
        write(logf,*) "Mean free path (pMpc): ", mfp_LLS_pMpc
     endif
     

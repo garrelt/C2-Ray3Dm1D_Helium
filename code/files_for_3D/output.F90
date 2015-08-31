@@ -23,14 +23,12 @@ module output_module
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
-  use evolve, only: phih_grid
-  use sourceprops, only: srcpos, NormFlux, NumSrc
+  use evolve_data, only: phih_grid, phiheat
+  use sourceprops, only: srcpos
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
   use photonstatistics, only: photon_loss, grtotal_src
   use photonstatistics, only: initialize_photonstatistics
-  use radiation, only: teff,rstar,lstar,S_star
-
 
   implicit none
   
@@ -156,13 +154,35 @@ contains
     ! Set photon conservation flag to zero on all processors
     photcons_flag=0
 
+#ifdef MPILOG     
+     write(logf,*) 'output 1'
+#endif 
     if (streams(1) == 1) call write_stream1 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 2'
+#endif 
     if (streams(2) == 1) call write_stream2 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 3'
+#endif 
     if (streams(3) == 1) call write_stream3 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 4'
+#endif 
     if (streams(4) == 1) call write_stream4 (zred_now)
+#ifdef MPILOG     
+     write(logf,*) 'output 5'
+#endif 
     if (streams(5) == 1) call write_stream5 (zred_now)
 
+#ifdef MPILOG     
+     write(logf,*) 'output 6'
+#endif 
     call write_photonstatistics (zred_now,time,dt,photcons_flag)
+
+#ifdef MPILOG     
+     write(logf,*) 'output 7'
+#endif 
 
   end subroutine output
 
@@ -193,7 +213,7 @@ contains
           ! Write data
           if (.not.isothermal) then
              do i=1,mesh(1)
-                write(51,"(7(1pe10.3,1x))")  &
+                write(51,"(7(es10.3,1x))")  &
                      xh(i,srcpos(2,1),srcpos(3,1),0), &
                      xh(i,srcpos(2,1),srcpos(3,1),1), &
                      ndens(i,srcpos(2,1),srcpos(3,1)), &
@@ -204,7 +224,7 @@ contains
              enddo
           else
              do i=1,mesh(1)
-                write(51,"(7(1pe10.3,1x))")  &
+                write(51,"(7(es10.3,1x))")  &
                      xh(i,srcpos(2,1),srcpos(3,1),0), &
                      xh(i,srcpos(2,1),srcpos(3,1),1), &
                      ndens(i,srcpos(2,1),srcpos(3,1)), &
@@ -314,8 +334,17 @@ contains
                   j=1,mesh(2)),k=1,mesh(3))
              close(153)
 
+#ifdef MPILOG     
+             write(logf,*) 'output 3: temper3d'
+             flush(logf)
+#endif 
           endif
 
+#ifdef MPILOG
+          write(logf,*) allocated(phih_grid)
+          write(logf,*) 'shape phih_grid: ',shape(phih_grid)
+          flush(logf)
+#endif 
           write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"IonRates3D_"// &
                trim(adjustl(file1))//base_extension
@@ -326,6 +355,20 @@ contains
                k=1,mesh(3))
           close(53)
 
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(phiheat(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+#ifdef MPILOG     
+          write(logf,*) 'output 3: IonRates3D'
+          flush(logf)
+#endif 
        else
           ! Report error
           write(logf,*) "Calling stream 3 output where we should not."
@@ -460,36 +503,11 @@ contains
     if (rank == 0) then
        ! Check if we are tracking photon conservation
        if (do_photonstatistics) then
-          ! Photon Statistics
-          ! total_ion is the total number of new ionization, plus
-          ! the total number of recombinations, and here is also
-          ! added the number of photons lost from the grid. Since
-          ! this number was divided by the number of cells, we
-          ! multiply by this again.
-          total_photon_loss=sum(photon_loss)*dt* &
-               real(mesh(1))*real(mesh(2))*real(mesh(3))
-          !total_ion=total_ion + total_photon_loss
-          totalsrc=sum(NormFlux(1:NumSrc))*s_star*dt
-          photcons=(total_ion-totcollisions)/totalsrc
-          !PhotonCounts: time
-          !              Number of (ionizations + recombinations) / photons 
-          !                   during time step
-          !              Number of ionizations /(ionizations + recombinations)
-          !              Number of recombinations /(ionizations + recombinations)
-          !              Number of (ionizations + recombinations) / photons 
-          !              Number of (ionizations + recombinations) / photons 
-          !                   since t=0
-          if (time > 0.0) then
-             !write(90,"(f6.3,8(1pe10.3))") &
-             !     zred_now, &
-             !     total_ion, totalsrc, &
-             !     photcons, &
-             !     (dh0+dhe0+dhe2)/total_ion, &
-             !     totrec/total_ion, &
-             !     total_photon_loss/totalsrc, &
-             !     totcollisions/total_ion, &
-             !     grtotal_ion/grtotal_src
-          endif
+          ! Before we were calculating photon conservation here
+          ! and writing to the PhotonCounts.out file. This is
+          ! now done in the photonstatistics module.
+          ! Here we only report average ionization fractions
+
           totions=sum(ndens(:,:,:)*(xhe(:,:,:,2)*2.0_dp+xhe(:,:,:,1)+xh(:,:,:,1)))*vol
           volfrac(0)=sum(xh(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3))
           volfrac(1)=sum(xhe(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3))
@@ -497,17 +515,17 @@ contains
           massfrac(0)=sum(xh(:,:,:,1)*ndens(:,:,:) ) /sum(real(ndens,dp))
           massfrac(1)=sum(xhe(:,:,:,1)*ndens(:,:,:) ) /sum(real(ndens,dp))
           massfrac(2)=sum(xhe(:,:,:,2)*ndens(:,:,:) ) /sum(real(ndens,dp))
-          write(95,"(f6.3,8(1pe10.3))") zred_now,totions,grtotal_src, &
+          write(95,"(f6.3,8(es10.3))") zred_now,totions,grtotal_src, &
                volfrac,massfrac
 
-          photcons_flag=0
 !*** for the moment, I turn that off, until I checked, how I calculate those quantities.
+          photcons_flag=0
           !if (abs(1.0-photcons) > 0.15) then
              !if ((1.0-photcons) > 0.15 .and. &
               !    total_photon_loss/totalsrc < (1.0-photcons) ) then
               !  photcons_flag=1
                 ! Report photon conservation
-              !  write(logf,"(A,2(1pe10.3,x))") &
+              !  write(logf,"(A,2(es10.3,x))") &
                   !   "Photon conservation problem: ", &
                     ! photcons, total_photon_loss/totalsrc
 

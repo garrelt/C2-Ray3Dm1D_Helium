@@ -130,9 +130,9 @@ Program C2Ray
   ! Loop until end time is reached
   do nstep=1,number_timesteps!-1
 
- 	sim_time=timess(nstep) 
-  	dt=sim_time-timess(nstep-1)
-  	actual_dt=dt
+     sim_time=timess(nstep) 
+     dt=sim_time-timess(nstep-1)
+     actual_dt=dt
      ! Write output
      !	if (mod(nstep,outputsteps).lt.1.0) then
      !   	call output(nstep,sim_time,dt,end_time)
@@ -151,7 +151,7 @@ Program C2Ray
 
 !     nstep=nstep+1
      ! Report time and time step
-     write(logf,'(A,2(1pe10.3,1x),A)') 'Time, dt:', &
+     write(logf,'(A,2(es10.3,1x),A)') 'Time, dt:', &
           sim_time/YEAR,actual_dt/YEAR,' (years)'
 !     write(48,*) '0', nstep 
      ! For cosmological simulations evolve proper quantities
@@ -162,11 +162,10 @@ Program C2Ray
 
      ! Take one time step
      call evolve1D(actual_dt)
-
-     	if (mod(nstep,outputsteps).lt.1.0) then
-        	call output(nstep,sim_time,dt,end_time)
-        	write(50,*) sim_time/YEAR
-        endif
+     if (mod(nstep,outputsteps).lt.1.0) then
+        call output(nstep,sim_time,dt,end_time)
+        write(50,*) sim_time/YEAR
+     endif
 
      sim_time=sim_time+actual_dt     ! Update time  
 !     if (abs(sim_time-end_time).lt.1e-6*end_time) exit     

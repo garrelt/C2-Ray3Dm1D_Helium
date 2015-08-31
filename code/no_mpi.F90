@@ -21,15 +21,10 @@ module my_mpi
 
 #ifdef IFORT
   USE IFPORT, only: hostnm, flush
-#ifdef MY_OPENMP
-  USE OMP_LIB, only: omp_get_num_threads, omp_get_thread_num
-#endif
 #endif
   
-#ifdef GFORT
 #ifdef MY_OPENMP
   USE OMP_LIB, only: omp_get_num_threads, omp_get_thread_num
-#endif
 #endif
 
   implicit none
@@ -69,9 +64,10 @@ contains
   subroutine mpi_setup ( )
 
     character(len=512) :: filename        ! name of the log file
-    character(len=4) :: number
     integer :: ierror
+#ifdef MY_OPENMP
     integer :: tn
+#endif
     character(len=100) :: hostname
 
     call mpi_basic ()
@@ -100,12 +96,13 @@ contains
     nthreads=omp_get_num_threads()
 #endif
     !$omp end parallel
-!#ifdef MY_OPENMP
-    write(logf,*) ' Number of OpenMP threads is ',nthreads
-!#endif
+#ifdef MY_OPENMP
+    write(logf,*) ' The code was compiled for OpenMP'
+    write(logf,*) ' Number of OpenMP threads used is ',nthreads
+#endif
 
     ! Let OpenMP threads report
-    !$omp parallel default(private)
+    !$omp parallel default(shared) private(tn)
 #ifdef MY_OPENMP
     tn=omp_get_thread_num()+1
     write(logf,*) 'Thread number ',tn,' reporting'

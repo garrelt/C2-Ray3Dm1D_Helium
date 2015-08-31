@@ -12,7 +12,7 @@ module material
   use my_mpi
   use grid, only: dr,vol,sim_volume
   use cgsconstants, only: m_p,ini_rec_colion_factors, c
-  use cgsphotoconstants, only: sigh
+  use cgsphotoconstants, only: sigma_HI_at_ion_freq
   use astroconstants, only: M_solar, Mpc
   use cosmology_parameters, only: Omega_B, Omega0, rho_crit_0, h, H0
   use nbody, only: nbody_type, M_grid, M_particle, id_str, dir_dens, NumZred, Zred_array, dir_clump, dir_LLS
@@ -22,8 +22,6 @@ module material
   use nbody, only: density_convert_particle, density_convert_grid, density_unit
   use abundances, only: mu, abu_he
   use c2ray_parameters, only: type_of_clumping,clumping_factor, cosmological, type_of_LLS
-
-  
 
   implicit none
 
@@ -48,7 +46,7 @@ module material
   public :: set_clumping, clumping_point
   ! LLS data
   real(kind=dp),parameter :: opdepth_LL = 2.0 !< typical optical depth of LLS
-  real(kind=dp),parameter :: N_1 = opdepth_LL / sigh !< typical column density of LLS
+  real(kind=dp),parameter :: N_1 = opdepth_LL / sigma_HI_at_ion_freq !< typical column density of LLS
   real(kind=dp),public :: n_LLS
   real(kind=dp),public :: coldensh_LLS = 0.0_dp ! Column density of LLSs per cell
   real(kind=dp),public :: mfp_LLS_pMpc
@@ -133,17 +131,16 @@ contains
           read(stdinput,*) temper_val
           
           if (.not.file_input) &
-              write(*,"(A,$)") "isothermal? y/n: "
-              
+               write(*,"(A,$)") "isothermal? y/n: "
           read(stdinput,*) isothermal_answer
           if (isothermal_answer.eq.'n')then
-                  isothermal=.false.
+             isothermal=.false.
           elseif (isothermal_answer.eq.'y') then
-                  isothermal=.true.
+             isothermal=.true.
           else 
-                  write(*,"(A,$)") "mistake you should write y or n" 
-                  write(*,"(A,$)") ' '
-                  call exit(0)                
+             write(*,"(A,$)") "mistake you should write y or n" 
+             write(*,"(A,$)") ' '
+             call exit(0)                
           endif
                     
           if (.not.file_input) write(*,"(A,$)") "Restart (y/n)? : "
@@ -206,12 +203,14 @@ contains
        ! Allocate ionization fraction arrays
        allocate(xh(mesh(1),mesh(2),mesh(3),0:1))
        allocate(xhe(mesh(1),mesh(2),mesh(3),0:2))
-       ! Assign ionization fractions (completely neutral)
+       ! Assign ionization fractions. For z = 40 - 20 RECFAST gives 
+       ! an average ionization fraction of about 2e-4 for H and
+       ! 1e-15 for He. We use this here.
        ! In case of a restart this will be overwritten in xfrac_ini
-       xh(:,:,:,0)=1.0
-       xh(:,:,:,1)=0.0
-       xhe(:,:,:,0)=1.0
-       xhe(:,:,:,1)=0.0
+       xh(:,:,:,1)=2e-4
+       xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
+       xhe(:,:,:,1)=1e-15_dp
+       xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)
        xhe(:,:,:,2)=0.0
        ! Initialize LLS parametets
        call LLS_init ()       
@@ -340,11 +339,11 @@ contains
        write(logf,*) "Raw density diagnostics (cm^-3)"
        write(logf,*) "minimum density: ",minval(ndens)
        write(logf,*) "maximum density: ",maxval(ndens)
-       write(logf,"(A,1pe10.3,A)") "Average density = ",avg_dens," cm^-3"
-       write(logf,"(A,1pe10.3,A)") "Theoretical value = ", &
+       write(logf,"(A,es10.3,A)") "Average density = ",avg_dens," cm^-3"
+       write(logf,"(A,es10.3,A)") "Theoretical value = ", &
             rho_crit_0*Omega_B/(mu*m_p)*(1.0+zred_now)**3, &
             " cm^-3" 
-       write(logf,"(A,1pe10.3,A)") "(at z=0 : ", &
+       write(logf,"(A,es10.3,A)") "(at z=0 : ", &
             rho_crit_0*Omega_B/(mu*m_p), &
             " cm^-3)"
     endif
@@ -457,6 +456,41 @@ contains
   end subroutine xfrac_ini
 
   ! ===========================================================================
+  
+  subroutine protect_ionization_fractions(xfrac,lowfrac,highfrac,ifraction, &
+       name)
+
+    integer,intent(in) :: lowfrac
+    integer,intent(in) :: highfrac
+    integer,intent(in) :: ifraction
+    real(kind=dp),dimension(mesh(1),mesh(2),mesh(3),lowfrac:highfrac), &
+         intent(inout) :: xfrac
+    character(len=*) :: name
+
+    integer :: i,j,k
+
+    ! Check the fractions for negative values
+    do k=1,mesh(3)
+       do j=1,mesh(2)
+          do i=1,mesh(1)
+             if (xfrac(i,j,k,ifraction) < 0.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' < 0 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=0.0_dp
+             endif
+             if (xfrac(i,j,k,ifraction) > 1.0d0) then
+#ifdef MPILOG
+                write(logf,*) name,' > 1 at ',i,j,k,xfrac(i,j,k,ifraction)
+#endif
+                xfrac(i,j,k,ifraction)=1.0_dp
+             endif
+          enddo
+       enddo
+    enddo
+    
+  end subroutine protect_ionization_fractions
+
   ! ===========================================================================
 
   subroutine temper_ini (zred_now)
@@ -486,7 +520,7 @@ contains
           
           write(unit=logf,fmt="(2A)") "Reading temperature from ", &
                trim(temper_file)
-          ! Open ionization fractions file
+          ! Open temperature file
           open(unit=20,file=temper_file,form="unformatted",status="old")
           
           ! Read in data
@@ -497,10 +531,12 @@ contains
           else
              read(20) temperature_grid(:,:,:,0)
           endif
-          ! Fill the other parts of the temperature_grid array
-          ! See evolve for what they are used for
+          
+          ! Fill the other parts of the temperature grid array
+          ! See evolve for their use
           temperature_grid(:,:,:,1)=temperature_grid(:,:,:,0)
           temperature_grid(:,:,:,2)=temperature_grid(:,:,:,0)
+
           ! close file
           close(20)
        endif
@@ -812,7 +848,7 @@ contains
 
     if (rank == 0) then
        write(logf,*) "Average optical depth per cell due to LLSs: ", &
-            coldensh_LLS*sigh,"(type ", type_of_LLS,")"
+            coldensh_LLS*sigma_HI_at_ion_freq,"(type ", type_of_LLS,")"
        write(logf,*) "Mean free path (pMpc): ", mfp_LLS_pMpc
     endif
     

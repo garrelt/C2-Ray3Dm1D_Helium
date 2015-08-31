@@ -14,6 +14,8 @@ module c2ray_parameters
   ! This module collects parameters needed by C2-Ray
 
   use precision, only: dp
+  use cgsconstants, only: ev2fr
+  use cgsphotoconstants, only: ion_freq_HeII
   use astroconstants, only: YEAR
   use sizes, only: mesh
 
@@ -30,20 +32,23 @@ module c2ray_parameters
   real(kind=dp),parameter :: epsilon=1.0e-20_dp
 
   !> Convergence criterion for per source calculation (evolve0d)
-  real(kind=dp),parameter :: convergence1=1.0e-3
+  !real(kind=dp),parameter :: minimum_fractional_change = 1.0e-3
+  real(kind=dp),parameter :: minimum_fractional_change = 1.0e-2
 
   !> Convergence criterion for global calculation (evolve0d)
-  real(kind=dp),parameter :: convergence2=1.0e-2
+  real(kind=dp),parameter :: convergence2 = 1.0e-2
+  real(kind=dp),parameter :: LTE_fractional_change = 1.0e-0
+  real(kind=dp),parameter :: minimum_fraction_of_photons = 1.0e-3
 
   !> Convergence criterion for neutral fraction (evolve4_periodic)
-  real(kind=dp),parameter :: convergence_frac=1.0e-8
+  real(kind=dp),parameter :: minimum_fraction_of_atoms=1.0e-8
   real(kind=dp),parameter :: convergence_frac2=1.0e-6
 
   !> Size increase of subboxes around sources (evolve4_periodic)
   !! If 10, we do 10^3, 20^3, 30^3 cubes around a source until
   !! no photons escape or we reach the edge of the (possibly periodic)
   !! grid
-  integer,parameter :: subboxsize=mesh(1)
+  integer,parameter :: subboxsize=10
 
   !> The maximum number	of cells on EITHER side	of the	source for which
   !! ray tracing is done. This	is a very crude	mean free path parameter
@@ -56,18 +61,46 @@ module c2ray_parameters
   !> Parameters for nominal SED (BB)
   !> Effective temperature (K); if set to zero, the code will ask
   !! for SED parameters
-  real(kind=dp),parameter :: teff_nominal=5.0e4
+  real(kind=dp),parameter :: T_eff_nominal=5.0e4
   !> Number of ionizing photons / second
-  real(kind=dp),parameter :: s_star_nominal=1e48_dp 
+  real(kind=dp),parameter :: S_star_nominal=1e48_dp
 
+#ifdef PL
   !> nominal Eddington efficiency
-  real(kind=dp),parameter :: EddLeff_nom=1.0_dp 
+  real(kind=dp),parameter :: EddLeff_nominal=1.0_dp
   !> nominal power law index (for photon number)
-  real(kind=dp),parameter :: plindex_nom=2.5_dp
+  real(kind=dp),parameter :: pl_index_nominal=2.5_dp
   !> nominal black hole mass for Eddington luminosity (M0)
-  real(kind=dp),parameter :: mass_nom=1.0e6_dp
-  !> Eddington luminosity per mass_nom solar mass (erg/s)
-  real(kind=dp),parameter :: EddLum=1.38e38*mass_nom 
+  real(kind=dp),parameter :: mass_nominal=1.0e6_dp
+  !> Eddington luminosity per mass_nominal solar mass (erg/s)
+  real(kind=dp),parameter :: EddLum=1.38e38*mass_nominal
+  !> Number of ionizing photons / second
+  real(kind=dp),parameter :: pl_S_star_nominal=1e48_dp
+  !> nominal minimum and maximum frequency for power law source
+  real(kind=dp),parameter :: pl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: pl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
+  !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
+  !! 0.02 as their nominal value. Note that this depends on your integration
+  !! limits. Mesinger et al. use 300 eV as lowest energy.
+  real,parameter :: xray_phot_per_atom = 0.02
+  !real,parameter :: xray_phot_per_atom = 0.1
+#endif
+
+#ifdef QUASARS
+  !> nominal quasar Eddington efficiency
+  real(kind=dp),parameter :: qEddLeff_nominal=1.0_dp
+  !> nominal quasar index (for photon number)
+  real(kind=dp),parameter :: qpl_index_nominal=0.8_dp
+  !> nominal quasar black hole mass for Eddington luminosity (M0)
+  real(kind=dp),parameter :: qmass_nominal=1.0e6_dp
+  !> Eddington luminosity per qmass_nominal solar mass (erg/s)
+  real(kind=dp),parameter :: qEddLum=1.38e38*qmass_nominal
+  !> Number of ionizing photons / second for quasars
+  real(kind=dp),parameter :: qpl_S_star_nominal=1e48_dp
+  !> nominal minimum and maximum frequency for quasar source
+  real(kind=dp),parameter :: qpl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: qpl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
+#endif
 
   !> Subgrid clumping\n
   !! 1: constant clumping (with clumping_factor)\n
@@ -99,10 +132,12 @@ module c2ray_parameters
   !> Thermal: fraction of the cooling time step below which no iteration is done
   real(kind=dp),parameter :: relative_denergy=0.1
 
-  !> Source properties: Number of different sources
-  integer,parameter :: Number_Sourcetypes=3
+  !> Source properties: Number of different stellar source types 
+  integer,parameter :: Number_Sourcetypes=2
   !> Source properties: Photon per atom for different source types (high to low mass)
-  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 , 0.0 /)
+  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 /)
+  !real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 , 0.0 /)
+
   !> Source properties: Life time of sources (if set at compile time)
   real,parameter :: lifetime=20e6*YEAR
   !> Source properties: Smallest number of particles that makes a reliable halo
