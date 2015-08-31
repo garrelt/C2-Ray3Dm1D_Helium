@@ -39,22 +39,20 @@ module radiation_tables
   use radiation_sed_parameters, only: T_eff, R_star, R_star2, h_over_kT
   use radiation_sed_parameters, only: spectrum_parms, spec_diag
 
+  use radiation_sizes, only: cross_section_HI_powerlaw_index
+  use radiation_sizes, only: cross_section_HeI_powerlaw_index
+  use radiation_sizes, only: cross_section_HeII_powerlaw_index
+
 #ifdef PL
   use radiation_sed_parameters, only: pl_index, pl_scaling
   use radiation_sed_parameters, only: pl_minfreq, pl_maxfreq
-
-  use radiation_sizes, only: pl_index_cross_section_HI
-  use radiation_sizes, only: pl_index_cross_section_HeI
-  use radiation_sizes, only: pl_index_cross_section_HeII
 #endif
+
 #ifdef QUASARS
   use radiation_sed_parameters, only: qpl_index, qpl_scaling
   use radiation_sed_parameters, only: qpl_minfreq, qpl_maxfreq
-
-  use radiation_sizes, only: qpl_index_cross_section_HI
-  use radiation_sizes, only: qpl_index_cross_section_HeI
-  use radiation_sizes, only: qpl_index_cross_section_HeII
 #endif  
+
   implicit none
 
   ! Parameters defining the optical depth entries in the table.
@@ -268,16 +266,11 @@ contains
        
        ! Fill frequency array
        call set_frequency_array(i_subband)
-#ifdef PL       
+
        ! Set frequency dependence of cross section
        call set_cross_section_freq_dependence(i_subband, &
-            pl_index_cross_section_HI(i_subband),grey)
-#endif       
-#ifdef QUASARS
-       ! Set frequency dependence of cross section
-       call set_cross_section_freq_dependence(i_subband, &
-            qpl_index_cross_section_HI(i_subband),grey)
-#endif
+            cross_section_HI_powerlaw_index(i_subband),grey)
+
        ! Make photo integrands
        call fill_photo_integrands(i_subband)
        
@@ -310,16 +303,11 @@ contains
        
        ! Fill frequency array
        call set_frequency_array(i_subband)
-#ifdef PL       
+
        ! Set frequency dependence of cross section
        call set_cross_section_freq_dependence(i_subband, &
-            pl_index_cross_section_HeI(i_subband),grey)
-#endif       
-#ifdef QUASARS
-       ! Set frequency dependence of cross section
-       call set_cross_section_freq_dependence(i_subband, &
-            qpl_index_cross_section_HeI(i_subband),grey)
-#endif
+            cross_section_HeI_powerlaw_index(i_subband),grey)
+
        ! Make photo integrands
        call fill_photo_integrands(i_subband)
        
@@ -358,16 +346,11 @@ contains
        
        ! Fill frequency array
        call set_frequency_array(i_subband)
-#ifdef PL       
+
        ! Set frequency dependence of cross section
        call set_cross_section_freq_dependence(i_subband, &
-            pl_index_cross_section_HeII(i_subband),grey)
-#endif       
-#ifdef QUASARS
-       ! Set frequency dependence of cross section
-       call set_cross_section_freq_dependence(i_subband, &
-            qpl_index_cross_section_HeII(i_subband),grey)
-#endif
+            cross_section_HeII_powerlaw_index(i_subband),grey)
+
        ! Make photo integrands
        call fill_photo_integrands(i_subband)
        
@@ -566,10 +549,10 @@ contains
   end subroutine set_frequency_array
 
 !---------------------------------------------------------------------------
-  subroutine set_cross_section_freq_dependence(i_subband,pl_index_crosssection,grey)
+  subroutine set_cross_section_freq_dependence(i_subband,crosssection_powerlaw_index,grey)
 
     integer,intent(in) :: i_subband
-    real(kind=dp),intent(in) :: pl_index_crosssection
+    real(kind=dp),intent(in) :: crosssection_powerlaw_index
     logical,intent(in) :: grey
     
     integer :: i_freq
@@ -581,7 +564,7 @@ contains
     else
        do i_freq=0,NumFreq
           cross_section_freq_dependence(i_freq) = &
-               (frequency(i_freq)/freq_min(i_subband))**(-pl_index_crosssection)        
+               (frequency(i_freq)/freq_min(i_subband))**(-crosssection_powerlaw_index)        
        enddo
     endif
     

@@ -31,18 +31,12 @@ module radiation_sizes
   real(kind=dp), dimension(:), allocatable :: delta_freq      ! Frequency width of integration 
   real(kind=dp), dimension(:), allocatable :: freq_max        ! Maximum freqeucny of integration 
   real(kind=dp), dimension(:), allocatable :: freq_min        ! Minimum freqeucny of integration
-#ifdef PL
+
   ! Power law fit parameter for frequency range 1:3
-  real(kind=dp), dimension(:), allocatable :: pl_index_cross_section_HI    ! Power law index of cross section of HI
-  real(kind=dp), dimension(:), allocatable :: pl_index_cross_section_HeI   ! Power law index of cross section of HeI
-  real(kind=dp), dimension(:), allocatable :: pl_index_cross_section_HeII  ! Power law index of cross section of HeII
-#endif
-#ifdef QUASARS
-  ! Power law fit parameter for frequency range 1:3
-  real(kind=dp), dimension(:), allocatable :: qpl_index_cross_section_HI    !Power law index of cross section of HI
-  real(kind=dp), dimension(:), allocatable :: qpl_index_cross_section_HeI   !Power law index of cross section of HeI
-  real(kind=dp), dimension(:), allocatable :: qpl_index_cross_section_HeII  !Power law index of cross section of HeII
-#endif
+  real(kind=dp), dimension(:), allocatable :: cross_section_HI_powerlaw_index    ! Power law index of cross section of HI
+  real(kind=dp), dimension(:), allocatable :: cross_section_HeI_powerlaw_index   ! Power law index of cross section of HeI
+  real(kind=dp), dimension(:), allocatable :: cross_section_HeII_powerlaw_index  ! Power law index of cross section of HeII
+
   ! Cross section of atoms
   real(kind=dp), dimension(:), allocatable :: sigma_HI       ! Cross section of HI
   real(kind=dp), dimension(:), allocatable :: sigma_HeI      ! Cross section of HeI
@@ -73,16 +67,11 @@ contains
     allocate(delta_freq(1:NumFreqBnd))  
     allocate(freq_max(1:NumFreqBnd))  
     allocate(freq_min(1:NumFreqBnd))  
-#ifdef PL
-    allocate(pl_index_cross_section_HI(1:NumFreqBnd))
-    allocate(pl_index_cross_section_HeI(1:NumFreqBnd))
-    allocate(pl_index_cross_section_HeII(1:NumFreqBnd))
-#endif
-#ifdef QUASARS
-    allocate(qpl_index_cross_section_HI(1:NumFreqBnd))
-    allocate(qpl_index_cross_section_HeI(1:NumFreqBnd))
-    allocate(qpl_index_cross_section_HeII(1:NumFreqBnd))
-#endif
+
+    allocate(cross_section_HI_powerlaw_index(1:NumFreqBnd))
+    allocate(cross_section_HeI_powerlaw_index(1:NumFreqBnd))
+    allocate(cross_section_HeII_powerlaw_index(1:NumFreqBnd))
+
     allocate(sigma_HI(1:NumFreqBnd))
     allocate(sigma_HeI(1:NumFreqBnd))
     allocate(sigma_HeII(1:NumFreqBnd))
@@ -555,13 +544,14 @@ contains
 
     end select
 
-#ifdef PL
-    ! Assign power-law index of HI, HeI and HeII at different frequencies (about absorption)
+    ! Assign the power-law indeces of the cross-sections of HI, 
+    ! HeI and HeII in different frequency subbins (depending on 
+    ! the number of subbins)
     select case (NumBndin1)
 
     case (1)
 
-       pl_index_cross_section_HI(1) = 2.761_dp
+       cross_section_HI_powerlaw_index(1) = 2.761_dp
 
     end select
 
@@ -569,13 +559,13 @@ contains
 
     case (26) 
 
-       pl_index_cross_section_HI(NumBndin1+1:NumBndin1+26) = (/2.8277_dp, 2.8330_dp, 2.8382_dp, &
+       cross_section_HI_powerlaw_index(NumBndin1+1:NumBndin1+26) = (/2.8277_dp, 2.8330_dp, 2.8382_dp, &
             2.8432_dp, 2.8509_dp, 2.8601_dp, 2.8688_dp, 2.8771_dp, &
             2.8850_dp, 2.8925_dp, 2.8997_dp, 2.9066_dp, 2.9132_dp, &
             2.9196_dp, 2.9257_dp, 2.9316_dp, 2.9373_dp, 2.9428_dp, &
             2.9481_dp, 2.9532_dp, 2.9582_dp, 2.9630_dp, 2.9677_dp, &
             2.9722_dp, 2.9766_dp, 2.9813_dp/)
-       pl_index_cross_section_HeI(NumBndin1+1:NumBndin1+26) = (/1.5509_dp, 1.5785_dp, 1.6047_dp, &
+       cross_section_HeI_powerlaw_index(NumBndin1+1:NumBndin1+26) = (/1.5509_dp, 1.5785_dp, 1.6047_dp, &
             1.6290_dp, 1.6649_dp, 1.7051_dp, 1.7405_dp, 1.7719_dp, &
             1.8000_dp, 1.8253_dp, 1.8486_dp, 1.8701_dp, 1.8904_dp, &
             1.9098_dp, 1.9287_dp, 1.9472_dp, 1.9654_dp, 1.9835_dp, &
@@ -584,32 +574,32 @@ contains
 
     case (10) 
 
-       pl_index_cross_section_HI(NumBndin1+1:NumBndin1+10) = (/2.8360_dp, 2.8554_dp, 2.8729_dp, 2.8887_dp, &
+       cross_section_HI_powerlaw_index(NumBndin1+1:NumBndin1+10) = (/2.8360_dp, 2.8554_dp, 2.8729_dp, 2.8887_dp, &
             2.9031_dp,2.9164_dp, 2.9287_dp,2.9400_dp,2.9507_dp,2.9701_dp/)
-       pl_index_cross_section_HeI(NumBndin1+1:NumBndin1+10) = (/1.5932_dp, 1.6849_dp, 1.7561_dp, 1.8126_dp, &
+       cross_section_HeI_powerlaw_index(NumBndin1+1:NumBndin1+10) = (/1.5932_dp, 1.6849_dp, 1.7561_dp, 1.8126_dp, &
             1.8592_dp, 1.9000_dp, 1.9379_dp, 1.9744_dp, 2.0105_dp, 2.0840_dp/)
 
     case (6)
 
-       pl_index_cross_section_HI(NumBndin1+1:NumBndin1+6) = (/2.8408_dp, 2.8685_dp, 2.8958_dp, &
+       cross_section_HI_powerlaw_index(NumBndin1+1:NumBndin1+6) = (/2.8408_dp, 2.8685_dp, 2.8958_dp, &
             2.9224_dp, 2.9481_dp, 2.9727_dp/)
-       pl_index_cross_section_HeI(NumBndin1+1:NumBndin1+6) = (/1.6168_dp, 1.7390_dp, 1.8355_dp, &
+       cross_section_HeI_powerlaw_index(NumBndin1+1:NumBndin1+6) = (/1.6168_dp, 1.7390_dp, 1.8355_dp, &
             1.9186_dp, 2.0018_dp, 2.0945_dp/)
 
     case (3) 
 
-       pl_index_cross_section_HI(NumBndin1+1:NumBndin1+3) = (/2.8542_dp, 2.9086_dp, 2.9600_dp/)
-       pl_index_cross_section_HeI(NumBndin1+1:NumBndin1+3) = (/1.6770_dp, 1.8758_dp, 2.0458_dp/)
+       cross_section_HI_powerlaw_index(NumBndin1+1:NumBndin1+3) = (/2.8542_dp, 2.9086_dp, 2.9600_dp/)
+       cross_section_HeI_powerlaw_index(NumBndin1+1:NumBndin1+3) = (/1.6770_dp, 1.8758_dp, 2.0458_dp/)
 
     case (2)
 
-       pl_index_cross_section_HI(NumBndin1+1:NumBndin1+2) = (/2.8697_dp, 2.9486_dp/)
-       pl_index_cross_section_HeI(NumBndin1+1:NumBndin1+2) = (/1.7385_dp, 2.0061_dp/)
+       cross_section_HI_powerlaw_index(NumBndin1+1:NumBndin1+2) = (/2.8697_dp, 2.9486_dp/)
+       cross_section_HeI_powerlaw_index(NumBndin1+1:NumBndin1+2) = (/1.7385_dp, 2.0061_dp/)
 
     case (1) 
 
-       pl_index_cross_section_HI(NumBndin1+1) = 2.9118_dp
-       pl_index_cross_section_HeI(NumBndin1+1) = 1.8832_dp
+       cross_section_HI_powerlaw_index(NumBndin1+1) = 2.9118_dp
+       cross_section_HeI_powerlaw_index(NumBndin1+1) = 1.8832_dp
 
     end select
 
@@ -617,17 +607,17 @@ contains
 
     case (20)
 
-       pl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) = &
+       cross_section_HI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) = &
             (/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
             3.0872_dp, 3.1166_dp, 3.1455_dp, 3.1773_dp, 3.2089_dp, &
             3.2410_dp, 3.2765_dp, 3.3107_dp, 3.3376_dp, 3.3613_dp, &
             3.3816_dp, 3.3948_dp, 3.4078_dp, 3.4197_dp, 3.4379_dp/)
-       pl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) = &
+       cross_section_HeI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) = &
             (/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
             2.6397_dp, 2.7642_dp, 2.8714_dp, 2.9700_dp, 3.0528_dp, &
             3.1229_dp, 3.1892_dp, 3.2451_dp, 3.2853_dp, 3.3187_dp, &
             3.3464_dp, 3.3640_dp, 3.3811_dp, 3.3967_dp, 3.4203_dp/)
-       pl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) = &
+       cross_section_HeII_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) = &
             (/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
             2.8300_dp, 2.8711_dp, 2.9121_dp, 2.9577_dp, 3.0041_dp, &
             3.0522_dp, 3.1069_dp, 3.1612_dp, 3.2051_dp, 3.2448_dp, &
@@ -635,17 +625,17 @@ contains
 
     case (16) 
 
-       pl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) = &
+       cross_section_HI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) = &
             (/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
             3.0872_dp, 3.1303_dp, 3.1920_dp, 3.2410_dp, 3.2765_dp, &
             3.3107_dp, 3.3376_dp, 3.3613_dp, 3.3878_dp, 3.4078_dp, &
             3.4343_dp/)
-       pl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) = &
+       cross_section_HeI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) = &
             (/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
             2.6397_dp, 2.8157_dp, 3.0093_dp, 3.1229_dp, 3.1892_dp, &
             3.2451_dp, 3.2853_dp, 3.3187_dp, 3.3546_dp, 3.3811_dp, &
             3.4157_dp/)
-       pl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) = &
+       cross_section_HeII_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) = &
             (/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
             2.8300_dp, 2.8904_dp, 2.9793_dp, 3.0522_dp, 3.1069_dp, &
             3.1612_dp, 3.2051_dp, 3.2448_dp, 3.2904_dp, 3.3258_dp, &
@@ -653,197 +643,47 @@ contains
 
     case (11) 
 
-       pl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) = &
+       cross_section_HI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) = &
             (/2.9926_dp, 3.0088_dp, 3.0357_dp, 3.0777_dp, 3.1303_dp, &
             3.1773_dp, 3.2292_dp, 3.2765_dp, 3.3230_dp, 3.3775_dp, &
             3.4155_dp/)
-       pl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) = &
+       cross_section_HeI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) = &
             (/2.1803_dp, 2.2564_dp, 2.3901_dp, 2.5951_dp, 2.8157_dp, &
             2.9700_dp, 3.0976_dp, 3.1892_dp, 3.2636_dp, 3.3407_dp, &
             3.3913_dp/)
-       pl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) = &
+       cross_section_HeII_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) = &
             (/2.6989_dp, 2.7213_dp, 2.7585_dp, 2.8167_dp, 2.8904_dp, &
             2.9577_dp, 3.0345_dp, 3.1069_dp, 3.1811_dp, 3.2727_dp, &
             3.3397_dp/)
 
     case (9) 
 
-       pl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) = &
+       cross_section_HI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) = &
             (/3.0207_dp, 3.0777_dp, 3.1303_dp, 3.1773_dp, 3.2292_dp, &
             3.2765_dp, 3.3230_dp, 3.3775_dp, 3.4155_dp/)
-       pl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) = &
+       cross_section_HeI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) = &
             (/2.3157_dp, 2.5951_dp, 2.8157_dp, 2.9700_dp, 3.0976_dp,&
             3.1892_dp, 3.2636_dp, 3.3407_dp, 3.3913_dp/)
-       pl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) = &
+       cross_section_HeII_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) = &
             (/2.7377_dp, 2.8167_dp, 2.8904_dp, 2.9577_dp, 3.0345_dp,&
             3.1069_dp, 3.1811_dp, 3.2727_dp, 3.3397_dp/)
 
     case (4)
 
-       pl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) = &
+       cross_section_HI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) = &
             (/3.0465_dp, 3.1516_dp, 3.2501_dp, 3.3833_dp/)
-       pl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) = &
+       cross_section_HeI_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) = &
             (/2.4431_dp, 2.8878_dp, 3.1390_dp, 3.3479_dp/)
-       pl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) = &
+       cross_section_HeII_powerlaw_index(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) = &
             (/2.7735_dp, 2.9209_dp, 3.0663_dp, 3.2833_dp/)
 
     case (1)
 
-       pl_index_cross_section_HI(NumBndin1+NumBndin2+1) = 3.3369_dp
-       pl_index_cross_section_HeI(NumBndin1+NumBndin2+1) = 3.2681_dp
-       pl_index_cross_section_HeII(NumBndin1+NumBndin2+1) = 3.2082_dp
+       cross_section_HI_powerlaw_index(NumBndin1+NumBndin2+1) = 3.3369_dp
+       cross_section_HeI_powerlaw_index(NumBndin1+NumBndin2+1) = 3.2681_dp
+       cross_section_HeII_powerlaw_index(NumBndin1+NumBndin2+1) = 3.2082_dp
 
     end select
-#endif
-#ifdef QUASARS
-    ! Assign quasar power-law index of HI, HeI and HeII at different frequencies (about
-    ! absorption)
-    select case (NumBndin1)
-
-    case (1)
-
-       qpl_index_cross_section_HI(1) = 2.761_dp
-
-    end select
-
-    select case (NumBndin2)
-
-    case (26)
-
-       qpl_index_cross_section_HI(NumBndin1+1:NumBndin1+26) = &
-            (/2.8277_dp, 2.8330_dp, 2.8382_dp, &
-            2.8432_dp, 2.8509_dp, 2.8601_dp, 2.8688_dp, 2.8771_dp, &
-            2.8850_dp, 2.8925_dp, 2.8997_dp, 2.9066_dp, 2.9132_dp, &
-            2.9196_dp, 2.9257_dp, 2.9316_dp, 2.9373_dp, 2.9428_dp, &
-            2.9481_dp, 2.9532_dp, 2.9582_dp, 2.9630_dp, 2.9677_dp, &
-            2.9722_dp, 2.9766_dp, 2.9813_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+1:NumBndin1+26) = &
-            (/1.5509_dp,1.5785_dp, 1.6047_dp, &
-            1.6290_dp, 1.6649_dp, 1.7051_dp, 1.7405_dp, 1.7719_dp, &
-            1.8000_dp, 1.8253_dp, 1.8486_dp, 1.8701_dp, 1.8904_dp, &
-            1.9098_dp, 1.9287_dp, 1.9472_dp, 1.9654_dp, 1.9835_dp, &
-            2.0016_dp, 2.0196_dp, 2.0376_dp, 2.0557_dp, 2.0738_dp, &
-            2.0919_dp, 2.1099_dp, 2.1302_dp/)
-
-    case (10)
-
-       qpl_index_cross_section_HI(NumBndin1+1:NumBndin1+10) = &
-            (/2.8360_dp, 2.8554_dp, 2.8729_dp, 2.8887_dp, &
-            2.9031_dp,2.9164_dp, 2.9287_dp,2.9400_dp,2.9507_dp,2.9701_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+1:NumBndin1+10) = &
-            (/1.5932_dp, 1.6849_dp, 1.7561_dp, 1.8126_dp, &
-            1.8592_dp, 1.9000_dp, 1.9379_dp, 1.9744_dp, 2.0105_dp, 2.0840_dp/)
-
-    case (6)
-
-       qpl_index_cross_section_HI(NumBndin1+1:NumBndin1+6) =&
-            (/2.8408_dp, 2.8685_dp, 2.8958_dp, &
-            2.9224_dp, 2.9481_dp, 2.9727_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+1:NumBndin1+6) = &
-           (/1.6168_dp,1.7390_dp, 1.8355_dp, &
-            1.9186_dp, 2.0018_dp, 2.0945_dp/)
-
-    case (3)
-
-       qpl_index_cross_section_HI(NumBndin1+1:NumBndin1+3) =&
-       (/2.8542_dp, 2.9086_dp, 2.9600_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+1:NumBndin1+3) =& 
-       (/1.6770_dp, 1.8758_dp, 2.0458_dp/)
-
-    case (2)
-
-       qpl_index_cross_section_HI(NumBndin1+1:NumBndin1+2) = (/2.8697_dp,2.9486_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+1:NumBndin1+2) =(/1.7385_dp,2.0061_dp/)
-
-
-    case (1)
-
-       qpl_index_cross_section_HI(NumBndin1+1) = 2.9118_dp
-       qpl_index_cross_section_HeI(NumBndin1+1) = 1.8832_dp
-
-    end select
-
-    select case (NumBndin3)
-
-    case (20)
-
-       qpl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20) =&
-            (/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
-            3.0872_dp, 3.1166_dp, 3.1455_dp, 3.1773_dp, 3.2089_dp, &
-            3.2410_dp, 3.2765_dp, 3.3107_dp, 3.3376_dp, 3.3613_dp, &
-            3.3816_dp, 3.3948_dp, 3.4078_dp, 3.4197_dp, 3.4379_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20)= &
-            (/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
-            2.6397_dp, 2.7642_dp, 2.8714_dp, 2.9700_dp, 3.0528_dp, &
-            3.1229_dp, 3.1892_dp, 3.2451_dp, 3.2853_dp, 3.3187_dp, &
-            3.3464_dp, 3.3640_dp, 3.3811_dp, 3.3967_dp, 3.4203_dp/)
-       qpl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+20)= &
-            (/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
-            2.8300_dp, 2.8711_dp, 2.9121_dp, 2.9577_dp, 3.0041_dp, &
-            3.0522_dp, 3.1069_dp, 3.1612_dp, 3.2051_dp, 3.2448_dp, &
-            3.2796_dp, 3.3027_dp, 3.3258_dp, 3.3472_dp, 3.3805_dp/)
-
-    case (16)
-
-       qpl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16) =&
-            (/2.9884_dp, 2.9970_dp, 3.0088_dp, 3.0298_dp, 3.0589_dp, &
-            3.0872_dp, 3.1303_dp, 3.1920_dp, 3.2410_dp, 3.2765_dp, &
-            3.3107_dp, 3.3376_dp, 3.3613_dp, 3.3878_dp, 3.4078_dp, &
-            3.4343_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16)= &
-            (/2.1612_dp, 2.2001_dp, 2.2564_dp, 2.3601_dp, 2.5054_dp, &
-            2.6397_dp, 2.8157_dp, 3.0093_dp, 3.1229_dp, 3.1892_dp, &
-            3.2451_dp, 3.2853_dp, 3.3187_dp, 3.3546_dp, 3.3811_dp, &
-            3.4157_dp/)
-       qpl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+16)= &
-            (/2.6930_dp, 2.7049_dp, 2.7213_dp, 2.7503_dp, 2.7906_dp, &
-            2.8300_dp, 2.8904_dp, 2.9793_dp, 3.0522_dp, 3.1069_dp, &
-            3.1612_dp, 3.2051_dp, 3.2448_dp, 3.2904_dp, 3.3258_dp, &
-            3.3740_dp/)
-
-    case (11)
-
-       qpl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11) =&
-            (/2.9926_dp, 3.0088_dp, 3.0357_dp, 3.0777_dp, 3.1303_dp, &
-            3.1773_dp, 3.2292_dp, 3.2765_dp, 3.3230_dp, 3.3775_dp, &
-            3.4155_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11)= &
-            (/2.1803_dp, 2.2564_dp, 2.3901_dp, 2.5951_dp, 2.8157_dp, &
-            2.9700_dp, 3.0976_dp, 3.1892_dp, 3.2636_dp, 3.3407_dp, &
-            3.3913_dp/)
-       qpl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+11)= &
-            (/2.6989_dp, 2.7213_dp, 2.7585_dp, 2.8167_dp, 2.8904_dp, &
-            2.9577_dp, 3.0345_dp, 3.1069_dp, 3.1811_dp, 3.2727_dp, &
-            3.3397_dp/)
-
-    case (9)
-
-       qpl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9) =&
-            (/3.0207_dp, 3.0777_dp, 3.1303_dp, 3.1773_dp, 3.2292_dp, &
-            3.2765_dp, 3.3230_dp, 3.3775_dp, 3.4155_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9)=&
-            (/2.3157_dp, 2.5951_dp, 2.8157_dp, 2.9700_dp, 3.0976_dp,&
-            3.1892_dp, 3.2636_dp, 3.3407_dp, 3.3913_dp/)
-       qpl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+9)= &
-            (/2.7377_dp, 2.8167_dp, 2.8904_dp, 2.9577_dp, 3.0345_dp,&
-            3.1069_dp, 3.1811_dp, 3.2727_dp, 3.3397_dp/)
-
-    case (4)
-
-       qpl_index_cross_section_HI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) =&
-            (/3.0465_dp, 3.1516_dp, 3.2501_dp, 3.3833_dp/)
-       qpl_index_cross_section_HeI(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4) =&
-            (/2.4431_dp, 2.8878_dp, 3.1390_dp, 3.3479_dp/)
-       qpl_index_cross_section_HeII(NumBndin1+NumBndin2+1:NumBndin1+NumBndin2+4)= &
-            (/2.7735_dp, 2.9209_dp, 3.0663_dp, 3.2833_dp/)
-
-    case (1)
-
-       qpl_index_cross_section_HI(NumBndin1+NumBndin2+1) = 3.3369_dp
-       qpl_index_cross_section_HeI(NumBndin1+NumBndin2+1) = 3.2681_dp
-       qpl_index_cross_section_HeII(NumBndin1+NumBndin2+1) = 3.2082_dp
-    endselect
-#endif
 
   end subroutine setup_scalingfactors
 
