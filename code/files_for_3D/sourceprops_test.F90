@@ -90,7 +90,7 @@ contains
        ! Establish number of sources
        read(sourcefile,*) NumSrc
 
-       write(*,*)  "Number of sources: ",NumSrc
+       if (rank /=0) write(logf,*)  "Number of sources in source file: ",NumSrc
 
     endif ! end of rank 0 test
     
@@ -100,12 +100,11 @@ contains
 #endif
 
 #ifdef MPILOG
-    if (rank /=0) write(logf,*) "Number of sources, with suppression: ",NumSrc
+    if (rank == 0) write(logf,*) "Number of sources, with suppression: ",NumSrc
 #endif
 
     ! Allocate arrays for this NumSrc
     if (NumSrc > 0) then
-       write(*,*)  "Reading number of sources: ",NumSrc
        allocate(srcpos(3,NumSrc))
        allocate(NormFlux(0:NumSrc)) ! 0 will hold lost photons
        allocate(SrcSeries(NumSrc))
