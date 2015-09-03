@@ -217,6 +217,8 @@ contains
 #endif
 
     ! Set identifying string (resolution-dependent)
+    ! Note: this case statement should be redone to remove the
+    ! division n_box/mesh(1) which just complicates the statements
     ! Construct the file name
     select case (int(boxsize))
     case (37, 64)
