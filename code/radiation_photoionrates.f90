@@ -611,21 +611,21 @@ contains
           
           ! Band 2, HI
           phi_heat_in_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
-               tau_pos_in,i_subband,2*i_subband-2)
+               tau_pos_in,i_subband,2*i_subband-NumBndin1-1)
           phi_heat_in_HeI = NFlux * read_table(heat_thick_table,NumheatBin, &
-               tau_pos_in,i_subband,2*i_subband-1)
+               tau_pos_in,i_subband,2*i_subband-NumBndin1)
           
           ! When current cell is optically thick  (in total tau)
           if (abs(tau_out_all(i_subband)-tau_in_all(i_subband)) > &
                tau_heat_limit) then
              phi_heat_out_HI = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
-                  tau_pos_out,i_subband,2*i_subband-2)
+                  tau_pos_out,i_subband,2*i_subband-NumBndin1-1)
              phi_heat_HI = scaling_HI(i_subband)*(phi_heat_in_HI-phi_heat_out_HI)/vol 
              
              phi_heat_out_HeI = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
-                  tau_pos_out,i_subband,2*i_subband-1)
+                  tau_pos_out,i_subband,2*i_subband-NumBndin1)
              phi_heat_HeI = scaling_HeI(i_subband)*(phi_heat_in_HeI-phi_heat_out_HeI)/vol
 
              ! When current cell optically thin
@@ -634,7 +634,7 @@ contains
              ! apply the scaling_HI factor!
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
-                  tau_pos_in,i_subband,2*i_subband-2)
+                  tau_pos_in,i_subband,2*i_subband-NumBndin1-1)
              !phi_heat_out_HI = phi_heat_in_HI-phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
 
@@ -642,7 +642,7 @@ contains
              ! apply the scaling_HeI factor!
              phi_heat_HeI = NFlux * tau_cell_HeI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
-                  tau_pos_in,i_subband,2*i_subband-1)
+                  tau_pos_in,i_subband,2*i_subband-NumBndin1)
              !phi_heat_out_HeI=phi_heat_in_HeI-phi_heat_HeI
              phi_heat_HeI = phi_heat_HeI/vol
 
@@ -673,32 +673,32 @@ contains
 
           ! Band 3, HI
           phi_heat_in_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
-               tau_pos_in,i_subband,3*i_subband-NumBndin2-4)
+               tau_pos_in,i_subband,3*i_subband-NumBndin2-NumBndin1*2-2)
           ! Band 3, HeI
           phi_heat_in_HeI = NFlux * read_table(heat_thick_table,NumheatBin, &
-               tau_pos_in,i_subband,3*i_subband-NumBndin2-3)
+               tau_pos_in,i_subband,3*i_subband-NumBndin2-NumBndin1*2-1)
           ! Band 3, HeII
           phi_heat_in_HeII = NFlux * read_table(heat_thick_table,NumheatBin, &
-               tau_pos_in,i_subband,3*i_subband-NumBndin2-2)
+               tau_pos_in,i_subband,3*i_subband-NumBndin2-NumBndin1*2)
 
           ! When current cell is optically thick (in total tau)
           if (abs(tau_out_all(i_subband)-tau_in_all(i_subband)) > &
                tau_heat_limit) then
 
              phi_heat_out_HI = NFlux * read_table(heat_thick_table,NumheatBin, &
-               tau_pos_out,i_subband,3*i_subband-NumBndin2-4)
+               tau_pos_out,i_subband,3*i_subband-NumBndin2-NumBndin1*2-2)
              phi_heat_HI = scaling_HI(i_subband)* &
                   (phi_heat_in_HI-phi_heat_out_HI)/vol
 
              phi_heat_out_HeI = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
-                  tau_pos_out,i_subband,3*i_subband-NumBndin2-3)
+                  tau_pos_out,i_subband,3*i_subband-NumBndin2-NumBndin1*2-1)
              phi_heat_HeI = scaling_HeI(i_subband)* &
                   (phi_heat_in_HeI-phi_heat_out_HeI)/vol
              
              phi_heat_out_HeII = NFlux * &
                   read_table(heat_thick_table,NumheatBin, &
-                  tau_pos_out,i_subband,3*i_subband-NumBndin2-2)
+                  tau_pos_out,i_subband,3*i_subband-NumBndin2-NumBndin1*2)
              phi_heat_HeII = scaling_HeII(i_subband)* &
                   (phi_heat_in_HeII-phi_heat_out_HeII)/vol
              
@@ -709,7 +709,7 @@ contains
              ! apply the scaling_HI factor!
              phi_heat_HI = NFlux * tau_cell_HI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
-                  tau_pos_in,i_subband,3*i_subband-NumBndin2-4)
+                  tau_pos_in,i_subband,3*i_subband-NumBndin2-NumBndin1*2-2)
              !phi_heat_out_HI = phi_heat_in_HI-phi_heat_HI
              phi_heat_HI = phi_heat_HI/vol
 
@@ -717,7 +717,7 @@ contains
              ! apply the scaling_HeI factor!
              phi_heat_HeI = NFlux * tau_cell_HeI(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
-                  tau_pos_in,i_subband,3*i_subband-NumBndin2-3)
+                  tau_pos_in,i_subband,3*i_subband-NumBndin2-NumBndin1*2-1)
              !phi_heat_out_HeI = phi_heat_in_HeI-phi_heat_HeI
              phi_heat_HeI = phi_heat_HeI/vol
 
@@ -725,7 +725,7 @@ contains
              ! apply the scaling_HeII factor!
              phi_heat_HeII = NFlux * tau_cell_HeII(i_subband) * &
                   read_table(heat_thin_table,NumheatBin, &
-                  tau_pos_in,i_subband,3*i_subband-NumBndin2-2)
+                  tau_pos_in,i_subband,3*i_subband-NumBndin2-NumBndin1*2)
              !phi_heat_out_HeII = phi_heat_in_HeII-phi_heat_HeII
              phi_heat_HeII = phi_heat_HeII/vol
 

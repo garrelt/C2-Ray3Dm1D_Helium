@@ -90,7 +90,7 @@ module c2ray_parameters
   !> nominal quasar Eddington efficiency
   real(kind=dp),parameter :: qEddLeff_nominal=1.0_dp
   !> nominal quasar index (for photon number)
-  real(kind=dp),parameter :: qpl_index_nominal=0.8_dp
+  real(kind=dp),parameter :: qpl_index_nominal=1.8_dp
   !> nominal quasar black hole mass for Eddington luminosity (M0)
   real(kind=dp),parameter :: qmass_nominal=1.0e6_dp
   !> Eddington luminosity per qmass_nominal solar mass (erg/s)

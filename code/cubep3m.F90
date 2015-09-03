@@ -38,8 +38,11 @@ module nbody
 
   character(len=10),parameter :: nbody_type="cubep3m" !< ID of Nbody type
 
-  real(kind=dp),parameter :: boxsize=37.0  !< Box size in Mpc/h comoving
-  integer,parameter :: n_box=2048  !< cells/side (in N-body,fine grid)
+  real(kind=dp),parameter :: boxsize=244.0 !< Box size in Mpc/h comoving
+  integer,parameter :: n_box=8000  !< cells/side (in N-body,fine grid)
+
+  !real(kind=dp),parameter :: boxsize=37.0  !< Box size in Mpc/h comoving
+  !integer,parameter :: n_box=2048  !< cells/side (in N-body,fine grid)
 
   !real(kind=dp),parameter :: boxsize=64.0  !< Box size in Mpc/h comoving
   !integer,parameter :: n_box=3456  !< cells/side (in N-body,fine grid)
@@ -246,6 +249,36 @@ contains
        case(14)
           id_str="coarse"
        end select
+    case(47)
+    ! Note that n_box/mesh is no longer an integer quantity for this
+    ! run. The numbers below are the integer parts of the division
+       asubbox=int(n_box/meshx)
+       select case (asubbox)
+       case(11)
+          id_str="coarsest"
+       case(5)
+              id_str="coarser"
+!      	       case(12)
+!          id_str="coarse"
+       end select
+    case(244)
+       select case (n_box/mesh(1))
+       case(32)
+  	   id_str="coarsest"
+       case(16)
+          id_str="coarser"
+!       case(12)
+!          id_str="coarse"
+       end select
+!    case(244)
+! II: This is for low-res, 125^3 tests ONLY!!!!!!
+!        asubbox=int(n_box/mesh(1))
+!        select case (asubbox)
+        !case(64)
+        !    id_str="coarsest"
+        !case(64)
+        !    id_str="coarsest"
+!        end select
     end select
     if (rank == 0) write(unit=logf,fmt=*) "Type of resolution: ",id_str
 

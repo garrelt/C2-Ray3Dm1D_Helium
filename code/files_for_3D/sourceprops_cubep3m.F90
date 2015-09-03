@@ -691,8 +691,10 @@ contains
     Emax = qpl_MaxFreq_nominal/(ev2fr) !in ev
     delta_E = (Emax - Emin)*ev2erg !Needs to be in ergs as luminosity is given in ergs
 
-    QPL_Luminosity_convert = -1.0/delta_E * Lum/(2000**(-qpl_index_nominal)) * &
-                1.0/qpl_index_nominal*(Emax**(-qpl_index_nominal) - Emin**(-qpl_index_nominal))
+    alpha = qpl_index_nominal - 1.0
+
+    QPL_Luminosity_convert = -1.0/delta_E * Lum/(2000**(-alpha)) * &
+                1.0/alpha*(Emax**(-alpha) - Emin**(-alpha))
 !    write(*,*) "Emax, Emin: ", Emax, Emin    
 !    write(*,*) "Lum: ", Lum
 !    if (QPL_Luminosity_convert /= 0.0) write(*,*) "number of photons: ", QPL_Luminosity_convert
