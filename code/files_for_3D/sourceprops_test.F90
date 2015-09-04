@@ -20,18 +20,14 @@ module sourceprops
   use nbody, only:  dir_src
   !use material, only: xh
   use grid, only: x,y,z
-#ifdef PL
-  use c2ray_parameters, only: xray_phot_per_atom, pl_S_star_nominal,&
-       EddLeff_nominal,mass_nominal,EddLum
-#endif
-#ifdef QUASARS
-  use c2ray_parameters, only: qpl_S_star_nominal,qEddLeff_nominal,&
-      qmass_nominal,qEddLum, qpl_index_nominal, qpl_MinFreq_nominal,&
-      qpl_MaxFreq_nominal
-#endif
   use c2ray_parameters, only: phot_per_atom, lifetime, &
        S_star_nominal, StillNeutral, Number_Sourcetypes
-  
+#ifdef PL
+  use c2ray_parameters, only: pl_S_star_nominal
+#endif
+#ifdef QUASARS
+  use c2ray_parameters, only: qpl_S_star_nominal
+#endif  
   implicit none
 
   !> base name of source list files
@@ -41,7 +37,12 @@ module sourceprops
   integer :: NumSrc=0 !< Number of sources 
   integer,dimension(:,:),allocatable :: srcpos
   real(kind=dp),dimension(:),allocatable :: NormFlux !< normalized ionizing flux of sources
+#ifdef PL
   real(kind=dp),dimension(:),allocatable :: NormFluxPL !< normalized ionizing flux of sources
+#endif
+#ifdef QUASARS
+  real(kind=dp),dimension(:),allocatable :: NormFluxQPL !< normalized ionizing flux of sources
+#endif
   integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
 
   character(len=512),private :: sourcelistfile,sourcelistfilesuppress
@@ -65,6 +66,9 @@ contains
 
     integer :: ns,ns0
 
+    ! Added by Hannah Ross to read more efficiently
+    real(kind=dp),dimension(:),allocatable :: temparray
+
 #ifdef MPI
     integer :: mympierror
 #endif
@@ -76,11 +80,31 @@ contains
     ! Deallocate source arrays
     if (allocated(srcpos)) deallocate(srcpos)
     if (allocated(NormFlux)) deallocate(NormFlux)
-    if (allocated(srcSeries)) deallocate(srcSeries)
 #ifdef PL
     if (allocated(NormFluxPL)) deallocate(NormFluxPL)
 #endif
+#ifdef QUASARS
+    if (allocated(NormFluxQPL)) deallocate(NormFluxQPL)
+#endif
+    if (allocated(srcSeries)) deallocate(srcSeries)
     
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(4))
+#ifdef PL
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(5))
+#endif
+#ifdef QUASARS
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(5))
+#endif
+#ifdef PL
+#ifdef QUASARS
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(6))
+#endif
+#endif
+
     ! Rank 0 reads in sources
     if (rank == 0) then
        ! Construct the file names
@@ -90,7 +114,7 @@ contains
        ! Establish number of sources
        read(sourcefile,*) NumSrc
 
-       if (rank /=0) write(logf,*)  "Number of sources in source file: ",NumSrc
+   
 
     endif ! end of rank 0 test
     
@@ -100,31 +124,46 @@ contains
 #endif
 
 #ifdef MPILOG
-    if (rank == 0) write(logf,*) "Number of sources, with suppression: ",NumSrc
+    if (rank /=0) write(logf,*) "Number of sources, with suppression: ",NumSrc
 #endif
 
     ! Allocate arrays for this NumSrc
     if (NumSrc > 0) then
        allocate(srcpos(3,NumSrc))
        allocate(NormFlux(0:NumSrc)) ! 0 will hold lost photons
-       allocate(SrcSeries(NumSrc))
 #ifdef PL
        allocate(NormFluxPL(NumSrc))
 #endif
+#ifdef QUASARS
+       allocate(NormFluxQPL(NumSrc))
+#endif
+       allocate(SrcSeries(NumSrc))
 
        ! Fill in the source arrays
        if (rank == 0) then
           do ns=1,NumSrc
+
+
+              read(sourcefile,*) temparray
+
+              srcpos(1,ns) = temparray(1)
+              srcpos(2,ns) = temparray(2)
+              srcpos(3,ns) = temparray(3)
+              NormFlux(ns) = temparray(4)/S_star_nominal
 #ifdef PL
-             read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
-                  NormFlux(ns),NormFluxPL(ns)
-             NormFluxPL(ns)=NormFluxPL(ns)/pl_S_star_nominal
-#else
-             read(sourcefile,*) srcpos(1,ns),srcpos(2,ns),srcpos(3,ns), &
-                  NormFlux(ns)
+              NormFluxPL(ns)= temparray(5)/pl_S_star_nominal
 #endif
-             NormFlux(ns)=NormFlux(ns)/S_star_nominal
+#ifdef QUASARS
+              NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
+#endif
+#ifdef PL
+#ifdef QUASARS
+             NormFluxPL(ns) = temparray(5)/pl_S_star_nominal
+             NormFluxQPL(ns) = temparray(6)/qpl_S_star_nominal
+#endif
+#endif
           enddo
+          close(sourcefile)
           
           ! STANDARD TEST
           ! Source positions in file start at 1!
@@ -158,8 +197,11 @@ contains
           write(logf,*) 'Total photon rate (PL)= ', &
                sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
 #endif
-
-          ! Create array of source numbers for generating random order
+#ifdef QUASARS
+          write(logf,*) 'Total photon rate (Q)= ', &
+               sum(NormFluxQPL)*qpl_S_star_nominal,' s^-1'
+#endif
+          ! Create array of source numbers for generating random order 
           do ns=1,NumSrc
              SrcSeries(ns)=ns
           enddo
@@ -174,14 +216,14 @@ contains
 #ifdef PL
        call MPI_BCAST(NormFluxPL,NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
 #endif
+#ifdef QUASARS
+       call MPI_BCAST(NormFluxQPL,NumSrc,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
        ! Distribute the source series to the other nodes
        call MPI_BCAST(SrcSeries,NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
        
     endif
-
-    ! close the source file if you are rank 0
-    if (rank == 0) close(sourcefile)
 
   end subroutine source_properties
   
@@ -192,5 +234,4 @@ contains
   !! I'm using it now for the 1D-code
   subroutine source_properties_ini ()
   end subroutine source_properties_ini
-
 end module sourceprops

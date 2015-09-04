@@ -325,8 +325,8 @@ contains
        
        ! Make heating tables
        if (.not.isothermal) then
-          call make_heat_tables_HI(i_subband*2-2)
-          call make_heat_tables_HeI(i_subband*2-1)
+           call make_heat_tables_HI(i_subband*2-NumBndin1-1)
+           call make_heat_tables_HeI(i_subband*2-NumBndin1-0)
        endif
        
     enddo
@@ -376,10 +376,15 @@ contains
 #endif
        ! Make heating tables
        if (.not.isothermal) then
-          call make_heat_tables_HeII(i_subband*3-NumBndin2-4)
-          call make_heat_tables_HeII(i_subband*3-NumBndin2-3)
-          call make_heat_tables_HeII(i_subband*3-NumBndin2-2)
-       endif
+!          call make_heat_tables_HI(i_subband*3-NumBndin2-4)
+!          call make_heat_tables_HeI(i_subband*3-NumBndin2-3)
+!          call make_heat_tables_HeII(i_subband*3-NumBndin2-2)
+          call make_heat_tables_HI(i_subband*3-NumBndin2-NumBndin1*2-2)
+          call make_heat_tables_HeI(i_subband*3-NumBndin2-NumBndin1*2-1)
+          call make_heat_tables_HeII(i_subband*3-NumBndin2-NumBndin1*2)
+
+
+      endif
        
     enddo
     
@@ -396,10 +401,23 @@ contains
 
     ! report a table value
     if (rank == 0) then
+       write(logf,*) "Diagnostic reporting of heating and photoionization tables"
        write(logf,*) "bb_photo_thick_table: ",sum(bb_photo_thick_table(0,:))
        write(logf,*) "bb_photo_thin_table: ",sum(bb_photo_thin_table(0,:))
        write(logf,*) "bb_heat_thick_table: ",(bb_heat_thick_table(0,1))
        write(logf,*) "bb_heat_thin_table: ",(bb_heat_thin_table(0,1))
+#ifdef PL
+       write(logf,*) "pl_photo_thick_table:",sum(pl_photo_thick_table(0,:))
+       write(logf,*) "pl_photo_thin_table: ",sum(pl_photo_thin_table(0,:))
+       write(logf,*) "pl_heat_thick_table: ",(pl_heat_thick_table(0,1))
+       write(logf,*) "pl_heat_thin_table: ",(pl_heat_thin_table(0,1))
+#endif
+#ifdef QUASARS
+       write(logf,*) "qpl_photo_thick_table:",sum(qpl_photo_thick_table(0,:))
+       write(logf,*) "qpl_photo_thin_table: ",sum(qpl_photo_thin_table(0,:))
+       write(logf,*) "qpl_heat_thick_table: ",(qpl_heat_thick_table(0,1))
+       write(logf,*) "qpl_heat_thin_table: ",(qpl_heat_thin_table(0,1))
+#endif
     endif
     
   end subroutine spec_integration
@@ -820,7 +838,13 @@ contains
     pl_heat_thick_table(:,table_position) = answer
     call vector_romberg (pl_heat_thin_integrand_HI,vector_weight,NumFreq,NumFreq,NumTau,answer)
     pl_heat_thin_table(:,table_position) = answer
-#endif    
+#endif 
+#ifdef QUASARS
+    call vector_romberg (qpl_heat_thick_integrand_HI,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_heat_thick_table(:,table_position) = answer
+    call vector_romberg (qpl_heat_thin_integrand_HI,vector_weight,NumFreq,NumFreq,NumTau,answer)
+    qpl_heat_thin_table(:,table_position) = answer
+#endif   
   end subroutine make_heat_tables_HI
   
 !---------------------------------------------------------------------------
