@@ -685,6 +685,7 @@ contains
     real(kind=dp) :: Emin
     real(kind=dp) :: delta_E
     real(kind=dp) :: QPL_Luminosity_convert
+    real(kind=dp) :: alpha
     
     !Convert luminosity to total number of photons per second
     Emin = qpl_MinFreq_nominal/(ev2fr) !in ev
