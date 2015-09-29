@@ -487,11 +487,15 @@ contains
     ! Determine the scaling factor pl_scaling
     ! needed to achieve either the specified ionizing photon rate or ionizing luminosity
     if (pl_S_star > 0.0) then
+       if (rank==0) write(logf,*) "pl_S_star set"
        ! Total power-law ionizing photon rate is specified (photon sense)
        pl_S_star_unscaled = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","S")
        !pl_S_star_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
        pl_S_star_wanted = pl_S_star
        pl_scaling = pl_S_star_wanted/pl_S_star_unscaled
+       if (rank==0) write(logf,*) "pl_S_star_wanted: ", pl_S_star_wanted, &
+                                 ", pl_S_star_unscaled: ", pl_S_star_unscaled, &
+                                 ", pl_scaling: ", pl_scaling
        pl_ionizing_luminosity = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","L")
        !pl_ionizing_luminosity = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
        Edd_Efficiency = pl_ionizing_luminosity / EddLum

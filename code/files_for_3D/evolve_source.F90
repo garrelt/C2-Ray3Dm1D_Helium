@@ -127,13 +127,13 @@ contains
     ! photons are leaving this subbox and we need to do another
     ! one. We also stop once we have done the whole grid.
     nbox=0 ! subbox counter
-    qnbox=0 ! counter for number of large subboxes (check that this equals number of quasars later)
     total_source_flux=NormFlux(ns)*S_star
 #ifdef PL    
     total_source_flux=total_source_flux + NormFluxPL(ns)*pl_S_star
 #endif
 #ifdef QUASARS
     total_source_flux=total_source_flux+NormFluxQPL(ns)*qpl_S_star 
+    qnbox=0 ! counter for number of large subboxes (check that this equals number of quasars later)
 #endif     
     photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
     last_r(:)=srcpos(:,ns) ! to pass the first while test
