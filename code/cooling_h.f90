@@ -80,7 +80,7 @@ contains
     integer :: element,ion,nchck
 
     ! Open cooling table (H0)
-    open(unit=22,file='../tables/H0-cool.tab',status='old')
+    open(unit=22,file='tables/H0-cool.tab',status='old')
     ! Read the cooling data
     read(22,*) element,ion,nchck
     if (nchck.eq.0) then
@@ -97,7 +97,7 @@ contains
     ! not needed: maxtemp=temp(temppoints)
     
     ! Open cooling table (H1)
-    open(unit=22,file='../tables/H1-cool-B.tab',status='old')
+    open(unit=22,file='tables/H1-cool-B.tab',status='old')
     ! Read the cooling data
     read(22,*) element,ion,nchck
     if (nchck.eq.0) then
@@ -114,7 +114,7 @@ contains
     ! Since it is not clear what is in the old table, we use now:
     ! The data from the new table is compiled from:
     ! collisional ionization from Hui&Gnedin 1997
-    open(unit=22,file='../tables/He0-cool_new.tab',status='old')    
+    open(unit=22,file='tables/He0-cool_new.tab',status='old')    
     ! Read the cooling data
     read(22,*) element,ion,nchck
 !    if (nchck.eq.0) then
@@ -133,7 +133,7 @@ contains
     ! The data from the new table is compiled from:
     ! free-free and recombination B from Hummer&Storey 1998
     ! collisional excitaion and ionization + dielectronic recomb from Hui&Gnedin 1997
-    open(unit=22,file='../tables/He1-cool_new_nocollion.tab',status='old')  
+    open(unit=22,file='tables/He1-cool_new_nocollion.tab',status='old')  
     ! Read the cooling data
     read(22,*) element,ion,nchck
     if (nchck.eq.0) then
@@ -146,7 +146,7 @@ contains
     close(22)
 
     ! Open cooling table (He2)
-    open(unit=22,file='../tables/He2-cool.tab',status='old')  
+    open(unit=22,file='tables/He2-cool.tab',status='old')  
     ! Read the cooling data
     read(22,*) element,ion,nchck
     if (nchck.eq.0) then

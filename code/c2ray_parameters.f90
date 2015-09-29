@@ -54,7 +54,7 @@ module c2ray_parameters
   !! ray tracing is done. This	is a very crude	mean free path parameter
   !! which sets	up a photon wall at exactly this distance.
   integer,parameter :: max_subbox=1150
-  
+   
   !> Add photon losses back into volume or not
   logical,parameter :: add_photon_losses=.false. !.true.
 

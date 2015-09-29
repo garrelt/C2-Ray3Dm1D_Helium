@@ -57,6 +57,12 @@ module evolve
 
   use evolve_point, only: evolve0d_global
   use master_slave_processing, only: do_grid
+#ifdef QUASARS
+  use evolve_source, only: sum_qnbox,sum_qnbox_all
+  use sourceprops, only: NumQsr
+#endif
+
+
 
   implicit none
 
@@ -192,9 +198,20 @@ contains
           call pass_all_sources (niter,dt)
 
           ! Report subbox statistics
-          if (rank == 0) &
+          if (rank == 0) then
                write(logf,*) "Average number of subboxes: ", &
                real(sum_nbox_all)/real(NumSrc)
+#if defined(QUASARS) && !defined(PL)
+               write(logf,*) "This means there are: ", &
+               real(sum_qnbox_all), "large boxes at this redshift"
+               write(logf,*) "There should be ",NumQsr," at this redshift"
+               if (sum_qnbox_all /= NumQsr) then
+                   write(logf,*) "WARNING: incorrect number of large subboxes"
+               else
+                   write(logf,*) "Correct number of large subboxes"
+               endif
+#endif
+            endif
 
           if (rank == 0) then
              call system_clock(wallclock2,countspersec)
@@ -394,6 +411,9 @@ contains
 
     ! Reset sum of subboxes counter
     sum_nbox=0
+#ifdef QUASARS
+    sum_qnbox=0
+#endif
 
     ! Reset local_chemistry flag
     local_chemistry=.false.
@@ -422,6 +442,9 @@ contains
 #else
     photon_loss_all(:)=photon_loss(:)
     sum_nbox_all=sum_nbox
+#ifdef QUASARS
+    sum_qnbox_all=sum_qnbox
+#endif
 #endif
     
 #ifdef MPI
@@ -543,7 +566,16 @@ contains
     ! accumulate (sum) the MPI distributed sum of number of boxes
     call MPI_ALLREDUCE(sum_nbox, sum_nbox_all, 1, &
          MPI_INTEGER, MPI_SUM, MPI_COMM_NEW, mympierror)
+#ifdef QUASARS
+    ! accumulate (sum) the MPI distributed sum of number of boxes with quasars
+    ! in
+    write(logf,*) "Rank: ", rank, ". Before mpi sum: ", sum_qnbox_all
+    call MPI_ALLREDUCE(sum_qnbox, sum_qnbox_all, 1, &
+         MPI_INTEGER, MPI_SUM, MPI_COMM_NEW, mympierror)
+    write(logf,*) "Rank: ", rank, ". After mpi sum: ", sum_qnbox_all
 #endif
+#endif
+
 
   end subroutine mpi_accumulate_grid_quantities
 

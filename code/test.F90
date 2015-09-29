@@ -90,11 +90,11 @@ contains
     if (rank == 0) then
 
        ! Set the number of redshift slices
-       NumZred=5
+       NumZred=85
        allocate(zred_array(NumZred))
 
        ! Time step
-       timestep=1e7*YEAR
+       timestep=1e6*YEAR!1e7*YEAR
 
        ! Starting redshift
        zred_array(1)=9.

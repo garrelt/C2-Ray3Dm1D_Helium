@@ -89,20 +89,16 @@ contains
     if (allocated(srcSeries)) deallocate(srcSeries)
     
     if (allocated(temparray)) deallocate(temparray)
-    allocate(temparray(4))
-#ifdef PL
-    if (allocated(temparray)) deallocate(temparray)
-    allocate(temparray(5))
-#endif
-#ifdef QUASARS
-    if (allocated(temparray)) deallocate(temparray)
-    allocate(temparray(5))
-#endif
-#ifdef PL
-#ifdef QUASARS
-    if (allocated(temparray)) deallocate(temparray)
+!    allocate(temparray(4))
+
+#if defined(QUASARS) && defined(PL)
     allocate(temparray(6))
-#endif
+#elif defined(QUASARS)
+    allocate(temparray(5))
+#elif defined(PL)
+    allocate(temparray(5))
+#else
+    allocate(temparray(4))
 #endif
 
     ! Rank 0 reads in sources
@@ -150,18 +146,15 @@ contains
               srcpos(2,ns) = temparray(2)
               srcpos(3,ns) = temparray(3)
               NormFlux(ns) = temparray(4)/S_star_nominal
-#ifdef PL
-              NormFluxPL(ns)= temparray(5)/pl_S_star_nominal
-#endif
-#ifdef QUASARS
-              NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
-#endif
-#ifdef PL
-#ifdef QUASARS
+#if defined(QUASARS) && defined(PL)
              NormFluxPL(ns) = temparray(5)/pl_S_star_nominal
              NormFluxQPL(ns) = temparray(6)/qpl_S_star_nominal
+#elif defined(QUASARS)
+             NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
+#elif defined(PL)
+             NormFluxPL(ns)= temparray(5)/pl_S_star_nominal
 #endif
-#endif
+
           enddo
           close(sourcefile)
           

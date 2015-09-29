@@ -79,7 +79,7 @@ module sourceprops
 #endif
 #ifdef QUASARS
  real(kind=dp),dimension(:),allocatable :: NormFluxQPL !< normalized ionizing flux of sources
- integer,private :: NumQsr !< counter: number of quasar sources
+ integer :: NumQsr !< counter: number of quasar sources
 #endif
   integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
   real(kind=dp),dimension(:),allocatable :: uv_array  !< list of UV flux evolution (for some sources models)
@@ -271,6 +271,9 @@ contains
        NumMassiveSrc = 0
        NumSupprbleSrc = 0
        NumSupprsdSrc = 0
+#ifdef QUASARS
+       NumQsr = 0
+#endif
        do ns0=1,NumSrc0
           ! If you change the following lines, also change it below in
           ! read_in_sources
@@ -685,6 +688,7 @@ contains
     real(kind=dp) :: Emin
     real(kind=dp) :: delta_E
     real(kind=dp) :: QPL_Luminosity_convert
+    real(kind=dp) :: alpha
     
     !Convert luminosity to total number of photons per second
     Emin = qpl_MinFreq_nominal/(ev2fr) !in ev

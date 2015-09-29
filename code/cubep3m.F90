@@ -51,7 +51,7 @@ module nbody
   !integer,parameter :: n_box=6144  !< cells/side (in N-body,fine grid)
 
   !> Path to directory containing directory with density files:
-  character(len=*),parameter,private :: dir_dens_path = "../" 
+  character(len=*),parameter,private :: dir_dens_path = "./" 
   !> Name of directory with density files
   !character(len=180),parameter,private :: dir_dens_name= "coarser_densities/"
   character(len=*),parameter,private :: dir_dens_name= "coarser_densities/halos_removed/"
@@ -272,14 +272,13 @@ contains
 !       case(12)
 !          id_str="coarse"
        end select
-!    case(244)
 ! II: This is for low-res, 125^3 tests ONLY!!!!!!
 !        asubbox=int(n_box/mesh(1))
 !        select case (asubbox)
-        !case(64)
-        !    id_str="coarsest"
-        !case(64)
-        !    id_str="coarsest"
+     !   case(64)
+     !       id_str="coarsest"
+    !        case(64)
+!            id_str="coarsest"
 !        end select
     end select
     if (rank == 0) write(unit=logf,fmt=*) "Type of resolution: ",id_str
