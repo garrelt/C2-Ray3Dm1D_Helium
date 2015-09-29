@@ -25,7 +25,7 @@ module photonstatistics
   use tped, only: electrondens
   use sourceprops, only: NormFlux, NumSrc
   use radiation_sizes, only: NumFreqBnd
-  use radiation_sed_parameters, only: S_star
+  use radiation_sed_parameters, only: bb_S_star
   use c2ray_parameters, only: type_of_clumping
   use abundances, only: abu_he
 #ifdef PL
@@ -279,7 +279,7 @@ contains
        total_photon_loss=sum(photon_loss)*dt* &
             real(mesh(1))*real(mesh(2))*real(mesh(3))
        total_LLS_loss = LLS_loss*dt         
-       totalsrc=sum(NormFlux(1:NumSrc))*S_star*dt
+       totalsrc=sum(NormFlux(1:NumSrc))*bb_S_star*dt
 #ifdef PL
        totalsrc =totalsrc+sum(NormFluxPL(1:NumSrc))*pl_S_star*dt   
 #endif
@@ -325,7 +325,7 @@ contains
     real(kind=dp),intent(in) :: dt !< time step
 
     if (NumSrc > 0.0) then
-       grtotal_src=grtotal_src+sum(NormFlux(1:NumSrc))*S_star*dt 
+       grtotal_src=grtotal_src+sum(NormFlux(1:NumSrc))*bb_S_star*dt 
 #ifdef PL
        grtotal_src=grtotal_src+sum(NormFluxPL(1:NumSrc))*pl_S_star*dt
 #endif 

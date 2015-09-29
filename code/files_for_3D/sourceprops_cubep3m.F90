@@ -29,7 +29,7 @@ module sourceprops
       qmass_nominal,qEddLum, qpl_index_nominal, qpl_MinFreq_nominal,&
       qpl_MaxFreq_nominal
 #endif
-  use c2ray_parameters, only: phot_per_atom, lifetime, S_star_nominal,&
+  use c2ray_parameters, only: phot_per_atom, lifetime, bb_S_star_nominal,&
        StillNeutral, Number_Sourcetypes
 
   implicit none
@@ -200,7 +200,7 @@ contains
           
           write(logf,*) 'Source lifetime=', lifetime2/(1e6*YEAR),' Myr'
           write(logf,*) 'Total photon rate (BB)= ', &
-               sum(NormFlux)*S_star_nominal,' s^-1'
+               sum(NormFlux)*bb_S_star_nominal,' s^-1'
 #ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
                sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
@@ -522,7 +522,7 @@ contains
 #ifdef MPILOG
     if (rank /=0) then
        write(logf,*) 'Source lifetime=', lifetime2/(1e6*YEAR),' Myr'
-       write(logf,*) 'S_star_nominal=',S_star_nominal
+       write(logf,*) 'bb_S_star_nominal=',bb_S_star_nominal
 #ifdef PL
        write(logf,*) 'pl_S_star_nominal=',pl_S_star_nominal
 #endif
@@ -562,7 +562,7 @@ contains
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
              NormFlux(ns)=(1.0+cumfrac)*uv_array(nz)/lifetime2*SrcMass(ns,0)/ &
-                  (total_SrcMass*S_star_nominal)
+                  (total_SrcMass*bb_S_star_nominal)
              ! Calculate normalized luminosity of power law source
 #ifdef PL
              NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
@@ -588,7 +588,7 @@ contains
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
              NormFlux(ns)=uv_array(nz)* &
-                  SrcMass(ns,0)/(total_SrcMass*S_star_nominal)
+                  SrcMass(ns,0)/(total_SrcMass*bb_S_star_nominal)
              ! Calculate normalized luminosity of power law source
 #ifdef PL
              NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
@@ -618,9 +618,9 @@ contains
   function Luminosity_from_mass (Mass)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called S_star_nominal.
+    ! in terms of a standard ionizing photon rate, called bb_S_star_nominal.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of S_star_nominal.
+    ! with an ionizing photon rate of bb_S_star_nominal.
 
     ! Mass is supposed to be total mass of the source MULTIPLIED with
     ! the efficiency factor (f) which is the product of the star formation
@@ -634,7 +634,7 @@ contains
     real(kind=dp) :: Mass !< mass in units of grid masses
     real(kind=dp) :: Luminosity_from_mass
 
-    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/S_star_nominal
+    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/bb_S_star_nominal
 
   end function Luminosity_from_mass
 
@@ -643,9 +643,9 @@ contains
   function PL_Luminosity_from_mass (Mass)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called S_star_nominal.
+    ! in terms of a standard ionizing photon rate, called bb_S_star_nominal.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of S_star_nominal.
+    ! with an ionizing photon rate of bb_S_star_nominal.
 
     ! Mass is supposed to be total mass of the source MULTIPLIED with
     ! the efficiency factor (f) which is the product of the star formation

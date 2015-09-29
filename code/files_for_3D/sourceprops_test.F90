@@ -21,7 +21,7 @@ module sourceprops
   !use material, only: xh
   use grid, only: x,y,z
   use c2ray_parameters, only: phot_per_atom, lifetime, &
-       S_star_nominal, StillNeutral, Number_Sourcetypes
+       bb_S_star_nominal, StillNeutral, Number_Sourcetypes
 #ifdef PL
   use c2ray_parameters, only: pl_S_star_nominal
 #endif
@@ -149,7 +149,7 @@ contains
               srcpos(1,ns) = temparray(1)
               srcpos(2,ns) = temparray(2)
               srcpos(3,ns) = temparray(3)
-              NormFlux(ns) = temparray(4)/S_star_nominal
+              NormFlux(ns) = temparray(4)/bb_S_star_nominal
 #ifdef PL
               NormFluxPL(ns)= temparray(5)/pl_S_star_nominal
 #endif
@@ -171,7 +171,7 @@ contains
           !srcpos(1:3,2)=(/ 51, 50, 50 /)
           !srcpos(1:3,3)=(/ 52, 50, 50 /)
           !srcpos(1:3,4)=(/ 53, 50, 50 /)
-          !NormFlux(1:4)=1e55_dp/S_star_nominal
+          !NormFlux(1:4)=1e55_dp/bb_S_star_nominal
           !NormFluxPL(1:4)=0.0_dp
           
           !srcpos(1:3,5)=(/ 20, 10, 10 /)
@@ -182,17 +182,17 @@ contains
           !srcpos(1:3,7)=(/ 72, 70, 50 /)
           !srcpos(1:3,8)=(/ 70, 72, 50 /)
           !srcpos(1:3,9)=(/ 72, 72, 50 /)
-          !NormFlux(6:8)=1e55_dp/S_star_nominal
-          !NormFlux(9)=1e56_dp/S_star_nominal
+          !NormFlux(6:8)=1e55_dp/bb_S_star_nominal
+          !NormFlux(9)=1e56_dp/bb_S_star_nominal
           !NormFluxPL(6:9)=0.0
           
           !srcpos(1:3,10)=(/ 20, 10, 90 /)
-          !NormFlux(10)=1e54_dp/S_star_nominal
+          !NormFlux(10)=1e54_dp/bb_S_star_nominal
           ! Note, no normalization is used for PL source
           !NormFluxPL(10)=3.0_dp
           
           write(logf,*) 'Total photon rate (BB)= ', &
-               sum(NormFlux)*S_star_nominal,' s^-1'
+               sum(NormFlux)*bb_S_star_nominal,' s^-1'
 #ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
                sum(NormFluxPL)*pl_S_star_nominal,' s^-1'

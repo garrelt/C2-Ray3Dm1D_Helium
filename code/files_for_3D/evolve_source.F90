@@ -22,7 +22,7 @@ module evolve_source
   use c2ray_parameters, only: subboxsize, max_subbox
   use sizes, only: Ndim, mesh
   use sourceprops, only: NumSrc, srcpos, NormFlux !SrcSeries
-  use radiation_sed_parameters, only: S_star
+  use radiation_sed_parameters, only: bb_S_star
 #ifdef PL
   use radiation_sed_parameters, only: pl_S_star
   use sourceprops, only: NormFluxPL
@@ -119,7 +119,7 @@ contains
     ! photons are leaving this subbox and we need to do another
     ! one. We also stop once we have done the whole grid.
     nbox=0 ! subbox counter
-    total_source_flux=NormFlux(ns)*S_star
+    total_source_flux=NormFlux(ns)*bb_S_star
 #ifdef PL    
     total_source_flux=total_source_flux + NormFluxPL(ns)*pl_S_star
 #endif
@@ -132,7 +132,7 @@ contains
 
     ! Loop through boxes of increasing size
     ! NOTE: make this limit on the photon_loss a fraction of
-    ! a source flux loss_fraction*NormFlux(ns)*S_star)
+    ! a source flux loss_fraction*NormFlux(ns)*bb_S_star)
     do while (photon_loss_src > 1e-10*total_source_flux &
     !do while (all(photon_loss_src(:) /= 0.0) &
          .and. last_r(3) < lastpos_r(3) &
