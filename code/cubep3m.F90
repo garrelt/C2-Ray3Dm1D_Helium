@@ -41,6 +41,9 @@ module nbody
   real(kind=dp),parameter :: boxsize=244.0 !< Box size in Mpc/h comoving
   integer,parameter :: n_box=8000  !< cells/side (in N-body,fine grid)
 
+  real(kind=dp),parameter :: boxsize=425.0  !< Box size in Mpc/h comoving
+  integer,parameter :: n_box=10976  !< cells/side (in N-body,fine grid)
+
   !real(kind=dp),parameter :: boxsize=37.0  !< Box size in Mpc/h comoving
   !integer,parameter :: n_box=2048  !< cells/side (in N-body,fine grid)
 
@@ -71,6 +74,7 @@ module nbody
   character(len=*),parameter,private :: dir_LLS_path = "../" 
   !> Name of directory with files used for LLS
   character(len=*),parameter,private :: dir_LLS_name= "halos/"
+
   !> Format of density file (unformatted or binary)
 #ifdef IFORT
   ! ifort standard for "binary"
@@ -102,7 +106,7 @@ module nbody
   !> clumping file with header?
   logical,parameter :: clumpingheader=.true.
   !> LLS file with header?
-  logical,parameter :: LLSheader=.true.  
+  logical,parameter :: LLSheader=.true.
   !> unit of density in density file
   !! can be "grid", "particle", "M0Mpc3"
   character(len=*),parameter :: density_unit="grid"
@@ -131,11 +135,11 @@ module nbody
   integer, public :: NumZred               !< number of redshifts
   real(kind=dp),dimension(:),allocatable,public :: zred_array !< array of redshifts 
   integer,dimension(:),allocatable,public :: snap !< array of snapshot numbers (for compatibility)
-  character(len=8),public :: id_str       !< resolution dependent string
+  character(len=8),public :: id_str="unknown" !< resolution dependent string
 
   character(len=480),public :: dir_dens !< Path to directory with density files
-  character(len=480),public :: dir_clump !< Path to directory with density files
-  character(len=480),public :: dir_LLS !< Path to directory with LLS files  
+  character(len=480),public :: dir_clump !< Path to directory with clump files
+  character(len=480),public :: dir_LLS !< Path to directory with LLS files
   character(len=480),public :: dir_src !< Path to directory with source files
 
 #ifdef MPI
@@ -146,13 +150,17 @@ contains
 
   ! ===========================================================================
 
-  subroutine nbody_ini ()
+  subroutine nbody_ini (ierror)
     
+    integer,intent(out) :: ierror
     character(len=180) :: redshift_file ! name of file with list of redshifts
     integer :: nz ! loop counter
     character(len=20) :: dataroot="DEISA_DATA"
     character(len=256) :: value
     integer :: len, status, asubbox
+
+    ! Set error flag to zero
+    ierror=0
 
     ! In some cases a special file system is used, and its name is
     ! found from an environment variable.
@@ -167,7 +175,7 @@ contains
           dir_clump=value(1:len)//trim(adjustl(dir_clump_path)) &
                //trim(adjustl(dir_clump_name))
           dir_LLS=value(1:len)//trim(adjustl(dir_LLS_path)) &
-               //trim(adjustl(dir_LLS_name))     
+               //trim(adjustl(dir_LLS_name))
           dir_src=value(1:len)//trim(adjustl(dir_src_path)) &
                //trim(adjustl(dir_src_name))
        else
@@ -180,7 +188,7 @@ contains
        ! Assume that the whole path is set in the parameter
        dir_dens=trim(adjustl(dir_dens_path))//trim(adjustl(dir_dens_name))
        dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
-       dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))       
+       dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))
        dir_src=trim(adjustl(dir_src_path))//trim(adjustl(dir_src_name))
     elseif (status == -1) then
        ! Warning
@@ -189,7 +197,7 @@ contains
 #else
     dir_dens=trim(adjustl(dir_dens_path))//trim(adjustl(dir_dens_name))
     dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
-    dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))    
+    dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))
     dir_src=trim(adjustl(dir_src_path))//trim(adjustl(dir_src_name))
 #endif
        
@@ -217,55 +225,58 @@ contains
 #endif
 
     ! Set identifying string (resolution-dependent)
-    ! Construct the file name
+    ! This string is used to construct the source file name.
     select case (int(boxsize))
-    case (37, 64)
-       select case (n_box/mesh(1))
-       case(16)	
+    case (37)
+       select case (mesh(1))
+       case(128)	
           id_str="coarsest"
-       case(8) 
+       case(256) 
           id_str="coarser"
-       case(4) 
+       case(512) 
+          id_str="coarse"
+       end select
+    case (64)
+       select case (mesh(1))
+       case(216)	
+          id_str="coarsest"
+       case(432) 
+          id_str="coarser"
+       case(864) 
           id_str="coarse"
        end select
     case(114)
-       select case (n_box/mesh(1))
-       case(24)	
+       select case (mesh(1))
+       case(256)	
           id_str="coarsest"
-       case(16) 
+       case(384) 
           id_str="coarser"
-       case(12) 
+       case(512) 
           id_str="coarse"
        end select
     case(425)
-    ! Note that n_box/mesh is no longer an integer quantity for this
-    ! run. The numbers below are the integer parts of the division 
-       asubbox=int(n_box/meshx)
-       select case (asubbox)
-       case(43)
+       select case (mesh(1))
+       case(252)
           id_str="coarsest"
-       case(21,22)
+       case(504)
           id_str="coarser"
-       case(14)
+       case(784)
           id_str="coarse"
        end select
     case(47)
-    ! Note that n_box/mesh is no longer an integer quantity for this
-    ! run. The numbers below are the integer parts of the division
-       asubbox=int(n_box/meshx)
-       select case (asubbox)
-       case(11)
+       select case (mesh(1))
+       case(256)
           id_str="coarsest"
-       case(5)
+       case(512)
               id_str="coarser"
 !      	       case(12)
 !          id_str="coarse"
        end select
     case(244)
-       select case (n_box/mesh(1))
-       case(32)
+       select case (mesh(1))
+       case(250)
   	   id_str="coarsest"
-       case(16)
+       case(500)
           id_str="coarser"
 !       case(12)
 !          id_str="coarse"
@@ -273,14 +284,14 @@ contains
 !    case(244)
 ! II: This is for low-res, 125^3 tests ONLY!!!!!!
 !        asubbox=int(n_box/mesh(1))
-!        select case (asubbox)
-        !case(64)
-        !    id_str="coarsest"
-        !case(64)
+!        select case (mesh(1))
+        !case(125)
         !    id_str="coarsest"
 !        end select
     end select
     if (rank == 0) write(unit=logf,fmt=*) "Type of resolution: ",id_str
+
+    if (id_str == "unknown" ) ierror=1
 
   end subroutine nbody_ini
 
