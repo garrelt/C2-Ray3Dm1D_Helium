@@ -181,7 +181,7 @@ contains
        call MPI_BCAST(pl_MaxFreq,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
 #endif
-#ifdef QUASAR
+#ifdef QUASARS
        call MPI_BCAST(qEdd_Efficiency,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
        call MPI_BCAST(qpl_S_star,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
@@ -495,26 +495,25 @@ contains
     ! This is R_star^2 for the black body source
     R_star2=R_star*R_star
 
-#ifdef PL
-    ! Determine the scaling factor pl_scaling
-    call set_scaling_factor("P")
-#endif
-
-#ifdef QUASARS
-    ! Determine the scaling factor qpl_scaling
-    call set_scaling_factor("Q")
-#endif
-
     ! Report information about the three frequency bands
     if (sourcetype == "B" .or. sourcetype == " " .or. sourcetype == "A") &
          call report_source_band_information("B")
 
 #ifdef PL
+    ! Determine the scaling factor pl_scaling
+    call set_scaling_factor("P")
+
+    ! Report information about the three frequency bands
     if (sourcetype == "P" .or. sourcetype == " " .or. sourcetype == "A") &
          call report_source_band_information("P")
 #endif
 
+
 #ifdef QUASARS
+    ! Determine the scaling factor qpl_scaling
+    call set_scaling_factor("Q")
+
+    ! Report information about the three frequency bands
     if (sourcetype == "Q" .or. sourcetype == " " .or. sourcetype == "A") &
          call report_source_band_information("Q")
 #endif
@@ -550,6 +549,7 @@ contains
        S_star = bb_S_star
        L_ionizing = L_star_ion
        MinFreq = freq_min(NumBndin1)
+       MaxFreq = freq_max(NumBndin1+NumBndin2+NumBndin3)
 #ifdef PL
     case("P") 
        source_string="power law"
@@ -635,7 +635,7 @@ contains
           write(logf,'(a,es10.3,a)')   ' Luminosity = ', L_star/l_solar, ' L_solar'
        end select
        write(logf,'(a,es10.3,a)')   ' Ionizing photon rate = ', S_star, ' s^-1'
-       write(logf,'(a,es10.3,a)')   ' Ionizing luminosity = ', L_ionizing, ' L_solar'
+       write(logf,'(a,es10.3,a)')   ' Ionizing luminosity = ', L_ionizing/l_solar, ' L_solar'
        write(logf,'(a,2f8.3,a)')   ' between energies ', &
             MinFreq/(1e3*ev2fr),MaxFreq/(1e3*ev2fr),' kEv'
     endif
@@ -675,30 +675,30 @@ contains
     freq_min_Bnd2=max(freq_min(NumBndin1+1),MinFreq)
     freq_min_Bnd3=max(freq_min(NumBndin1+NumBndin2+1),MinFreq)
     ! Find out the number of photons in each band
-    if (freq_min_Bnd1 > freq_max(NumBndin1)) then
-       S_star_band1 = integrate_sed(freq_min(NumBndin1), &
+    if (freq_min_Bnd1 < freq_max(NumBndin1)) then
+       S_star_band1 = integrate_sed(freq_min_Bnd1, &
             freq_max(NumBndin1),sourcetype,"S")
-       L_star_band1 = integrate_sed(freq_min(NumBndin1), &
+       L_star_band1 = integrate_sed(freq_min_Bnd1, &
             freq_max(NumBndin1),sourcetype,"L")
     else
        S_star_band1 = 0.0
        L_star_band1 = 0.0
     endif
     
-    if (freq_min_Bnd2 > freq_max(NumBndin1+NumBndin2)) then
-       S_star_band2 = integrate_sed(freq_min(NumBndin1+1), &
+    if (freq_min_Bnd2 < freq_max(NumBndin1+NumBndin2)) then
+       S_star_band2 = integrate_sed(freq_min_Bnd2, &
             freq_max(NumBndin1+NumBndin2),sourcetype,"S")
-       L_star_band2 = integrate_sed(freq_min(NumBndin1+1), &
+       L_star_band2 = integrate_sed(freq_min_Bnd2, &
             freq_max(NumBndin1+NumBndin2),sourcetype,"L")
     else
        S_star_band2 = 0.0
        L_star_band2 = 0.0
     endif
-    
-    if (freq_min_Bnd3 > freq_max(NumBndin1+NumBndin2+NumBndin3)) then
-       S_star_band3 = integrate_sed(freq_min(NumBndin1+NumBndin2+1), &
+
+    if (freq_min_Bnd3 < freq_max(NumBndin1+NumBndin2+NumBndin3)) then
+       S_star_band3 = integrate_sed(freq_min_Bnd3, &
             freq_max(NumBndin1+NumBndin2+NumBndin3),sourcetype,"S")
-       L_star_band3 = integrate_sed(freq_min(NumBndin1+NumBndin2+1), &
+       L_star_band3 = integrate_sed(freq_min_Bnd3, &
             freq_max(NumBndin1+NumBndin2+NumBndin3),sourcetype,"L")
     else
        S_star_band3 = 0.0
@@ -707,22 +707,22 @@ contains
     
     ! Report back to the log file
     if (rank == 0) then
-       write(logf,'(A,(ES12.5),A//)') " Number of ",source_string," photons in band 1: ", &
+       write(logf,'(A,A,A,(ES12.5),A//)') " Number of ",source_string," photons in band 1: ", &
             S_star_band1, " s^-1"
-       write(logf,'(A,(ES12.5),A//)') source_string," luminosity in band 1: ", &
+       write(logf,'(A,A,(ES12.5),A//)') source_string," luminosity in band 1: ", &
             L_star_band1, " erg s^-1"
-       write(logf,'(A,(ES12.5),A//)') " Number of ",source_string," photons in band 2: ", &
+       write(logf,'(A,A,A,(ES12.5),A//)') " Number of ",source_string," photons in band 2: ", &
             S_star_band2, " s^-1"
-       write(logf,'(A,(ES12.5),A//)') source_string," luminosity in band 2: ", &
+       write(logf,'(A,A,(ES12.5),A//)') source_string," luminosity in band 2: ", &
             L_star_band2, " erg s^-1"
-       write(logf,'(A,(ES12.5),A//)') " Number of ",source_string," photons in band 3: ", &
+       write(logf,'(A,A,A(ES12.5),A//)') " Number of ",source_string," photons in band 3: ", &
             S_star_band3, " s^-1"
-       write(logf,'(A,(ES12.5),A//)') source_string," luminosity in band 3: ", &
+       write(logf,'(A,A,(ES12.5),A//)') source_string," luminosity in band 3: ", &
             S_star_band3, " erg s^-1"
-       write(logf,'(A,(ES12.5),A//)') &
+       write(logf,'(A,A,A,(ES12.5),A//)') &
             " Total number of ionizing photons in band 1,2,3 (",source_string,"): ", &
             S_star_band1+S_star_band2+S_star_band3, "s^-1"
-       write(logf,'(A,(ES12.5),A,(ES12.5),A,//)') &
+       write(logf,'(A,A,A,(ES12.5),A,(ES12.5),A,//)') &
             " Total luminosity in band 1,2,3 (",source_string,"): ", &
             L_star_band1+L_star_band2+L_star_band3, "erg s^-1 = ", &
             (L_star_band1+L_star_band2+L_star_band3)/L_solar, " L0"
