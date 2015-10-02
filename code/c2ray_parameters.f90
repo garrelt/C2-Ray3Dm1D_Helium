@@ -61,7 +61,7 @@ module c2ray_parameters
   !> Parameters for nominal SED (BB)
   !> Effective temperature (K); if set to zero, the code will ask
   !! for SED parameters
-  real(kind=dp),parameter :: T_eff_nominal=5.0e4
+  real(kind=dp),parameter :: T_eff_nominal=0.0 !5.0e4
   !> Number of ionizing photons / second
   real(kind=dp),parameter :: bb_S_star_nominal=1e48_dp
 
@@ -72,7 +72,7 @@ module c2ray_parameters
 
 #ifdef PL
   !> nominal Eddington efficiency
-  real(kind=dp),parameter :: EddLeff_nominal=1.0_dp
+  real(kind=dp),parameter :: pl_EddLeff_nominal=1.0_dp
   !> nominal power law index (for photon number)
   real(kind=dp),parameter :: pl_index_nominal=2.5_dp
   !> Number of ionizing photons / second
@@ -89,7 +89,7 @@ module c2ray_parameters
 
 #ifdef QUASARS
   !> nominal quasar Eddington efficiency
-  real(kind=dp),parameter :: qEddLeff_nominal=1.0_dp
+  real(kind=dp),parameter :: qpl_EddLeff_nominal=1.0_dp
   !> nominal quasar index (for photon number)
   real(kind=dp),parameter :: qpl_index_nominal=1.8_dp
   !> Number of ionizing photons / second for quasars

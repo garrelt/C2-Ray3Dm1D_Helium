@@ -33,14 +33,14 @@ module radiation_sed_parameters
                               EddLum                     ! Eddington luminosity (for mass_nominal)
 #ifdef PL
   use c2ray_parameters, only: pl_index_nominal,&         ! Power law index for for nominal PL SED
-                              EddLeff_nominal,&          ! Eddington efficiency for for nominal PL SED
+                              pl_EddLeff_nominal,&          ! Eddington efficiency for for nominal PL SED
                               pl_S_star_nominal, &       ! Ionizing photon rate for nominal PL SED
                               pl_MinFreq_nominal, &      ! Lowest frequency for nominal PL SED
                               pl_MaxFreq_nominal        ! Highest frequency for nominal PL SED
 #endif
 #ifdef QUASARS
  use c2ray_parameters, only: qpl_index_nominal,&         ! Power law index for for nominal QU SED
-                              qEddLeff_nominal,&          ! Eddington efficiency for for nominal QU SED
+                              qpl_EddLeff_nominal,&          ! Eddington efficiency for for nominal QU SED
                               qpl_S_star_nominal, &       ! Ionizing photon rate for nominal QU SED
                               qpl_MinFreq_nominal, &      ! Lowest frequency for nominal QU SED
                               qpl_MaxFreq_nominal         ! Highest frequency for nominal QU SED
@@ -82,7 +82,7 @@ module radiation_sed_parameters
   real(kind=dp) :: pl_minfreq           ! Minimum frequency for integration of total power
   real(kind=dp) :: pl_maxfreq           ! Maximum frequency for integration of total power
   real(kind=dp) :: pl_scaling = 1.0     ! The scaling of the flux (needs to be initialized)
-  real(kind=dp) :: Edd_Efficiency = 0.0 ! Eddington efficieny
+  real(kind=dp) :: pl_Edd_Efficiency = 0.0 ! Eddington efficieny
   real(kind=dp) :: pl_S_star = 1.0
 #endif
 
@@ -91,7 +91,7 @@ module radiation_sed_parameters
   real(kind=dp) :: qpl_minfreq           ! Minimum frequency for integration of total power
   real(kind=dp) :: qpl_maxfreq           ! Maximum frequency for integration of total power
   real(kind=dp) :: qpl_scaling = 1.0     ! The scaling of the flux (needs to be initialized)
-  real(kind=dp) :: qEdd_Efficiency = 0.0 ! Eddington efficieny
+  real(kind=dp) :: qpl_Edd_Efficiency = 0.0 ! Eddington efficieny
   real(kind=dp) :: qpl_S_star = 1.0
 #endif
 
@@ -111,13 +111,14 @@ contains
     if (T_eff_nominal == 0.0) then
        
        if (rank == 0) then
-          do while ((sourcetype  /= 'B') .and. (sourcetype /= 'P'))
+          do while ((sourcetype  /= 'B') .and. (sourcetype /= 'P') .and. &
+               (sourcetype /= 'Q') .and. (sourcetype /= 'A'))
              
 #if defined(QUASARS) && defined(PL)
              if (.not.file_input) &
-                  write(*,"(A,$)") "Specify source type;", &
+                  write(*,"(A,A,A,$)") "Specify source type; ", &
                   "Choices are blackbody source (B), power law source (P), ", &
-                  "quasar (Q) or all three (A)"
+                  "quasar (Q) or all three (A): "
              ! Read source type, either blackbody, power law or quasar source
              read(stdinput,*) sourcetype 
 #elif defined(QUASARS)
@@ -131,7 +132,7 @@ contains
              if (.not.file_input) &
                   write(*,"(A,$)") "Specify source type;", &
                   "Choices are blackbody source (B), power law source (P), ", &
-                  "or both (A)"
+                  "or both (A): "
              ! Read source type, either blackbody or power law source
              read(stdinput,*) sourcetype 
 #else
@@ -172,7 +173,7 @@ contains
        call MPI_BCAST(bb_S_star,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
 #ifdef PL
-       call MPI_BCAST(Edd_Efficiency,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
+       call MPI_BCAST(pl_Edd_Efficiency,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
        call MPI_BCAST(pl_S_star,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
@@ -182,7 +183,7 @@ contains
             mympierror)
 #endif
 #ifdef QUASARS
-       call MPI_BCAST(qEdd_Efficiency,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
+       call MPI_BCAST(qpl_Edd_Efficiency,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
        call MPI_BCAST(qpl_S_star,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW, &
             mympierror)
@@ -213,7 +214,7 @@ contains
        ! Assign some fiducial values, these are scaled to correspond 
        ! to S_star in routine spec_diag
        pl_scaling=1.0
-       Edd_Efficiency=0.0
+       pl_Edd_Efficiency=0.0
 #endif
 
 #ifdef QUASARS
@@ -226,7 +227,7 @@ contains
        ! Assign some fiducial values, these are scaled to correspond 
        ! to S_star in routine spec_diag
        qpl_scaling=1.0
-       qEdd_Efficiency=0.0
+       qpl_Edd_Efficiency=0.0
 #endif
 
     endif
@@ -263,7 +264,7 @@ contains
     
     ! Ask for radius, luminosity, ionizing luminosity or ionizing photon rate?
     if (.not.file_input) then
-       write(*,'(A)') 'You can specify' 
+       write(*,'(A)') 'For a Black Body You can specify' 
        write(*,'(A)') ' 1) a stellar radius'
        write(*,'(A)') ' 2) a total luminosity'
        write(*,'(A)') ' 3) Total ionizing luminosity'
@@ -322,13 +323,6 @@ contains
        
     end select
     
-    ! set some fiducial values for the BB source here, though they are
-    ! not useful
-    R_star=r_solar
-    bb_S_star=0.0
-    L_star=0.0
-    T_eff=1.0e5
-    
   end subroutine input_black_body_spectral_parameters
 
   !-----------------------------------------------------------------------------
@@ -345,12 +339,19 @@ contains
     ! In power-law case, we ask for number of ionizing photons per second
     ! or Eddington luminosity efficiency 
     write(logf,*) 'Power law source'
+
+    ! Ask for power law index
+    if (.not.file_input) write(*,'(A,$)') 'Specify power law index for power law source (for number of photons, not energy) '
+    read(stdinput,*) pl_index      ! Read power law index, this number equal to one plus that of energy 
+    write(logf,*) 'Power law index for power law source is ', pl_index
+
     if (.not.file_input) then
-       write(*,'(A)') 'You can specify'
+       write(*,'(A)') 'For a power law you can specify'
        write(*,'(A)') ' 1)  Number of ionizing photons per second '
        write(*,'(A)') ' 2)  Efficiency parameter assuming a 1e6 solar mass BH' 
     endif
     
+    ichoice=0
     ! Report error if options are not 1 and 2
     do while (i_choice <= 0 .or. i_choice > 2)
        if (.not.file_input) write(*,'(A,$)') 'Preferred option (1 or 2): '
@@ -364,28 +365,25 @@ contains
        
     case (1)
        write(logf,*) 'Rate of ionizing photons is specified'
-       if (.not.file_input) write(*,'(A,$)') 'give number of ionizing photons per second '
+       if (.not.file_input) write(*,'(A,$)') 'give number of ionizing photons per second: '
        read(stdinput,*) pl_S_star          ! Read ionizing photons per second
        write(logf,*) 'The rate is ', pl_S_star
        
        ! Set the Eddinton luminosity efficiency to the nominal value 
-       Edd_Efficiency=EddLeff_nominal
+       pl_Edd_Efficiency=pl_EddLeff_nominal
        pl_scaling=1.0 ! fiducial value, to be updated in spec_diag
        
     case (2)
        write(logf,*) 'Efficiency parameter is specified'
-       if (.not.file_input) write(*,'(A,$)') 'give efficiency parameter '
-       read(stdinput,*) Edd_Efficiency         ! Read Eddington efficiency
-       write(logf,*) 'The efficiency parameter is ', Edd_Efficiency
+       if (.not.file_input) write(*,'(A,$)') 'give efficiency parameter: '
+       read(stdinput,*) pl_Edd_Efficiency         ! Read Eddington efficiency
+       write(logf,*) 'The efficiency parameter is ', pl_Edd_Efficiency
        ! Set some fiducial value, to be updated in spec_diag
        pl_S_star=0.0
        pl_scaling=1.0
     end select
     
-    if (.not.file_input) write(*,'(A,$)') 'Specify power law index (for number of photons, not energy) '
-    read(stdinput,*) pl_index      ! Read power law index, this number equal to one plus that of energy 
-    write(logf,*) 'Power law index is ', pl_index
-    if (.not.file_input) write(*,'(A,$)') 'give lower and upper frequency limits in eV '
+    if (.not.file_input) write(*,'(A,$)') 'For power law source specify lower and upper frequency limits in eV: '
     read(stdinput,*) pl_MinFreq,pl_MaxFreq     ! Read lower and upper frequency limits in eV	
     write(logf,*) 'The lower energy limit is ', pl_MinFreq, ' eV'
     write(logf,*) 'The upper energy limit is ', pl_MaxFreq, ' eV'
@@ -408,15 +406,21 @@ contains
 
     integer :: i_choice
 
+    ! Ask for power law index for quasar source
+    if (.not.file_input) write(*,'(A,$)') 'Specify quasar spectrum power law index (for number of photons, not energy) '
+    read(stdinput,*) qpl_index      ! Read power law index, this number equal to one plus that of energy 
+    write(logf,*) 'Power law index for Quasar source is ', qpl_index
+
     ! In quasar case, we ask for number of ionizing photons per second
     ! or Eddinton luminosity efficiency 
     write(logf,*) 'Quasar source'
     if (.not.file_input) then
-       write(*,'(A)') 'You can specify'
+       write(*,'(A)') 'For the Quasar source you can specify'
        write(*,'(A)') ' (1)  Number of ionizing photons per second '
        write(*,'(A)') ' (2)  Efficiency parameter assuming a 1e6 solar mass BH'
     endif
     
+    ichoice=0
     ! Report error if options are not 1 and 2
     do while (i_choice <= 0 .or. i_choice > 2)
        if (.not.file_input) write(*,'(A,$)') 'Preferred option (1 or 2): '
@@ -430,27 +434,25 @@ contains
        
     case (1)
        write(logf,*) 'Rate of ionizing photons is specified'
-       if (.not.file_input) write(*,'(A,$)') 'give number of ionizing photons per second '
+       if (.not.file_input) write(*,'(A,$)') 'give number of ionizing photons per second: '
        read(stdinput,*) qpl_S_star          ! Read ionizing photons per second
        write(logf,*) 'The rate is ', qpl_S_star
        
        ! Set the Eddinton luminosity efficiency to the nominal value 
-       qEdd_Efficiency=qEddLeff_nominal
+       qpl_Edd_Efficiency=qpl_EddLeff_nominal
        qpl_scaling=1.0 ! fiducial value, to be updated in spec_diag
        
     case (2)
        write(logf,*) 'Efficiency parameter is specified'
-       if (.not.file_input) write(*,'(A,$)') 'give efficiency parameter'
-       read(stdinput,*) qEdd_Efficiency         ! Read Eddington efficiency
-       write(logf,*) 'The efficiency parameter is ', qEdd_Efficiency
+       if (.not.file_input) write(*,'(A,$)') 'give efficiency parameter: '
+       read(stdinput,*) qpl_Edd_Efficiency         ! Read Eddington efficiency
+       write(logf,*) 'The efficiency parameter is ', qpl_Edd_Efficiency
        ! Set some fiducial value, to be updated in spec_diag
        qpl_S_star=0.0
        qpl_scaling=1.0
     end select
-    if (.not.file_input) write(*,'(A,$)') 'Specify power law index (for number of photons, not energy) '
-    read(stdinput,*) qpl_index      ! Read power law index, this number equal to one plus that of energy 
-    write(logf,*) 'Power law index is ', qpl_index
-    if (.not.file_input) write(*,'(A,$)') 'give lower and upper frequency limits in eV '
+
+    if (.not.file_input) write(*,'(A,$)') 'For the quasar source specify lower and upper frequency limits in eV: '
     read(stdinput,*) qpl_MinFreq,qpl_MaxFreq     ! Read lower and upper frequency limits in eV   
     write(logf,*) 'The lower energy limit is ', qpl_MinFreq, ' eV'
     write(logf,*) 'The upper energy limit is ', qpl_MaxFreq, ' eV'
@@ -553,8 +555,9 @@ contains
 #ifdef PL
     case("P") 
        source_string="power law"
-       S_star = pl_S_star
        index = pl_index
+       Edd_Efficiency = pl_Edd_Efficiency
+       S_star = pl_S_star
        MinFreq = pl_MinFreq
        MaxFreq = pl_MaxFreq
 #endif
@@ -562,6 +565,7 @@ contains
     case("Q") 
        source_string="quasar"
        index = qpl_index
+       Edd_Efficiency = qpl_Edd_Efficiency
        S_star = qpl_S_star
        MinFreq = qpl_MinFreq
        MaxFreq = qpl_MaxFreq
@@ -615,10 +619,12 @@ contains
 #ifdef PL
     case("P") 
        pl_S_star = S_star
+       pl_Edd_Efficiency=Edd_Efficiency
 #endif
 #ifdef QUASARS
     case("Q") 
        qpl_S_star = S_star
+       qpl_Edd_Efficiency=Edd_Efficiency
 #endif
     end select
 
