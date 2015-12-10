@@ -125,7 +125,7 @@ contains
              if (.not.file_input) &
                   write(*,"(A,$)") "Specify source type;", &
                   "Choices are blackbody source (B), ", &
-                  "quasar (Q) or both (A)"
+                  "quasar (Q) or both (A): "
              ! Read source type, either blackbody or quasar
              read(stdinput,*) sourcetype 
 #elif defined(PL)
@@ -253,7 +253,7 @@ contains
     do while (T_eff < 2000.0 .or. T_eff > 1000000.) 
        if (.not.file_input) write(*,'(A,$)') 'Give black body effective temperature (2000 <= T <= 1000000): '
        read(stdinput,*) T_eff      ! Read temperature of black body
-       write(logf,*) 'Temperature of the black body : ', T_eff
+       write(logf,'(a,es10.3)') 'Temperature of the black body : ', T_eff
        if (T_eff < 2000.0 .or. T_eff > 1000000.) then
           write(*,*) 'Error: Effective temperature out of range. Try again'
        endif
@@ -286,7 +286,7 @@ contains
        write(logf,*) 'A stellar radius is specified'
        if (.not.file_input) write(*,'(A,$)') 'Give radius in solar radius: '
        read(stdinput,*) R_star      ! Read radius of the black body
-       write(logf,*) 'The radius is ', R_star, ' solar radius'
+       write(logf,'(a,es10.3,a)') 'The radius is ', R_star, ' solar radius'
        R_star=R_star*r_solar
        L_star=4.0d0*pi*R_star*R_star*bb_luminosity_unscaled
        bb_S_star=0.0  ! Number of photo-ionizing photons is set to zero here but will be reset in spec_diag routine
@@ -295,7 +295,7 @@ contains
        write(logf,*) 'A total luminosity is specified'
        if (.not.file_input) write(*,'(A,$)') 'Give total luminosity in solar luminosity: '
        read(stdinput,*) L_star      ! Read luminosity of the black body
-       write(logf,*) 'The luminosity is ', L_star, ' solar luminosity'
+       write(logf,'(a,es10.3,a)') 'The luminosity is ', L_star, ' solar luminosity'
        L_star=L_star*l_solar
        R_star=dsqrt(L_star/(4.0d0*pi*bb_luminosity_unscaled))
        bb_S_star=0.0   ! Number of photo-ionizing photons is set to zero here but will be reset in spec_diag routine
@@ -304,7 +304,7 @@ contains
        write(logf,*) 'Total ionizing luminosity is specified'
        if (.not.file_input) write(*,'(A,$)') 'Give total ionizing luminosity in solar luminosity: '
        read(stdinput,*) L_star_ion   ! Read ionizing luminosity of the black body
-       write(logf,*) 'Total ionizing luminosity is ', L_star_ion, ' solar luminosty'
+       write(logf,'(A,es10.3,A)') 'Total ionizing luminosity is ', L_star_ion, ' solar luminosty'
        L_star_ion=L_star_ion*l_solar
        ! Assign some fiducial values, these are overwritten in routine spec_diag
        R_star=r_solar
@@ -336,22 +336,22 @@ contains
 
     integer :: i_choice
 
-    ! In power-law case, we ask for number of ionizing photons per second
-    ! or Eddington luminosity efficiency 
     write(logf,*) 'Power law source'
 
     ! Ask for power law index
     if (.not.file_input) write(*,'(A,$)') 'Specify power law index for power law source (for number of photons, not energy) '
     read(stdinput,*) pl_index      ! Read power law index, this number equal to one plus that of energy 
-    write(logf,*) 'Power law index for power law source is ', pl_index
+    write(logf,'(A,F10.3)') 'Power law index for power law source is ', pl_index
 
+    ! In power-law case, we ask for number of ionizing photons per second
+    ! or Eddington luminosity efficiency 
     if (.not.file_input) then
        write(*,'(A)') 'For a power law you can specify'
        write(*,'(A)') ' 1)  Number of ionizing photons per second '
        write(*,'(A)') ' 2)  Efficiency parameter assuming a 1e6 solar mass BH' 
     endif
     
-    ichoice=0
+    i_choice=0
     ! Report error if options are not 1 and 2
     do while (i_choice <= 0 .or. i_choice > 2)
        if (.not.file_input) write(*,'(A,$)') 'Preferred option (1 or 2): '
@@ -367,7 +367,7 @@ contains
        write(logf,*) 'Rate of ionizing photons is specified'
        if (.not.file_input) write(*,'(A,$)') 'give number of ionizing photons per second: '
        read(stdinput,*) pl_S_star          ! Read ionizing photons per second
-       write(logf,*) 'The rate is ', pl_S_star
+       write(logf,'(A,es10.3)') 'The rate is ', pl_S_star
        
        ! Set the Eddinton luminosity efficiency to the nominal value 
        pl_Edd_Efficiency=pl_EddLeff_nominal
@@ -377,7 +377,7 @@ contains
        write(logf,*) 'Efficiency parameter is specified'
        if (.not.file_input) write(*,'(A,$)') 'give efficiency parameter: '
        read(stdinput,*) pl_Edd_Efficiency         ! Read Eddington efficiency
-       write(logf,*) 'The efficiency parameter is ', pl_Edd_Efficiency
+       write(logf,'(A,es10.3)') 'The efficiency parameter is ', pl_Edd_Efficiency
        ! Set some fiducial value, to be updated in spec_diag
        pl_S_star=0.0
        pl_scaling=1.0
@@ -385,8 +385,8 @@ contains
     
     if (.not.file_input) write(*,'(A,$)') 'For power law source specify lower and upper frequency limits in eV: '
     read(stdinput,*) pl_MinFreq,pl_MaxFreq     ! Read lower and upper frequency limits in eV	
-    write(logf,*) 'The lower energy limit is ', pl_MinFreq, ' eV'
-    write(logf,*) 'The upper energy limit is ', pl_MaxFreq, ' eV'
+    write(logf,'(A,F10.3,A)') 'The lower energy limit is ', pl_MinFreq, ' eV'
+    write(logf,'(A,F10.3,A)') 'The upper energy limit is ', pl_MaxFreq, ' eV'
     
     ! Convert eVs to Hz for the frequency limits
     pl_MinFreq = pl_MinFreq * ev2fr
@@ -406,21 +406,22 @@ contains
 
     integer :: i_choice
 
+    write(logf,*) 'Quasar source'
+
     ! Ask for power law index for quasar source
     if (.not.file_input) write(*,'(A,$)') 'Specify quasar spectrum power law index (for number of photons, not energy) '
     read(stdinput,*) qpl_index      ! Read power law index, this number equal to one plus that of energy 
-    write(logf,*) 'Power law index for Quasar source is ', qpl_index
+    write(logf,'(A,F10.3)') 'Power law index for Quasar source is ', qpl_index
 
     ! In quasar case, we ask for number of ionizing photons per second
     ! or Eddinton luminosity efficiency 
-    write(logf,*) 'Quasar source'
     if (.not.file_input) then
        write(*,'(A)') 'For the Quasar source you can specify'
        write(*,'(A)') ' (1)  Number of ionizing photons per second '
        write(*,'(A)') ' (2)  Efficiency parameter assuming a 1e6 solar mass BH'
     endif
     
-    ichoice=0
+    i_choice=0
     ! Report error if options are not 1 and 2
     do while (i_choice <= 0 .or. i_choice > 2)
        if (.not.file_input) write(*,'(A,$)') 'Preferred option (1 or 2): '
@@ -436,7 +437,7 @@ contains
        write(logf,*) 'Rate of ionizing photons is specified'
        if (.not.file_input) write(*,'(A,$)') 'give number of ionizing photons per second: '
        read(stdinput,*) qpl_S_star          ! Read ionizing photons per second
-       write(logf,*) 'The rate is ', qpl_S_star
+       write(logf,'(A,es10.3)') 'The rate is ', qpl_S_star
        
        ! Set the Eddinton luminosity efficiency to the nominal value 
        qpl_Edd_Efficiency=qpl_EddLeff_nominal
@@ -446,7 +447,7 @@ contains
        write(logf,*) 'Efficiency parameter is specified'
        if (.not.file_input) write(*,'(A,$)') 'give efficiency parameter: '
        read(stdinput,*) qpl_Edd_Efficiency         ! Read Eddington efficiency
-       write(logf,*) 'The efficiency parameter is ', qpl_Edd_Efficiency
+       write(logf,'(A,es10.3)') 'The efficiency parameter is ', qpl_Edd_Efficiency
        ! Set some fiducial value, to be updated in spec_diag
        qpl_S_star=0.0
        qpl_scaling=1.0
@@ -454,10 +455,9 @@ contains
 
     if (.not.file_input) write(*,'(A,$)') 'For the quasar source specify lower and upper frequency limits in eV: '
     read(stdinput,*) qpl_MinFreq,qpl_MaxFreq     ! Read lower and upper frequency limits in eV   
-    write(logf,*) 'The lower energy limit is ', qpl_MinFreq, ' eV'
-    write(logf,*) 'The upper energy limit is ', qpl_MaxFreq, ' eV'
+    write(logf,'(A,F10.3,A)') 'The lower energy limit is ', qpl_MinFreq, ' eV'
+    write(logf,'(A,F10.3,A)') 'The upper energy limit is ', qpl_MaxFreq, ' eV'
     
-
     ! Convert eVs to Hz for the frequency limits
     qpl_MinFreq = qpl_MinFreq * ev2fr
     qpl_MaxFreq = qpl_MaxFreq * ev2fr
@@ -491,33 +491,39 @@ contains
     real(kind=dp) :: qpl_ionizing_luminosity_wanted
 #endif  
 
-    ! Determine the scaling factor for the black body source
-    call set_scaling_factor("B")
-
-    ! This is R_star^2 for the black body source
-    R_star2=R_star*R_star
-
-    ! Report information about the three frequency bands
-    if (sourcetype == "B" .or. sourcetype == " " .or. sourcetype == "A") &
-         call report_source_band_information("B")
+    ! Set scaling for black body source if this sourcetype is active
+    if (sourcetype == "B" .or. sourcetype == " " .or. sourcetype == "A") then
+       ! Determine the scaling factor for the black body source
+       call set_scaling_factor("B")
+       
+       ! This is R_star^2 for the black body source
+       R_star2=R_star*R_star
+       
+       ! Report information about the three frequency bands
+       call report_source_band_information("B")
+    endif
 
 #ifdef PL
-    ! Determine the scaling factor pl_scaling
-    call set_scaling_factor("P")
+    ! Set scaling for power law source if this sourcetype is active
+    if (sourcetype == "P" .or. sourcetype == " " .or. sourcetype == "A") then
+       ! Determine the scaling factor pl_scaling
+       call set_scaling_factor("P")
 
-    ! Report information about the three frequency bands
-    if (sourcetype == "P" .or. sourcetype == " " .or. sourcetype == "A") &
-         call report_source_band_information("P")
+       ! Report information about the three frequency bands
+       call report_source_band_information("P")
+    endif
 #endif
 
 
 #ifdef QUASARS
-    ! Determine the scaling factor qpl_scaling
-    call set_scaling_factor("Q")
-
-    ! Report information about the three frequency bands
-    if (sourcetype == "Q" .or. sourcetype == " " .or. sourcetype == "A") &
-         call report_source_band_information("Q")
+    ! Set scaling for quasar source if this sourcetype is active
+    if (sourcetype == "Q" .or. sourcetype == " " .or. sourcetype == "A") then
+       ! Determine the scaling factor qpl_scaling
+       call set_scaling_factor("Q")
+       
+       ! Report information about the three frequency bands
+       call report_source_band_information("Q")
+    endif
 #endif
 
   end subroutine spec_diag
@@ -656,8 +662,9 @@ contains
 
     real(kind=dp) :: S_star_band1, S_star_band2, S_star_band3
     real(kind=dp) :: L_star_band1, L_star_band2, L_star_band3
-    real(kind=dp) :: MinFreq
+    real(kind=dp) :: MinFreq, MaxFreq
     real(kind=dp) :: freq_min_Bnd1, freq_min_Bnd2, freq_min_Bnd3
+    real(kind=dp) :: freq_max_Bnd1, freq_max_Bnd2, freq_max_Bnd3
     character(len=3) :: source_string
 
     select case (sourcetype)
@@ -668,44 +675,53 @@ contains
     case("P") 
        source_string="PL"
        MinFreq = pl_MinFreq
+       MaxFreq = pl_MaxFreq
 #endif
 #ifdef QUASARS
     case("Q") 
        source_string="QSO"
        MinFreq = qpl_MinFreq
+       MaxFreq = qpl_MaxFreq
 #endif
     end select
 
     ! Take care of frequency limits
     freq_min_Bnd1=max(freq_min(NumBndin1),MinFreq)
+    freq_max_Bnd1=min(freq_max(NumBndin1),MaxFreq)
     freq_min_Bnd2=max(freq_min(NumBndin1+1),MinFreq)
+    freq_max_Bnd2=min(freq_max(NumBndin1+NumBndin2),MaxFreq)
     freq_min_Bnd3=max(freq_min(NumBndin1+NumBndin2+1),MinFreq)
+    freq_max_Bnd3=min(freq_max(NumBndin1+NumBndin2+NumBndin3),MaxFreq)
+
     ! Find out the number of photons in each band
+    ! Band 1
     if (freq_min_Bnd1 < freq_max(NumBndin1)) then
        S_star_band1 = integrate_sed(freq_min_Bnd1, &
-            freq_max(NumBndin1),sourcetype,"S")
+            freq_max_Bnd1,sourcetype,"S")
        L_star_band1 = integrate_sed(freq_min_Bnd1, &
-            freq_max(NumBndin1),sourcetype,"L")
+            freq_max_Bnd1,sourcetype,"L")
     else
        S_star_band1 = 0.0
        L_star_band1 = 0.0
     endif
     
+    ! Band 2
     if (freq_min_Bnd2 < freq_max(NumBndin1+NumBndin2)) then
        S_star_band2 = integrate_sed(freq_min_Bnd2, &
-            freq_max(NumBndin1+NumBndin2),sourcetype,"S")
+            freq_max_Bnd2,sourcetype,"S")
        L_star_band2 = integrate_sed(freq_min_Bnd2, &
-            freq_max(NumBndin1+NumBndin2),sourcetype,"L")
+            freq_max_Bnd2,sourcetype,"L")
     else
        S_star_band2 = 0.0
        L_star_band2 = 0.0
     endif
 
+    ! Band 3
     if (freq_min_Bnd3 < freq_max(NumBndin1+NumBndin2+NumBndin3)) then
        S_star_band3 = integrate_sed(freq_min_Bnd3, &
-            freq_max(NumBndin1+NumBndin2+NumBndin3),sourcetype,"S")
+            freq_max_Bnd3,sourcetype,"S")
        L_star_band3 = integrate_sed(freq_min_Bnd3, &
-            freq_max(NumBndin1+NumBndin2+NumBndin3),sourcetype,"L")
+            freq_max_Bnd3,sourcetype,"L")
     else
        S_star_band3 = 0.0
        L_star_band3 = 0.0
