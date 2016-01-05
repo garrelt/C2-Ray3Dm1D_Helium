@@ -50,9 +50,14 @@ module evolve_source
   ! mesh positions of end points for RT
   integer,dimension(Ndim) :: lastpos_l !< mesh position of left end point for RT
   integer,dimension(Ndim) :: lastpos_r !< mesh position of right end point for RT
-  integer,public :: sum_nbox !< sum of all nboxes (on one processor)
+  integer,public :: sum_nbox  !< sum of all nboxes (on one processor)
   integer,public :: sum_nbox_all !< sum of all nboxes (on all processors)
-
+  integer,public :: current_subboxsize !variable to subbox size can be changed if there is a quasar 
+!  integer,public :: original_subboxsize = subboxsize!<keeps track of original subboxsize
+#ifdef QUASARS
+  integer,public :: sum_qnbox !<sum of all nboxes for quasars(on one processor)
+  integer,public :: sum_qnbox_all !< sum of all nboxes for quasars (on all processors)
+#endif
   real(kind=dp) :: photon_loss_src
 
   public do_source
@@ -76,6 +81,9 @@ contains
     integer :: ns
     integer :: k
     integer :: nbox
+#ifdef QUASARS
+    integer :: qnbox
+#endif
     integer :: nnt
     integer :: logf1
 
@@ -125,10 +133,27 @@ contains
 #endif
 #ifdef QUASARS
     total_source_flux=total_source_flux+NormFluxQPL(ns)*qpl_S_star 
+    qnbox=0 ! counter for number of large subboxes (check that this equals number of quasars later)
 #endif     
     photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
     last_r(:)=srcpos(:,ns) ! to pass the first while test
     last_l(:)=srcpos(:,ns) ! to pass the first while test
+
+    current_subboxsize = subboxsize !Reset subboxsize to original subboxsize in case there is no quasar
+#if defined(PL)
+    current_subboxsize = max_subbox !Set subbox to maximum size to make sure x-rays are traced accross full box
+    if (rank==0) write(logf,*) "Power laws on so subboxsize set to maximum"
+#elif defined(QUASARS) && !defined(PL)
+    if (NormFluxQPL(ns) > 0) then !Is there a quasar?
+        current_subboxsize = max_subbox !Set subbox to maximum size to make sure x-rays are traced accross full box
+        qnbox = 1 !always one as cannot be more than one bix box per quasar
+!        if (rank==0) write(logf,*) "Found quasar on line ", ns
+!    else
+!        qnbox = 0
+    endif
+    sum_qnbox=sum_qnbox+qnbox !sum total number of big boxes on this processor
+!    if (rank==0) write(logf,*) "sum qnbox: ", sum_qnbox !Report
+#endif
 
     ! Loop through boxes of increasing size
     ! NOTE: make this limit on the photon_loss a fraction of
@@ -140,8 +165,8 @@ contains
        nbox=nbox+1 ! increase subbox counter
        photon_loss_src = 0.0 ! reset photon_loss_src to zero
        photon_loss_src_thread(:) = 0.0 ! reset photon_loss_src to zero
-       last_r(:)=min(srcpos(:,ns)+subboxsize*nbox,lastpos_r(:))
-       last_l(:)=max(srcpos(:,ns)-subboxsize*nbox,lastpos_l(:))
+       last_r(:)=min(srcpos(:,ns)+current_subboxsize*nbox,lastpos_r(:))
+       last_l(:)=max(srcpos(:,ns)-current_subboxsize*nbox,lastpos_l(:))
 
        ! OpenMP: if we have multiple OpenMP threads (nthreads > 1) we 
        ! parallelize over the threads by doing independent parts of
