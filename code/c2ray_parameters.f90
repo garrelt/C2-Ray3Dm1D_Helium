@@ -14,7 +14,7 @@ module c2ray_parameters
   ! This module collects parameters needed by C2-Ray
 
   use precision, only: dp
-  use cgsconstants, only: ev2fr
+  use cgsconstants, only: eth0,ev2fr
   use cgsphotoconstants, only: ion_freq_HeII
   use astroconstants, only: YEAR
   use sizes, only: mesh
@@ -23,7 +23,7 @@ module c2ray_parameters
 
   !> Which fraction of the cells can be left unconverged in order
   !! to improve performance (used in rad_evolve3d)
-  real(kind=dp),parameter :: convergence_fraction=2.5e-4
+  real(kind=dp),parameter :: convergence_fraction=1e-5!2.5e-4
 
   !> Set to true to let C2-Ray not change the temperature
   ! logical,parameter :: isothermal=.false.
@@ -75,15 +75,15 @@ module c2ray_parameters
   !> Eddington luminosity per mass_nominal solar mass (erg/s)
   real(kind=dp),parameter :: EddLum=1.38e38*mass_nominal
   !> Number of ionizing photons / second
-  real(kind=dp),parameter :: pl_S_star_nominal=1e48_dp
+  real(kind=dp),parameter :: pl_S_star_nominal=1e48_dp!1e-18_dp!1e48_dp
   !> nominal minimum and maximum frequency for power law source
-  real(kind=dp),parameter :: pl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: pl_MinFreq_nominal=eth0*ev2fr
   real(kind=dp),parameter :: pl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
   !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
   !! 0.02 as their nominal value. Note that this depends on your integration
   !! limits. Mesinger et al. use 300 eV as lowest energy.
-  real,parameter :: xray_phot_per_atom = 0.02
-  !real,parameter :: xray_phot_per_atom = 0.1
+  !real,parameter :: xray_phot_per_atom = 0.02
+  real,parameter :: xray_phot_per_atom = 0.1
 #endif
 
 #ifdef QUASARS
@@ -98,7 +98,7 @@ module c2ray_parameters
   !> Number of ionizing photons / second for quasars
   real(kind=dp),parameter :: qpl_S_star_nominal=1e48_dp
   !> nominal minimum and maximum frequency for quasar source
-  real(kind=dp),parameter :: qpl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: qpl_MinFreq_nominal=eth0*ev2fr
   real(kind=dp),parameter :: qpl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
 #endif
 
@@ -135,7 +135,7 @@ module c2ray_parameters
   !> Source properties: Number of different stellar source types 
   integer,parameter :: Number_Sourcetypes=2
   !> Source properties: Photon per atom for different source types (high to low mass)
-  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 /)
+  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 2.0, 8.2 /)
   !real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 , 0.0 /)
 
   !> Source properties: Life time of sources (if set at compile time)

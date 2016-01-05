@@ -41,7 +41,7 @@ module sourceprops
   integer,parameter :: LMACH=5
 
 #ifdef QUASARS
-  integer ::
+  !> number of column containing quasar sources
   integer,parameter :: QSO=6
   !> number of columns in source list with quasars
   integer,parameter,private :: ncolumns_srcfile=6

@@ -1,4 +1,4 @@
-# Makefile for C2Ray_3D.
+#Makefile for C2Ray_3D.
 #
 # Author: Garrelt Mellema
 
@@ -199,7 +199,7 @@ C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) 
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
-C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) -DQUASARS
+C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) -DPL #-DQUASARS
 C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
@@ -310,7 +310,7 @@ C2Ray_3D_cubep3m_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CU
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_kyl_periodic: F90=$(FC)
-C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DQUASARS -DPL
+C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1)  #-DQUASARS -DPL
 C2Ray_3D_cubep3m_kyl_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
 
@@ -320,7 +320,7 @@ C2Ray_3D_cubep3m_periodic_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../mpi.o $(CU
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_periodic_omp: F90=$(FC)
-C2Ray_3D_cubep3m_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) 
+C2Ray_3D_cubep3m_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)  
 C2Ray_3D_cubep3m_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../no_mpi.o $(CUBEP3M1) $(GENERAL1) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 

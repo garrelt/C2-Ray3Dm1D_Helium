@@ -44,7 +44,7 @@ module nbody
 
   character(len=10),parameter :: nbody_type="test" !< ID of Nbody type
 
-  real(kind=dp),parameter :: boxsize=10.0 !0.021!0.0105  !< Box size in Mpc/h comoving
+  real(kind=dp),parameter :: boxsize=30.0 !0.021!0.0105  !< Box size in Mpc/h comoving
 
   ! redshift sequence information
   integer, public :: NumZred               !< number of redshifts
@@ -90,11 +90,11 @@ contains
     if (rank == 0) then
 
        ! Set the number of redshift slices
-       NumZred=85
+       NumZred=3000	
        allocate(zred_array(NumZred))
 
        ! Time step
-       timestep=1e6*YEAR!1e7*YEAR
+       timestep=1e5*YEAR!1e7*YEAR
 
        ! Starting redshift
        zred_array(1)=9.
