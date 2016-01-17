@@ -132,8 +132,8 @@ LIBS = -lirc
 
 #-------------------------------------------------------
 
-UTILS1= ../precision.o ../mrgrnk.o ../ctrper.o ../romberg.o ../file_admin.o ../report_memory.o
-UTILS2= precision.o mrgrnk.o ctrper.o romberg.o file_admin.o report_memory.o
+UTILS1= ../precision.o ../mrgrnk.o ../ctrper.o ../romberg.o ../file_admin.o ../read_sm3d.o ../report_memory.o
+UTILS2= precision.o mrgrnk.o ctrper.o romberg.o file_admin.o read_sm3d.o report_memory.o
 
 CONSTANTS1 = ../mathconstants.o ../cgsconstants.o  ../cgsphotoconstants.o  ../cgsastroconstants.o ../c2ray_parameters.o ../cosmoparms.o ../abundances.o ../atomic.o
 
@@ -160,29 +160,31 @@ GENERAL1_KYL=../cosmology.o  ../cooling_h.o $(RADIATION1)   ../thermal.o ../time
 
 GENERAL2_KYL=cosmology.o  cooling_h.o $(RADIATION2) thermal.o time_ini.o doric.o photonstatistics.o $(EVOLVE) output.o
 
-TEST= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test.o
+TEST= ../clocks.o  ../test.o grid.o ../tped.o $(MATERIAL) sourceprops_test.o
 
-TEST_2= clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test.o
+TEST_2= clocks.o  test.o grid.o tped.o $(MATERIAL) sourceprops_test.o
 
-TEST1= ../clocks.o  ../test.o grid.o ../tped.o mat_ini_test.o sourceprops_test2.o
+TEST1= ../clocks.o  ../test.o grid.o ../tped.o $(MATERIAL) sourceprops_test2.o
 
-TEST2=  clocks.o  test.o grid.o tped.o mat_ini_test.o sourceprops_test2.o
+TEST2=  clocks.o  test.o grid.o tped.o $(MATERIAL) sourceprops_test2.o
 
 TEST4_1= ../clocks.o  ../test4.o grid.o ../tped.o mat_ini_test4.o sourceprops_test4.o
 
 TEST4_2=  clocks.o  test4.o grid.o tped.o mat_ini_test4.o sourceprops_test4.o
 
-PMFAST1= ../clocks.o pmfast.o grid.o ../tped.o mat_ini_pmfast.o sourceprops_pmfast.o
-PMFAST2= clocks.o pmfast.o grid.o tped.o mat_ini_pmfast.o sourceprops_pmfast.o
+PMFAST1= ../clocks.o pmfast.o grid.o ../tped.o $(MATERIAL) sourceprops_pmfast.o
+PMFAST2= clocks.o pmfast.o grid.o tped.o $(MATERIAL2) sourceprops_pmfast.o
 
-CUBEP3M1= ../clocks.o ../cubep3m.o grid.o ../tped.o mat_ini_cubep3m.o sourceprops_cubep3m.o
-CUBEP3M2= clocks.o cubep3m.o grid.o tped.o mat_ini_cubep3m.o sourceprops_cubep3m.o
+CUBEP3M1= ../clocks.o ../cubep3m.o grid.o ../tped.o $(MATERIAL) sourceprops_cubep3m.o
+CUBEP3M2= clocks.o cubep3m.o grid.o tped.o $(MATERIAL) sourceprops_cubep3m.o
 
-LG1= ../clocks.o  LG.o grid.o ../tped.o mat_ini_LG.o sourceprops_LG.o
-LG2= clocks.o  LG.o grid.o tped.o mat_ini_LG.o sourceprops_LG.o
+LG1= ../clocks.o  LG.o grid.o ../tped.o $(MATERIAL) sourceprops_LG.o
+LG2= clocks.o  LG.o grid.o tped.o $(MATERIAL) sourceprops_LG.o
 
-GADGET1= ../clocks.o gadget.o grid.o ../tped.o mat_ini_Gadget.o sourceprops_gadget.o
-GADGET2= clocks.o gadget.o grid.o tped.o mat_ini_Gadget.o sourceprops_gadget.o
+GADGET1= ../clocks.o gadget.o grid.o ../tped.o $(MATERIAL) sourceprops_gadget.o
+GADGET2= clocks.o gadget.o grid.o tped.o $(MATERIAL) sourceprops_gadget.o
+
+MATERIAL= clumping_module.o LLS.o temperature_module.o density_module.o ionfractions_module.o material.o
 
 #--------TEST----------------------------------------------------------------
 

@@ -19,7 +19,7 @@ module output_module
   use precision, only: dp
   use my_mpi
   use file_admin, only: stdinput, results_dir, file_input, logf
-  use material, only: isothermal
+  use c2ray_parameters, only: isothermal
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe

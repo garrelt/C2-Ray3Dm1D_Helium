@@ -35,7 +35,7 @@ module evolve
 
   use material, only: ndens
   use material, only: xh,xhe
-  use material, only: isothermal
+  use c2ray_parameters, only: isothermal
   use material, only: set_final_temperature_point
   use sourceprops, only: NumSrc
   use photonstatistics, only: photon_loss, LLS_loss

@@ -3,7 +3,8 @@ module ionfractions_module
   use precision, only: dp,si
   use sizes, only: mesh
   use file_admin, only: stdinput, logf, results_dir, file_input
-  use file_admin, only: read_sm3d_dp_file
+  use read_sm3d, only: read_sm3d_dp_file_routine
+  use c2ray_parameters, only: epsilon
   use my_mpi
   
   implicit none
@@ -15,11 +16,8 @@ module ionfractions_module
   end type ionstates
 
   ! xh - ionization fractions for one cell
-#ifdef ALLFRAC
   real(kind=dp),dimension(:,:,:,:),allocatable :: xh
-#else
-  real(kind=dp),dimension(:,:,:),allocatable :: xh
-#endif
+  real(kind=dp),dimension(:,:,:,:),allocatable :: xhe
 
 #ifdef MPI
   integer,private :: mympierror
@@ -31,25 +29,19 @@ contains
   
   subroutine xfrac_array_init ( )
 
-       ! Allocate ionization fraction array
-#ifdef ALLFRAC
+       ! Allocate hydrogen ionization fraction array
        allocate(xh(mesh(1),mesh(2),mesh(3),0:1))
-#else
-       allocate(xh(mesh(1),mesh(2),mesh(3)))
-#endif
-       ! Helium fractions array
+
+       ! Allocate helium ionization fractions array
        allocate(xhe(mesh(1),mesh(2),mesh(3),0:2))
 
        ! Assign ionization fractions. For z = 40 - 20 RECFAST gives 
        ! an average ionization fraction of about 2e-4. We use this
        ! here.
        ! In case of a restart this will be overwritten in xfrac_ini
-#ifdef ALLFRAC
        xh(:,:,:,1)=2e-4
        xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
-#else
-       xh(:,:,:)=2e-4
-#endif
+
        ! Helium fractions 
        xhe(:,:,:,0)=1.0-2.0_dp*epsilon
        xhe(:,:,:,1)=epsilon	
@@ -72,10 +64,12 @@ contains
     real(kind=dp),intent(in) :: zred_now
     
     character(len=512) :: xfrac_file
+    character(len=512) :: xfrac_file_He1
+    character(len=512) :: xfrac_file_He2
     character(len=6) :: zred_str
     integer :: m1,m2,m3
     ! Array needed to read in 4B reals
-    real(kind=dp),dimension(:,:,:),allocatable :: xh1_real
+    real(kind=dp),dimension(:,:,:),target,allocatable :: xh1_real
     !real(kind=si),dimension(:,:,:),allocatable :: xh1_real
     real(kind=dp),dimension(:,:,:),pointer :: ion_fraction
 
@@ -105,12 +99,8 @@ contains
  
        call read_sm3d_dp_file_routine(xfrac_file,ion_fraction)
 
-#ifdef ALLFRAC
-       xh(:,:,:,1)=xh1_real(:,:,:)
+       xh(:,:,:,1)=ion_fraction(:,:,:)
        xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
-#else
-       xh(:,:,:)=xh1_real(:,:,:)
-#endif
        
        call read_sm3d_dp_file_routine(xfrac_file_He1,ion_fraction)
        xhe(:,:,:,1)=ion_fraction(:,:,:)
@@ -125,13 +115,8 @@ contains
 
 #ifdef MPI       
     ! Distribute the input parameters to the other nodes
-#ifdef ALLFRAC
     call MPI_BCAST(xh,mesh(1)*mesh(2)*mesh(3)*2,MPI_DOUBLE_PRECISION,0,&
          MPI_COMM_NEW,mympierror)
-#else
-    call MPI_BCAST(xh,mesh(1)*mesh(2)*mesh(3),MPI_DOUBLE_PRECISION,0,&
-         MPI_COMM_NEW,mympierror)
-#endif
     call MPI_BCAST(xhe,mesh(1)*mesh(2)*mesh(3)*3,MPI_DOUBLE_PRECISION,0,&
          MPI_COMM_NEW,mympierror)
     call MPI_BARRIER(MPI_COMM_NEW,mympierror)

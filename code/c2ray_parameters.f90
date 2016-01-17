@@ -31,6 +31,9 @@ module c2ray_parameters
   !> A really small number
   real(kind=dp),parameter :: epsilon=1.0e-20_dp
 
+  !> Set to true to let C2-Ray not change the temperature
+  logical,parameter :: isothermal=.true.
+
   !> Convergence criterion for per source calculation (evolve0d)
   !real(kind=dp),parameter :: minimum_fractional_change = 1.0e-3
   real(kind=dp),parameter :: minimum_fractional_change = 1.0e-2
