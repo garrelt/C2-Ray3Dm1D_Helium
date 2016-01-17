@@ -44,7 +44,7 @@ module nbody
 
   character(len=10),parameter :: nbody_type="test" !< ID of Nbody type
 
-  real(kind=dp),parameter :: boxsize=10.0 !0.021!0.0105  !< Box size in Mpc/h comoving
+  real(kind=dp),parameter :: boxsize=100.0  !< Box size in Mpc/h comoving
 
   ! redshift sequence information
   integer, public :: NumZred               !< number of redshifts
@@ -52,18 +52,49 @@ module nbody
   integer,dimension(:),allocatable,public :: snap !< array of snapshot numbers (for compatibility)
   character(len=8),public :: id_str       !< resolution dependent string
 
-  character(len=180),public :: dir_dens !< Path to directory with density files
-  character(len=180),public :: dir_src="./" !< Path to directory with source files
-  !> Path to directory containing directory with LLS files:
-  character(len=*),parameter,private :: dir_LLS_path = "../" 
-  !> Name of directory with files used for LLS
-  character(len=*),parameter,private :: dir_LLS_name= "halos/"
-
+  character(len=480),public :: dir_dens !< Path to directory with density files
+  character(len=480),public :: dir_clump !< Path to directory with clump files
   character(len=480),public :: dir_LLS !< Path to directory with LLS files
-#ifdef MPI
-  integer,private :: mympierror !< MPI error flag variable
-#endif
+  character(len=480),public :: dir_src !< Path to directory with source files
 
+  !> Path to directory containing directory with density files:
+  character(len=*),parameter,private :: dir_dens_path = "" 
+  !> Name of directory with density files
+  character(len=180),parameter,private :: dir_dens_name= ""
+
+  !> Path to directory containing directory with clumping files:
+  character(len=*),parameter,private :: dir_clump_path = "" 
+  !> Name of directory with files used for clumping
+  character(len=*),parameter,private :: dir_clump_name= ""
+
+  !> Path to directory containing directory with LLS files:
+  character(len=*),parameter,private :: dir_LLS_path = "" 
+  !> Name of directory with files used for LLS
+  character(len=*),parameter,private :: dir_LLS_name= ""
+
+  !> Path to directory containing directory with source files:
+  character(len=*),parameter,private :: dir_src_path = "./" 
+  !> Name of directory with source files
+  character(len=*),parameter,private :: dir_src_name= ""
+
+  !> Format of density file (unformatted or binary)
+#ifdef IFORT
+  ! ifort standard for "binary"
+  character(len=*),parameter :: densityformat="binary"
+  character(len=*),parameter :: densityaccess="sequential"
+#else
+  ! Fortran2003 standard for "binary"
+  character(len=*),parameter :: densityformat="unformatted"
+  character(len=*),parameter :: densityaccess="stream"
+#endif
+  !> Format of clumping file (unformatted or binary)
+#ifdef IFORT
+  character(len=*),parameter :: clumpingformat="binary"
+  character(len=*),parameter :: clumpingaccess="sequential"
+#else
+  character(len=15),parameter :: clumpingformat="unformatted"
+  character(len=*),parameter :: clumpingaccess="stream"
+#endif
   !> Format of LLS file (unformatted or binary)
 #ifdef IFORT
   character(len=*),parameter :: LLSformat="binary"
@@ -72,8 +103,30 @@ module nbody
   character(len=15),parameter :: LLSformat="unformatted"
   character(len=*),parameter :: LLSaccess="stream"
 #endif
+  !> density file with header?
+  logical,parameter :: densityheader=.true.
+  !> clumping file with header?
+  logical,parameter :: clumpingheader=.true.
   !> LLS file with header?
   logical,parameter :: LLSheader=.true.
+
+  !> unit of density in density file
+  !! can be "grid", "particle", "M0Mpc3"
+  character(len=*),parameter :: density_unit="none"
+
+  ! Parameters of simulations boxes
+  ! properties of the box:
+  ! M_box      - mass in box
+  ! M_particle - mass per particle
+  ! M_grid - mean mass per pmfast cell
+  real(kind=dp),parameter,public :: M_box=rho_crit_0*Omega0*(boxsize*Mpc/h)**3 !< mass in box
+  real(kind=dp),parameter,public :: M_grid=0.0 !< mean mass per grid cell: not used
+  real(kind=dp),parameter,public :: M_particle=0.0 !< mass per particle: not used
+
+  !> Conversion factor for comoving gas (number) density (cm^-3)
+  real(kind=dp),parameter,public :: density_convert_grid=1.0
+  !> Conversion factor for comoving gas (number) density (cm^-3)
+  real(kind=dp),parameter,public :: density_convert_particle=1.0
 
 contains
 
@@ -85,6 +138,12 @@ contains
     integer :: nz ! loop counter
     character(len=256) :: value
     integer :: len, status
+
+    ! Set directories: not currently used
+    dir_dens=trim(adjustl(dir_dens_path))//trim(adjustl(dir_dens_name))
+    dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
+    dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))
+    dir_src=trim(adjustl(dir_src_path))//trim(adjustl(dir_src_name))
 
     ! Construct redshift sequence
     if (rank == 0) then
@@ -107,6 +166,7 @@ contains
                (t0/(t0+real(nz-1)*timestep))**(2./3.)
        enddo
     endif
+       dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
        dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))
 #ifdef MPI
     ! Distribute the input parameters to the other nodes
@@ -115,6 +175,9 @@ contains
     call MPI_BCAST(zred_array,NumZred,MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,&
          mympierror)
 #endif
+
+    ! Set id_str for compatibility reasons
+    id_str="test"
 
   end subroutine nbody_ini
 
