@@ -4,15 +4,15 @@
 module thermalevolution
 
   use precision, only: dp
-  use c2ray_parameters, only: minitemp, relative_denergy
+  use c2ray_parameters, only: minitemp, relative_denergy, cosmological
   use radiative_cooling, only: coolin
   use tped, only: temper2pressr, pressr2temper, electrondens
-  use cgsconstants
-  use atomic
-  use cosmology
+  !use cgsconstants
+  use atomic, only: gamma1
+  use cosmology, only: cosmo_cool
   !use radiation, only: photrates
   use radiation_photoionrates, only: photrates
-  use material, only: ionstates
+  use ionfractions_module, only: ionstates
 
   implicit none
 
