@@ -13,6 +13,9 @@ module ionfractions_module
      real(kind=dp) :: h(0:1)          !< H  ionization fractions        
      real(kind=dp) :: h_av(0:1)       !< average H  ionization fractions        
      real(kind=dp) :: h_old(0:1)      !< H  ionization fractions from last time step
+     real(kind=dp) :: he(0:2)         !< He ionization fractions           
+     real(kind=dp) :: he_av(0:2)      !< average He ionization fractions 
+     real(kind=dp) :: he_old(0:2)     !< He ionization fractions from last time step
   end type ionstates
 
   ! xh - ionization fractions for one cell

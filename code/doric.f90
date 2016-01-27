@@ -54,7 +54,8 @@ contains
     use cgsphotoconstants, only: sigma_HI_at_ion_freq, sigma_HeI_at_ion_freq
     !use subgrid_clumping, only: clumping
     use file_admin, only: stdinput
-    use material, only: clumping, ionstates
+    use ionfractions_module, only: ionstates
+    use clumping_module, only: clumping
     use abundances, only: abu_he
     !use radiation, only: photrates
     use radiation_photoionrates, only: photrates

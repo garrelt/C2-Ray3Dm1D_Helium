@@ -21,7 +21,8 @@ module photonstatistics
   use cgsphotoconstants, only: sigma_HI_at_ion_freq
   use sizes, only: mesh
   use grid, only: vol
-  use material, only: ndens, clumping, clumping_point
+  use density_module, only: ndens
+  use clumping_module, only: clumping, clumping_point
   use tped, only: electrondens
   use sourceprops, only: NormFlux, NormFluxPL, NumSrc
   !use radiation, only: S_star, pl_S_star, NumFreqBnd

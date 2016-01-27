@@ -37,12 +37,14 @@ module evolve_point
   use c2ray_parameters, only: add_photon_losses
   use sizes, only: Ndim, mesh
   use grid, only: vol,dr
-  use material, only: ndens, xh,xhe
-  use material, only: get_temperature_point, set_temperature_point
-  use material, only: set_final_temperature_point, isothermal
-  use material, only: ionstates
-  use material, only: clumping_point
-  use material, only: coldensh_LLS, LLS_point
+  use density_module, only: ndens
+  use ionfractions_module, only: xh,xhe
+  use temperature_module, only: get_temperature_point, set_temperature_point
+  use temperature_module, only: set_final_temperature_point
+  use c2ray_parameters, only: isothermal
+  use ionfractions_module, only: ionstates
+  use clumping_module, only: clumping_point
+  use LLS_module, only: coldensh_LLS, LLS_point
   use sourceprops, only: srcpos
   use radiation_photoionrates, only: photrates, photoion_rates
   use thermalevolution, only: thermal
@@ -379,8 +381,7 @@ contains
 
     ! Initialize local scalars for density and temperature
     ndens_p=ndens(pos(1),pos(2),pos(3))
-    call get_temperature_point (pos(1),pos(2),pos(3),temper_inter, &
-         temp_av_old,temper_old)
+    call get_temperature_point (pos(1),pos(2),pos(3),temperature_start)
     !avg_temper=temper
 
     ! Use the collected photo-ionization rates
