@@ -58,7 +58,7 @@ Program C2Ray
   !use evolve, only: evolve_ini,evolve3D
   use evolve_data, only: evolve_ini
   use evolve, only: evolve3D
-  use material,only: isothermal ! NB: in some versions set in c2ray_parameters
+  use c2ray_parameters, only: isothermal ! NB: in some versions set in material
   use radiative_cooling, only: setup_cool
 #ifdef XLF
   ! Place for xlf specific statements
