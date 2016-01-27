@@ -9,7 +9,7 @@ module radiation_sizes
                                sigma_HI_at_ion_freq,&    ! HI cross section at its ionzing frequency
                                sigma_HeI_at_ion_freq,&   ! HeI cross section at its ionzing frequency
                                sigma_HeII_at_ion_freq    ! HeII cross section at its ionzing frequency
-  use material, only: isothermal
+  use c2ray_parameters, only: isothermal
 
   
   implicit none

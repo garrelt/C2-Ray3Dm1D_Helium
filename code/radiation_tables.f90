@@ -27,7 +27,7 @@ module radiation_tables
                      vector_romberg, &                   ! 1D integration subroutine
                      romberg_initialisation              ! Romberg initialisation procedure
 
-  use material, only: isothermal
+  use c2ray_parameters, only: isothermal
 
   use radiation_sizes, only: NumFreq,NumFreqBnd,NumBndin1,NumBndin2,NumBndin3
   use radiation_sizes, only: Numheatbin

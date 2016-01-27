@@ -15,7 +15,7 @@ module radiation_photoionrates
                                ion_freq_HeI,&            ! HeI ionization energy in frequency
                                ion_freq_HeII             ! HeII ionization energy in frequency
 
-  use material, only: isothermal
+  use c2ray_parameters, only: isothermal
 
   use radiation_sizes, only: NumFreqBnd,NumBndin1,NumBndin2,NumBndin3
   use radiation_sizes, only: sigma_HI, sigma_HeI, sigma_HeII

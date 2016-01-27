@@ -35,7 +35,7 @@ module radiation_sed_parameters
                               pl_S_star_nominal, &       ! Ionizing photon rate for nominal PL SED
                               pl_MinFreq_nominal, &      ! Lowest frequency for nominal PL SED
                               pl_MaxFreq_nominal         ! Highest frequency for nominal PL SED
-  use material, only: isothermal
+  use c2ray_parameters, only: isothermal
 
   use radiation_sizes, only: NumFreq,NumFreqBnd,NumBndin1,NumBndin2,NumBndin3
   use radiation_sizes, only: freq_min,freq_max
