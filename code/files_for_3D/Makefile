@@ -160,26 +160,26 @@ GENERAL1_KYL=../cosmology.o  ../cooling_h.o $(RADIATION1)   ../thermal.o ../time
 
 GENERAL2_KYL=cosmology.o  cooling_h.o $(RADIATION2) thermal.o time_ini.o doric.o photonstatistics.o $(EVOLVE) output.o
 
-TEST= ../clocks.o  ../test.o grid.o ../tped.o $(MATERIAL) sourceprops_test.o
+TEST= ../clocks.o  ../nbody_test.o grid.o ../tped.o $(MATERIAL) sourceprops_test.o
 
-TEST_2= clocks.o  test.o grid.o tped.o $(MATERIAL) sourceprops_test.o
+TEST_2= clocks.o  nbody_test.o grid.o tped.o $(MATERIAL) sourceprops_test.o
 
-TEST1= ../clocks.o  ../test.o grid.o ../tped.o $(MATERIAL) sourceprops_test2.o
+TEST1= ../clocks.o  ../nbody_test.o grid.o ../tped.o $(MATERIAL) sourceprops_test2.o
 
-TEST2=  clocks.o  test.o grid.o tped.o $(MATERIAL) sourceprops_test2.o
+TEST2=  clocks.o  nbody_test.o grid.o tped.o $(MATERIAL) sourceprops_test2.o
 
 TEST4_1= ../clocks.o  ../test4.o grid.o ../tped.o mat_ini_test4.o sourceprops_test4.o
 
 TEST4_2=  clocks.o  test4.o grid.o tped.o mat_ini_test4.o sourceprops_test4.o
 
-PMFAST1= ../clocks.o pmfast.o grid.o ../tped.o $(MATERIAL) sourceprops_pmfast.o
-PMFAST2= clocks.o pmfast.o grid.o tped.o $(MATERIAL2) sourceprops_pmfast.o
+PMFAST1= ../clocks.o nbody_pmfast.o grid.o ../tped.o $(MATERIAL) sourceprops_nbody_pmfast.o
+PMFAST2= clocks.o nbody_pmfast.o grid.o tped.o $(MATERIAL2) sourceprops_pmfast.o
 
-CUBEP3M1= ../clocks.o ../cubep3m.o grid.o ../tped.o $(MATERIAL) sourceprops_cubep3m.o
-CUBEP3M2= clocks.o cubep3m.o grid.o tped.o $(MATERIAL) sourceprops_cubep3m.o
+CUBEP3M1= ../clocks.o ../nbody_cubep3m.o grid.o ../tped.o $(MATERIAL) sourceprops_nbody_cubep3m.o
+CUBEP3M2= clocks.o nbody_cubep3m.o grid.o tped.o $(MATERIAL) sourceprops_cubep3m.o
 
-LG1= ../clocks.o  LG.o grid.o ../tped.o $(MATERIAL) sourceprops_LG.o
-LG2= clocks.o  LG.o grid.o tped.o $(MATERIAL) sourceprops_LG.o
+LG1= ../clocks.o  nbody_LG.o grid.o ../tped.o $(MATERIAL) sourceprops_LG.o
+LG2= clocks.o  nbody_LG.o grid.o tped.o $(MATERIAL) sourceprops_LG.o
 
 GADGET1= ../clocks.o gadget.o grid.o ../tped.o $(MATERIAL) sourceprops_gadget.o
 GADGET2= clocks.o gadget.o grid.o tped.o $(MATERIAL) sourceprops_gadget.o
@@ -284,8 +284,8 @@ C2Ray_3D_pmfast_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../no_mpi.o $(PMFA
 
 C2Ray_3D_pmfast_periodic_compr: F90=$(FC)
 C2Ray_3D_pmfast_periodic_compr: F90FLAGS = $(F90FLAGS1)
-C2Ray_3D_pmfast_periodic_compr:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../no_mpi.o clocks.o pmfast.o grid.o tped.o mat_ini_pmfast_compr.o sourceprops_pmfast_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
-	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o clocks.o  pmfast.o grid.o tped.o mat_ini_pmfast_compr.o sourceprops_pmfast_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
+C2Ray_3D_pmfast_periodic_compr:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../no_mpi.o clocks.o nbody_pmfast.o grid.o tped.o mat_ini_pmfast_compr.o sourceprops_pmfast_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o clocks.o  nbody_pmfast.o grid.o tped.o mat_ini_pmfast_compr.o sourceprops_pmfast_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
 
 C2Ray_3D_pmfast_periodic_mpi: F90=$(MPIFC)
 C2Ray_3D_pmfast_periodic_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
@@ -336,8 +336,8 @@ C2Ray_3D_cubep3m_kyl_periodic_omp_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)  ../mpi
 
 C2Ray_3D_cubep3m_periodic_compr_mpi: F90=$(MPIFC)
 C2Ray_3D_cubep3m_periodic_compr_mpi: F90FLAGS = $(F90FLAGS1) $(MPI_FLAGS)
-C2Ray_3D_cubep3m_periodic_compr_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)    mpi.o clocks.o cubep3m.o grid.o tped.o mat_ini_cubep3m_compr.o sourceprops_cubep3m_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
-	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o clocks.o  cubep3m.o grid.o tped.o mat_ini_cubep3m_compr.o sourceprops_cubep3m_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
+C2Ray_3D_cubep3m_periodic_compr_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)    mpi.o clocks.o nbody_cubep3m.o grid.o tped.o mat_ini_cubep3m_compr.o sourceprops_cubep3m_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o clocks.o  nbody_cubep3m.o grid.o tped.o mat_ini_cubep3m_compr.o sourceprops_cubep3m_compr.o cooling.o radiation.o cosmology.o time_ini.o doric.o photonstatistics_compr.o evolve4_periodic_compr.o output_compr.o C2Ray.o
 
 #--------LG------------------------------------------------------------------
  
@@ -365,8 +365,8 @@ C2Ray_3D_LG_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(LG1
 
 C2Ray_3D_Gadget_periodic: F90=$(FC)
 C2Ray_3D_Gadget_periodic: F90FLAGS = $(F90FLAGS1)
-C2Ray_3D_Gadget_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(GADGET1) $(GENERAL1) C2Ray_GadgetTest.o
-	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(GADGET2) $(GENERAL2) C2Ray_GadgetTest.o
+C2Ray_3D_Gadget_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(GADGET1) $(GENERAL1) C2Ray_Gadgetnbody_test.o
+	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(GADGET2) $(GENERAL2) C2Ray_Gadgetnbody_test.o
 
 C2Ray_3D_Gadget_periodic_omp: F90=$(FC)
 C2Ray_3D_Gadget_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
