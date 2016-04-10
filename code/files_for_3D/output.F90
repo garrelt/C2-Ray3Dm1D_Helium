@@ -22,16 +22,18 @@ module output_module
   use c2ray_parameters, only: isothermal
   use sizes, only: mesh
   use grid, only: x, vol
-  use material, only: xh, temperature_grid, ndens, xhe
-  !use evolve, only: phih_grid, phiheat
+  use density_module, only: ndens
+  use ionfractions_module, only: xh, xhe
+  use temperature_module, only: temper, temperature_grid
+  use temperature_module, only: temperature_states_dbl
+  use temperature_module, only: get_temperature_point
   use evolve_data, only: phih_grid, phiheat
   use sourceprops, only: srcpos, NormFlux, NormFluxPL, NumSrc
+  use photonstatistics, only: initialize_photonstatistics
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
   use photonstatistics, only: photon_loss, grtotal_src
-  use photonstatistics, only: initialize_photonstatistics
-  !use radiation, only: T_eff,R_star,L_star,S_star, pl_S_star
-  use radiation_sed_parameters, only: T_eff,R_star,L_star,S_star, pl_S_star
+  use radiation_sed_parameters, only: S_star, pl_S_star
 
 
   implicit none
@@ -57,15 +59,15 @@ contains
 
     ! Stream1:
     ! Ifront1.out contains a line of constant y and z going through the
-    ! centre for all timesteps. (formatted)
+    ! centre of the grid for all timesteps. (formatted)
     
     ! Stream2: 
     ! Ionization fractions for the full data cube (unformatted)
     ! xfrac3d_",f5.3,".bin"
     ! xfrac3dHe1_",f5.3,".bin"
     ! xfrac3dHe2_",f5.3,".bin"
-    ! and if non isothermal also the temperature for the full data cube
-    ! Temper3d_",f5.3,".bin"
+    ! and if non-isothermal also the temperature for the full data cube (unformatted)
+    ! "Temper3d_",f5.3,".bin"
 
     ! Stream3: 
     ! Ionization rate for the full data cube (unformatted)
@@ -93,34 +95,17 @@ contains
        endif
        read(stdinput,*) streams(1),streams(2),streams(3),streams(4),streams(5)
        
-       ! Open files
-       if (do_photonstatistics) then
-          ! Fortran 2003 standard
-          open(unit=90,file=trim(adjustl(results_dir))//"PhotonCounts.out", &
-               form="formatted",status="unknown",position="append")
-          write(90,*) "This file is supposed to contain numbers related ", &
-               "to photon conservation. ", & 
-               "However, this is still being developed. "
-          !write(90,*) "redshift, total ionizations, total photons, " &
-          !     "photon conservation number, ", &
-          !     "fraction new ionization, fraction recombinations, ", &
-          !     "fraction photon losses, fraction collisional ionization, ", &
-          !     "grand total photon conservation number"
-
-          ! Fortran 2003 standard
-          open(unit=95,file=trim(adjustl(results_dir))//"PhotonCounts2.out", &
-               form="formatted",status="unknown",position="append")
-          write(95,*) "Columns: redshift, total number of ions, ", &
-               "grand total ionizing photons, ", &
-               "mean ionization fraction (H2,He2,He3) ", &
-               "(by volume and then mass)"
-       endif
 #ifdef MPILOG
        write(logf,*) "Making output streams according to: ", &
             streams(1),streams(2),streams(3),streams(4),streams(5)
 #endif
     endif
-    if (do_photonstatistics) call initialize_photonstatistics ()
+
+    ! Initialize photon statistics (open files and initialize some quantities)
+    if (do_photonstatistics) then
+       if (rank == 0) call open_photonstatistics_files()
+       call initialize_photonstatistics ()
+    endif
 
 #ifdef MPILOG
     write(logf,*) "End of setup output"
@@ -134,15 +119,51 @@ contains
 
   subroutine close_down ()
     
-    ! Closes down
-    
+    ! Rank 0 takes care of file i/o
     if (rank == 0) then
-       close(unit=90)
-       close(unit=95)
+       ! Close any open output files
+       ! There are none
+       if (do_photonstatistics) then
+          ! Close the photon statistics files
+          close(unit=90)
+          close(unit=95)
+       endif
     endif
 
   end subroutine close_down
   
+  !----------------------------------------------------------------------------
+
+  subroutine open_photonstatistics_files ()
+
+    ! Open files
+    if (do_photonstatistics .and. rank == 0) then
+
+       ! Open file 1
+       open(unit=90,file=trim(adjustl(results_dir))//"PhotonCounts.out", &
+            form="formatted",status="unknown",position="append")
+       ! Write header (content information)
+       write(90,*) "This file is supposed to contain numbers related ", &
+            "to photon conservation. ", & 
+            "However, this is still being developed. "
+       !write(90,*) "redshift, total ionizations, total photons, " &
+       !     "photon conservation number, ", &
+       !     "fraction new ionization, fraction recombinations, ", &
+       !     "fraction photon losses, fraction collisional ionization, ", &
+       !     "grand total photon conservation number"
+       
+       ! Open file 2
+       open(unit=95,file=trim(adjustl(results_dir))//"PhotonCounts2.out", &
+            form="formatted",status="unknown",position="append")
+       ! Write header (content information)
+       write(95,*) "Columns: redshift, total number of ions, ", &
+            "grand total ionizing photons, ", &
+            "mean ionization fraction (H2,He2,He3) ", &
+            "(by volume and then mass)"
+    endif
+
+  end subroutine open_photonstatistics_files
+
   !----------------------------------------------------------------------------
 
   !> Produce output for a time frame
@@ -159,33 +180,37 @@ contains
     photcons_flag=0
 
 #ifdef MPILOG     
-     write(logf,*) 'output 1'
+    write(logf,*) 'output 1'
 #endif 
     if (streams(1) == 1) call write_stream1 (zred_now)
+
 #ifdef MPILOG     
-     write(logf,*) 'output 2'
+    write(logf,*) 'output 2'
 #endif 
     if (streams(2) == 1) call write_stream2 (zred_now)
+
 #ifdef MPILOG     
-     write(logf,*) 'output 3'
+    write(logf,*) 'output 3'
 #endif 
     if (streams(3) == 1) call write_stream3 (zred_now)
+
 #ifdef MPILOG     
-     write(logf,*) 'output 4'
+    write(logf,*) 'output 4'
 #endif 
     if (streams(4) == 1) call write_stream4 (zred_now)
+
 #ifdef MPILOG     
-     write(logf,*) 'output 5'
+    write(logf,*) 'output 5'
 #endif 
     if (streams(5) == 1) call write_stream5 (zred_now)
 
 #ifdef MPILOG     
-     write(logf,*) 'output 6'
+    write(logf,*) 'output 6'
 #endif 
     call write_photonstatistics (zred_now,time,dt,photcons_flag)
 
 #ifdef MPILOG     
-     write(logf,*) 'output 7'
+    write(logf,*) 'output 7'
 #endif 
 
   end subroutine output
@@ -199,52 +224,52 @@ contains
 
     character(len=*),parameter :: basename="Ifront1_"
     character(len=*),parameter :: base_extension=".dat"
-    character(len=80) :: file1
+    character(len=512) :: file1
     integer :: i,j,k
+    type(temperature_states_dbl) :: temperature_point
+    real,dimension(mesh(1)) :: temperature_profile
 
+    ! Only produce output on rank 0
     if (rank == 0) then
+
        ! Stream 1
        if (streams(1) == 1) then
           ! Construct file name
           write(file1,"(f6.3)") zred_now
-          !file1=trim(adjustl(results_dir))//"Ifront1_"//trim(adjustl(file1))//".dat"
           file1=trim(adjustl(results_dir))//basename//trim(adjustl(file1)) &
                //base_extension
 
           ! Open file
           open(unit=51,file=file1,form="formatted",status="unknown")
 
+          ! Get temperature profile
+          do i=1,mesh(1)
+             call get_temperature_point(i,srcpos(2,1),srcpos(3,1), &
+                  temperature_point)
+             temperature_profile(i)=temperature_point%current
+          enddo
+
           ! Write data
-          if (.not.isothermal) then
-             do i=1,mesh(1)
-                write(51,"(7(es10.3,1x))")  &
-                     xh(i,srcpos(2,1),srcpos(3,1),0), &
-                     xh(i,srcpos(2,1),srcpos(3,1),1), &
-                     ndens(i,srcpos(2,1),srcpos(3,1)), &
-                     xhe(i,srcpos(2,1),srcpos(3,1),0), &
-                     xhe(i,srcpos(2,1),srcpos(3,1),1), &                 
-                     xhe(i,srcpos(2,1),srcpos(3,1),2), &                        
-                     temperature_grid(i,srcpos(2,1),srcpos(3,1),0)
-             enddo
-          else
-             do i=1,mesh(1)
-                write(51,"(7(es10.3,1x))")  &
-                     xh(i,srcpos(2,1),srcpos(3,1),0), &
-                     xh(i,srcpos(2,1),srcpos(3,1),1), &
-                     ndens(i,srcpos(2,1),srcpos(3,1)), &
-                     xhe(i,srcpos(2,1),srcpos(3,1),0), &
-                     xhe(i,srcpos(2,1),srcpos(3,1),1), &                 
-                     xhe(i,srcpos(2,1),srcpos(3,1),2)
-             enddo
-          endif
+          do i=1,mesh(1)
+             write(51,"(7(es10.3,1x))")  &
+                  xh(i,srcpos(2,1),srcpos(3,1),0), &
+                  xh(i,srcpos(2,1),srcpos(3,1),1), &
+                  ndens(i,srcpos(2,1),srcpos(3,1)), &
+                  xhe(i,srcpos(2,1),srcpos(3,1),0), &
+                  xhe(i,srcpos(2,1),srcpos(3,1),1), &                 
+                  xhe(i,srcpos(2,1),srcpos(3,1),2), &                        
+                  temperature_profile(i)
+          enddo
+
           ! Close file
-          close(51)
+          close(unit=51)
        else
           ! Report error
           write(logf,*) "Calling stream 1 output where we should not."
        endif
 
     endif
+
   end subroutine write_stream1
 
   !----------------------------------------------------------------------------
@@ -256,21 +281,20 @@ contains
 
     !character(len=*),parameter :: basename="Ifront1_"
     character(len=*),parameter :: base_extension=".bin"
-    character(len=80) :: file1
+    character(len=512) :: file1
     integer :: i,j,k
 
     ! Stream 2
     if (rank == 0) then
 
        if (streams(2) == 1) then
-
           ! Construct file name
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"xfrac3d_"//trim(adjustl(file1))// &
-               base_extension
-
-          ! Open, write and close
+          file1=trim(adjustl(results_dir))// &
+               "xfrac3d_"//trim(adjustl(file1))//base_extension
+          ! Open file
           open(unit=52,file=file1,form="unformatted",status="unknown")
+          ! Write data header
           write(52) mesh(1),mesh(2),mesh(3)
           write(52) (((xh(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
@@ -300,38 +324,10 @@ contains
                k=1,mesh(3))
           close(72)
 
-       else
-          ! Report error
-          write(logf,*) "Calling stream 2 output where we should not."
-       endif
-       
-    endif
-    
-  end subroutine write_stream2
-
-  !----------------------------------------------------------------------------
-
-  !> produces output for a time frame. See below for format
-  subroutine write_stream3 (zred_now)
-
-    real(kind=dp),intent(in) :: zred_now !< current redshift
-
-    !character(len=*),parameter :: basename="Ifront1_"
-    character(len=*),parameter :: base_extension=".bin"
-    character(len=80) :: file1
-    integer :: i,j,k
-
-    ! Stream 2
-    if (rank == 0) then
-
-       if (streams(3) == 1) then
-
-          if (.not. isothermal) then
-
+          if (.not.isothermal) then
              write(file1,"(f6.3)") zred_now
              file1=trim(adjustl(results_dir))//"Temper3D_"// &
                   trim(adjustl(file1))//base_extension
-
              open(unit=153,file=file1,form="unformatted",status="unknown")
              write(153) mesh(1),mesh(2),mesh(3)
              write(153) (((real(temperature_grid(i,j,k,0)),i=1,mesh(1)), &
@@ -344,17 +340,45 @@ contains
 #endif 
           endif
 
+       else
+          ! Report error
+          write(logf,*) "Calling stream 2 output where we should not."
+       endif
+   endif
+       
+  end subroutine write_stream2
+
+  !----------------------------------------------------------------------------
+
+  !> produces output for a time frame. See below for format
+  subroutine write_stream3 (zred_now)
+
+    real(kind=dp),intent(in) :: zred_now !< current redshift
+
+    !character(len=*),parameter :: basename="Ifront1_"
+    character(len=*),parameter :: base_extension=".bin"
+    character(len=512) :: file1
+    integer :: i,j,k
+
+    ! Stream 3
+    if (rank == 0) then
+
+       if (streams(3) == 1) then
+
 #ifdef MPILOG
           write(logf,*) allocated(phih_grid)
           write(logf,*) 'shape phih_grid: ',shape(phih_grid)
           flush(logf)
 #endif 
+          ! Construct filename
           write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"IonRates3D_"// &
                trim(adjustl(file1))//base_extension
-
+          ! Open file
           open(unit=53,file=file1,form="unformatted",status="unknown")
+          ! Write data header
           write(53) mesh(1),mesh(2),mesh(3)
+          ! Write data
           write(53) (((real(phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(53)
@@ -391,41 +415,37 @@ contains
 
     !character(len=*),parameter :: basename="Ifront1_"
     character(len=*),parameter :: base_extension=".bin"
-    character(len=80) :: file1,file2,file3
+    character(len=512) :: file1,file2,file3
     character(len=6) :: zred_str
     integer :: i,j,k
 
-    ! Stream 2
     if (rank == 0) then
 
        ! Stream 4
-       if (streams(4).eq.1) then
-
+       if (streams(4) == 1) then
           write(zred_str,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"Ifront2d_xy_"// &
-               trim(adjustl(zred_str))//".bin"
-          file2=trim(adjustl(results_dir))//"Ifront2d_xz_"// &
-               trim(adjustl(zred_str))//".bin"
-          file3=trim(adjustl(results_dir))//"Ifront2d_yz_"// &
-               trim(adjustl(zred_str))//".bin"
-
-
-          ! xy cut through source 
+          file1=trim(adjustl(results_dir))// &
+               "Ifront2_xy_"//trim(adjustl(zred_str))//".bin"
+          file2=trim(adjustl(results_dir))// &
+               "Ifront2_xz_"//trim(adjustl(zred_str))//".bin"
+          file3=trim(adjustl(results_dir))// &
+               "Ifront2_yz_"//trim(adjustl(zred_str))//".bin"
           open(unit=54,file=file1,form="unformatted",status="unknown")
+          open(unit=55,file=file2,form="unformatted",status="unknown")
+          open(unit=56,file=file3,form="unformatted",status="unknown")
+          ! xy cut through source 
           write(54) mesh(1),mesh(2)
           write(54) ((real(xh(i,j,mesh(3)/2,1)),i=1,mesh(1)), &
                j=1,mesh(2))
           close(54)
 
           ! xz cut through source 
-          open(unit=55,file=file2,form="unformatted",status="unknown")
           write(55) mesh(1),mesh(3)
           write(55) ((real(xh(i,mesh(2)/2,k,1)),i=1,mesh(1)), &
                k=1,mesh(3))
           close(55)
 
           ! yz cut through source 
-          open(unit=56,file=file3,form="unformatted",status="unknown")
           write(56) mesh(2),mesh(3)
           write(56) ((real(xh(mesh(1)/2,j,k,1)),j=1,mesh(2)), &
                k=1,mesh(3))
@@ -448,7 +468,7 @@ contains
 
     !character(len=*),parameter :: basename="Ifront1_"
     character(len=*),parameter :: base_extension=".bin"
-    character(len=80) :: file1,file2,file3
+    character(len=512) :: file1,file2,file3
     character(len=6) :: zred_str
     integer :: i,j,k
 
@@ -457,12 +477,15 @@ contains
        ! Stream 5
        if (streams(5) == 1) then
           write(zred_str,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"ndens_xy_"//trim(adjustl(zred_str))//".bin"
-          file2=trim(adjustl(results_dir))//"ndens_xz_"//trim(adjustl(zred_str))//".bin"
-          file3=trim(adjustl(results_dir))//"ndens_yz_"//trim(adjustl(zred_str))//".bin"
-
-          ! xy cut through source 
+          file1=trim(adjustl(results_dir))// &
+               "ndens_xy_"//trim(adjustl(zred_str))//".bin"
+          file2=trim(adjustl(results_dir))// &
+               "ndens_xz_"//trim(adjustl(zred_str))//".bin"
+          file3=trim(adjustl(results_dir))// &
+               "ndens_yz_"//trim(adjustl(zred_str))//".bin"
+          
           open(unit=57,file=file1,form="unformatted",status="unknown")
+          ! xy cut through source 
           write(57) mesh(1),mesh(2)
           write(57) ((real(ndens(i,j,mesh(3)/2)),i=1,mesh(1)),j=1,mesh(2))
           close(57)
@@ -486,7 +509,7 @@ contains
     endif
 
   end subroutine write_stream5
-      
+
   !----------------------------------------------------------------------------
 
   !> produces output for a time frame. See below for format
@@ -505,6 +528,7 @@ contains
 #endif
 
     if (rank == 0) then
+ 
        ! Check if we are tracking photon conservation
        if (do_photonstatistics) then
           ! Photon Statistics
