@@ -154,7 +154,7 @@ Program C2Ray
   write(logf,*) "Before nbody_ini"
 #endif
   ! Find the redshifts we are dealing with
-  call nbody_ini ()
+  call nbody_ini (ierror)
 
 #ifdef MPILOG
   write(logf,*) "Before source_properties_ini"
