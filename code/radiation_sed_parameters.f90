@@ -783,7 +783,7 @@ end subroutine report_on_seds
     case("P")
        do i_freq=0,NumFreq
           ! this power-law is in number of photon sense
-          integrand(i_freq)=powerlaw_sed (frequency(i_freq),pl_index,sedtype)
+          integrand(i_freq) = powerlaw_sed (frequency(i_freq),pl_index,sedtype)
        enddo
        integrate_sed = pl_scaling*scalar_romberg(integrand,weight,NumFreq,NumFreq,0)
 #endif

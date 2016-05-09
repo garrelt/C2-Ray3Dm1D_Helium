@@ -21,6 +21,9 @@ module sed_parameters
 
   implicit none
 
+  !> Logical which must be set to .true. if you want to specify the
+  !! SED parameters at start up. Otherwise the nominal values below
+  !! are used.
   logical,parameter :: ask_for_sed = .false.
 
   !> Parameters for nominal SED (Black Body)
