@@ -160,9 +160,9 @@ GENERAL1_KYL=../cosmology.o  ../cooling_h.o $(RADIATION1)   ../thermal.o ../time
 
 GENERAL2_KYL=cosmology.o  cooling_h.o $(RADIATION2) thermal.o time_ini.o doric.o photonstatistics.o $(EVOLVE) output.o
 
-TEST= ../clocks.o  ../nbody_test.o grid.o ../tped.o $(MATERIAL) sourceprops_test.o
+TEST= ../clocks.o  ../nbody_test.o grid.o ../tped.o $(MATERIAL) sourceprops.o
 
-TEST_2= clocks.o  nbody_test.o grid.o tped.o $(MATERIAL) sourceprops_test.o
+TEST_2= clocks.o  nbody_test.o grid.o tped.o $(MATERIAL) sourceprops.o
 
 TEST1= ../clocks.o  ../nbody_test.o grid.o ../tped.o $(MATERIAL) sourceprops_test2.o
 
@@ -172,29 +172,29 @@ TEST4_1= ../clocks.o  ../test4.o grid.o ../tped.o mat_ini_test4.o sourceprops_te
 
 TEST4_2=  clocks.o  test4.o grid.o tped.o mat_ini_test4.o sourceprops_test4.o
 
-PMFAST1= ../clocks.o nbody_pmfast.o grid.o ../tped.o $(MATERIAL) sourceprops_nbody_pmfast.o
-PMFAST2= clocks.o nbody_pmfast.o grid.o tped.o $(MATERIAL2) sourceprops_pmfast.o
+PMFAST1= ../clocks.o nbody_pmfast.o grid.o ../tped.o $(MATERIAL) sourceprops.o
+PMFAST2= clocks.o nbody_pmfast.o grid.o tped.o $(MATERIAL2) sourceprops.o
 
-CUBEP3M1= ../clocks.o ../nbody_cubep3m.o grid.o ../tped.o $(MATERIAL) sourceprops_nbody_cubep3m.o
-CUBEP3M2= clocks.o nbody_cubep3m.o grid.o tped.o $(MATERIAL) sourceprops_cubep3m.o
+CUBEP3M1= ../clocks.o ../nbody_cubep3m.o grid.o ../tped.o $(MATERIAL) sourceprops.o
+CUBEP3M2= clocks.o nbody_cubep3m.o grid.o tped.o $(MATERIAL) sourceprops.o
 
-LG1= ../clocks.o  nbody_LG.o grid.o ../tped.o $(MATERIAL) sourceprops_LG.o
-LG2= clocks.o  nbody_LG.o grid.o tped.o $(MATERIAL) sourceprops_LG.o
+LG1= ../clocks.o  nbody_LG.o grid.o ../tped.o $(MATERIAL) sourceprops.o
+LG2= clocks.o  nbody_LG.o grid.o tped.o $(MATERIAL) sourceprops.o
 
-GADGET1= ../clocks.o gadget.o grid.o ../tped.o $(MATERIAL) sourceprops_gadget.o
-GADGET2= clocks.o gadget.o grid.o tped.o $(MATERIAL) sourceprops_gadget.o
+GADGET1= ../clocks.o gadget.o grid.o ../tped.o $(MATERIAL) sourceprops.o
+GADGET2= clocks.o gadget.o grid.o tped.o $(MATERIAL) sourceprops.o
 
 MATERIAL= clumping_module.o LLS.o temperature_module.o density_module.o ionfractions_module.o material.o
 
 #--------TEST----------------------------------------------------------------
 
 C2Ray_3D_test_periodic: F90=$(FC)
-C2Ray_3D_test_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_test_periodic: F90FLAGS = $(F90FLAGS1) -DALLFRAC
 C2Ray_3D_test_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_kyl_periodic: F90=$(FC)
-C2Ray_3D_test_kyl_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_test_kyl_periodic: F90FLAGS = $(F90FLAGS1)  -DALLFRAC
 C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
@@ -305,12 +305,12 @@ C2Ray_3D_pmfast_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $
 #--------CUBEP3M-------------------------------------------------------------
 
 C2Ray_3D_cubep3m_periodic: F90=$(FC)
-C2Ray_3D_cubep3m_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_cubep3m_periodic: F90FLAGS = $(F90FLAGS1) -DALLFRAC
 C2Ray_3D_cubep3m_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_kyl_periodic: F90=$(FC)
-C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1)
+C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DALLFRAC
 C2Ray_3D_cubep3m_kyl_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
 
