@@ -528,11 +528,11 @@ contains
     ! is proportional to its SFR.
 
     real(kind=dp),intent(in) :: Mass !< mass in units of grid masses
-    real(kind=dp),intent(in) :: timeperiod !< timeperiod in seconds
+    real(kind=dp),intent(in) :: time_period !< timeperiod in seconds
     real(kind=dp) :: PL_Luminosity_from_mass !< photon rate in pl_S_star_nominal
 
     PL_Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/ &
-         timeperiod/pl_S_star_nominal
+         time_period/pl_S_star_nominal
 
   end function PL_Luminosity_from_mass
 
