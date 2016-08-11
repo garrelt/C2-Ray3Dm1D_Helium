@@ -1,3 +1,13 @@
 *.mod
 *.o
 *~
+code/files_for_1D/C2Ray_1D_test_klee
+code/files_for_3D/C2Ray_3D_cubep3m_kyl_periodic
+code/files_for_3D/C2Ray_3D_cubep3m_kyl_periodic_mpi
+code/files_for_3D/C2Ray_3D_cubep3m_kyl_periodic_omp_mpi
+code/files_for_3D/C2Ray_3D_test_kyl_periodic
+code/files_for_3D/C2Ray_3D_test_kyl_periodic_mpi
+code/files_for_3D/C2Ray_3D_test_kyl_periodic_omp
+code/files_for_3D/C2Ray_3D_test_kyl_periodic_omp_mpi
+code/files_for_3D/C2Ray_3D_test_periodic
+code/files_for_3D/results/
