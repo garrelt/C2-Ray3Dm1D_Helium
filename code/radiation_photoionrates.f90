@@ -55,7 +55,9 @@ module radiation_photoionrates
   real(kind=dp), dimension(1:3) :: bR2=(/0.38_dp,0.38_dp,0.34_dp/)
   !real(kind=dp), dimension(1:3) :: dR2=(/2.0_dp,2.0_dp,2.0_dp/) write explicitly ^2 -> introduce xeb
 
-  ! photrates contains all the photo-ionization rates and heating rates
+  ! photrates contains all the photo-ionization rates and heating rates 
+  ! update this type to include rates for pl & qpl sources? Or have three types
+  ! for each kind of source if function can return three arguements
   type photrates    
      real(kind=dp) :: photo_cell_HI          ! HI photoionization rate of the cell    
      real(kind=dp) :: photo_cell_HeI         ! HeI photoionization rate of the cell    
@@ -105,7 +107,7 @@ contains
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   ! this subroutine calculates photo-ionization rates at a particular sets of column density
-  function photoion_rates (colum_in_HI,colum_out_HI, &
+function photoion_rates (colum_in_HI,colum_out_HI, &
        colum_in_HeI,colum_out_HeI, &
        colum_in_HeII,colum_out_HeII, &
        vol,nsrc,i_state)
@@ -276,6 +278,155 @@ contains
 
   end function photoion_rates
  
+!---------------------------------------------------------------------------
+  ! this subroutine calculates photo-ionization rates at a particular sets of
+  ! column density for individual sourcetypes only
+function individual_photoion_rates (colum_in_HI,colum_out_HI, &
+       colum_in_HeI,colum_out_HeI, &
+       colum_in_HeII,colum_out_HeII, &
+       vol,nsrc,i_state,sourcetype)
+
+       use sourceprops, only: NormFlux
+#ifdef PL
+       use sourceprops, only: NormFluxPL
+#endif
+#ifdef QUASARS
+       use sourceprops, only: NormFluxQPL
+#endif
+
+    ! Function type 
+    type(photrates) :: individual_photoion_rates
+
+    ! Incoming and outgoing HI column density
+    real(kind=dp), intent(in) :: colum_in_HI, colum_out_HI
+
+    ! Incoming and outgoing HeI column density
+    real(kind=dp), intent(in) :: colum_in_HeI, colum_out_HeI
+    
+    ! Incoming and outgoing HeII column density
+    real(kind=dp), intent(in) :: colum_in_HeII, colum_out_HeII
+
+    ! Volume of shell cell
+    real(kind=dp), intent(in) :: vol
+
+    ! Ionization state of cell
+    real(kind=dp), intent(in) :: i_state
+
+    ! Number of the source
+    integer, intent(in) :: nsrc
+    character,intent(in) :: sourcetype
+
+    integer :: i_subband
+    real(kind=dp) :: colum_cell_HI
+    real(kind=dp) :: colum_cell_HeI
+    real(kind=dp) :: colum_cell_HeII
+    real(kind=dp) :: individual_flux
+    real(kind=dp), dimension(1:NumFreqBnd) :: tau_in_all
+    real(kind=dp), dimension(1:NumFreqBnd) :: tau_out_all
+    real(kind=dp), dimension(1:NumFreqBnd) :: tau_cell_HI
+    real(kind=dp), dimension(1:NumFreqBnd) :: tau_cell_HeI
+    real(kind=dp), dimension(1:NumFreqBnd) :: tau_cell_HeII
+    real(kind=dp), dimension(NumBndin1+1:NumBndin1+NumBndin2+NumBndin3) :: &
+         scaling_HI
+    real(kind=dp), dimension(NumBndin1+1:NumBndin1+NumBndin2+NumBndin3) :: & 
+         scaling_HeI
+    real(kind=dp), dimension(NumBndin1+1:NumBndin1+NumBndin2+NumBndin3) :: &
+         scaling_HeII
+    type(tablepos) :: tau_pos_in, tau_pos_out
+    type(photrates) :: phi
+
+    ! New source position, set local photo-ionization and heating rates 
+    ! to zero. The structure phi is ultimately copied to the result of this
+    ! function
+    call set_photrates_to_zero (phi)
+
+    if (sourcetype=="B") then
+       individual_flux = NormFlux(nsrc)
+#ifdef PL
+    elseif (sourcetype=="P") then
+       individual_flux = NormFluxPL(nsrc)
+#endif
+#ifdef QUASARS
+    elseif (sourcetype=="Q") then
+       individual_flux = NormFluxQPL(nsrc)
+#endif
+    else
+       write(logf,*) "Unrecognised sourcetype"
+    endif
+
+    ! Set the column densities (HI, HeI, HeII) of the current cell
+    colum_cell_HI = colum_out_HI-colum_in_HI
+    colum_cell_HeI = colum_out_HeI-colum_in_HeI
+    colum_cell_HeII = colum_out_HeII-colum_in_HeII
+
+    ! Calculate the optical depth (incoming, HI, HeI, HeII)
+    do i_subband=1,NumFreqBnd
+       tau_in_all(i_subband) = colum_in_HI*sigma_HI(i_subband)+ &
+            colum_in_HeI*sigma_HeI(i_subband)+ &
+            colum_in_HeII*sigma_HeII(i_subband)
+    enddo
+
+    ! total tau_out (including HI, HeI, HeII)
+    do i_subband=1,NumFreqBnd
+       tau_out_all(i_subband) = colum_out_HI*sigma_HI(i_subband)+ &
+            colum_out_HeI*sigma_HeI(i_subband)+ &
+            colum_out_HeII*sigma_HeII(i_subband)
+    enddo
+
+    ! find the table positions for the optical depth (ingoing and outgoing)
+    tau_pos_in = set_tau_table_positions(tau_in_all)
+    tau_pos_out = set_tau_table_positions(tau_out_all)
+
+    ! Find the scaling factors to be used in distributing rates over
+    ! species
+    do i_subband=NumBndin1+1,NumBndin1+NumBndin2 ! Band 2
+       ! Set the scaling factors to distribute the photo-ionization
+       ! over HI and HeI
+       call scale_int2(scaling_HI(i_subband),scaling_HeI(i_subband), &
+              colum_cell_HI,colum_cell_HeI, i_subband)
+    enddo
+    do i_subband=NumBndin1+NumBndin2+1,NumBndin1+NumBndin2+NumBndin3 ! Band 3
+       ! Set the scaling factors to distribute the photo-ionization
+       ! over HI, HeI and HeII
+       call scale_int3(scaling_HI(i_subband),scaling_HeI(i_subband), &
+            scaling_HeII(i_subband), &
+            colum_cell_HI,colum_cell_HeI,colum_cell_HeII,i_subband)
+    enddo
+    ! Find the photo-ionization rates by looking up the values in
+    ! the (appropriate) photo-ionization tables and add to the
+    ! rates
+    if (individual_flux > 0.0) &
+         phi = phi + photo_lookuptable(tau_pos_in,tau_pos_out, &
+         tau_in_all,tau_out_all, &
+         individual_flux,sourcetype,vol, &
+         scaling_HI,scaling_HeI,scaling_HeII)
+
+    ! Find the heating rates rates by looking up the values in
+    ! the (appropriate) photo-ionization tables and using the
+    ! secondary ionization. Add them to the rates.
+    if (.not.isothermal) then
+
+       ! The optical depths (HI, HeI, HeII) at current cell
+       ! These are only needed in heat_lookuptable
+       do i_subband=1,NumFreqBnd
+          tau_cell_HI(i_subband) = colum_cell_HI*sigma_HI(i_subband)
+          tau_cell_HeI(i_subband) = colum_cell_HeI*sigma_HeI(i_subband)
+          tau_cell_HeII(i_subband) = colum_cell_HeII*sigma_HeII(i_subband)
+       enddo
+
+       if (individual_flux>0.) &
+            phi = phi + heat_lookuptable(tau_pos_in,tau_pos_out, &
+            tau_in_all,tau_out_all, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,individual_flux,sourcetype, &
+            vol,i_state, &
+            scaling_HI,scaling_HeI,scaling_HeII)
+    endif
+
+    ! Assign result of function
+    individual_photoion_rates = phi
+
+  end function individual_photoion_rates
+
 !---------------------------------------------------------------------------
 
   ! Calculates the table position data for an optical depth tau

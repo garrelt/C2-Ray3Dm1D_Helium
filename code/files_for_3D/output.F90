@@ -23,7 +23,16 @@ module output_module
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
+#if defined(QUASARS) && defined(PLS)
+  use evolve_data, only: phih_grid, phiheat, pl_phih_grid, pl_phiheat, &
+                  qpl_phih_grid, qpl_phiheat
+#elif defined(QUASARS)
+  use evolve_data, only: phih_grid, phiheat, qpl_phih_grid, qpl_phiheat
+#elif defined(PL)
+  use evolve_data, only: phih_grid, phiheat, pl_phih_grid, pl_phiheat
+#else
   use evolve_data, only: phih_grid, phiheat
+#endif
   use sourceprops, only: srcpos
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
@@ -346,7 +355,7 @@ contains
           flush(logf)
 #endif 
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"IonRates3D_"// &
+          file1=trim(adjustl(results_dir))//"BB_IonRates3D_"// &
                trim(adjustl(file1))//base_extension
 
           open(unit=53,file=file1,form="unformatted",status="unknown")
@@ -356,7 +365,7 @@ contains
           close(53)
 
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"HeatRates3D_"// &
+          file1=trim(adjustl(results_dir))//"BB_HeatRates3D_"// &
                trim(adjustl(file1))//base_extension
 
           open(unit=53,file=file1,form="unformatted",status="unknown")
@@ -364,6 +373,52 @@ contains
           write(53) (((real(phiheat(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(53)
+
+#ifdef PLS
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"HMXB_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(pl_phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"HMXB_HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(pl_phiheat(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+#endif
+
+
+#ifdef QUASARS
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"QSO_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(qpl_phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"QSO_HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(qpl_phiheat(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+#endif
+
 
 #ifdef MPILOG     
           write(logf,*) 'output 3: IonRates3D'

@@ -44,13 +44,24 @@ module evolve_point
   use material, only: clumping_point
   use material, only: coldensh_LLS, LLS_point
   use sourceprops, only: srcpos
-  use radiation_photoionrates, only: photrates, photoion_rates
+  use radiation_photoionrates, only:photrates,individual_photoion_rates,&
+      photoion_rates
   use thermalevolution, only: thermal
   use photonstatistics, only: photon_loss, total_LLS_loss
   use tped, only: electrondens
   use doric_module, only: doric, prepare_doric_factors, coldens
-
+#if defined(QUASARS) && defined(PL)
+  use evolve_data, only: phih_grid, phihe_grid, phiheat, pl_phih_grid,&
+   pl_phiheat, qpl_phih_grid, qpl_phiheat
+#elif defined(QUASARS)
+  use evolve_data, only: phih_grid, phihe_grid, phiheat,qpl_phih_grid,&
+   qpl_phiheat
+#elif defined(PL)
+  use evolve_data, only: phih_grid, phihe_grid, phiheat, pl_phih_grid,&
+    pl_phiheat
+#else
   use evolve_data, only: phih_grid, phihe_grid, phiheat
+#endif
   use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
   use evolve_data, only: coldensh_out, coldenshe_out
   use evolve_data, only: photon_loss_src_thread
@@ -108,6 +119,12 @@ contains
     real(kind=dp) :: ndens_p
     
     type(photrates) :: phi, dummiphi
+#ifdef PL
+    type(photrates) :: pl_phi
+#endif
+#ifdef QUASARS
+    type(photrates) :: qpl_phi
+#endif
     type(ionstates) :: ion
 
     ! Map pos to mesh pos, assuming a periodic mesh
@@ -255,7 +272,18 @@ contains
 			 coldenshe_in(0),coldenshe_out_temp(0), &
 			 coldenshe_in(1),coldenshe_out_temp(1), &
 			 vol_ph,ns,ion%h_av(1))
-
+#ifdef PL
+          pl_phi=individual_photoion_rates(coldensh_in,coldensh_out(pos(1),pos(2),pos(3)), &
+                         coldenshe_in(0),coldenshe_out_temp(0), &
+                         coldenshe_in(1),coldenshe_out_temp(1), &
+                         vol_ph,ns,ion%h_av(1),"P")
+#endif
+#ifdef QUASARS
+          qpl_phi=individual_photoion_rates(coldensh_in,coldensh_out(pos(1),pos(2),pos(3)), &
+                         coldenshe_in(0),coldenshe_out_temp(0), &
+                         coldenshe_in(1),coldenshe_out_temp(1), &
+                         vol_ph,ns,ion%h_av(1),"Q")
+#endif
           !if ( all( pos(:) == srcpos(:,1) ) ) then 
           !   write(logf,*) "coldens: ",coldensh_in,coldensh_out(pos(1),pos(2),pos(3)), &
 	!		 coldenshe_in(0),coldenshe_out_temp(0), &
@@ -268,6 +296,17 @@ contains
           phi%photo_cell_HI=phi%photo_cell_HI/(ion%h_av(0)*ndens_p*(1.0_dp-abu_he))
           phi%photo_cell_HeI=phi%photo_cell_HeI/(ion%he_av(0)*ndens_p*abu_he)
           phi%photo_cell_HeII=phi%photo_cell_HeII/(ion%he_av(1)*ndens_p*abu_he)
+#ifdef PL
+          pl_phi%photo_cell_HI=pl_phi%photo_cell_HI/(ion%h_av(0)*ndens_p*(1.0_dp-abu_he))
+          pl_phi%photo_cell_HeI=pl_phi%photo_cell_HeI/(ion%he_av(0)*ndens_p*abu_he)
+          pl_phi%photo_cell_HeII=pl_phi%photo_cell_HeII/(ion%he_av(1)*ndens_p*abu_he)
+#endif
+
+#ifdef QUASARS
+          qpl_phi%photo_cell_HI=qpl_phi%photo_cell_HI/(ion%h_av(0)*ndens_p*(1.0_dp-abu_he))
+          qpl_phi%photo_cell_HeI=qpl_phi%photo_cell_HeI/(ion%he_av(0)*ndens_p*abu_he)
+          qpl_phi%photo_cell_HeII=qpl_phi%photo_cell_HeII/(ion%he_av(1)*ndens_p*abu_he)
+#endif
           
           ! Calculate the losses due to LLSs.
           ! GM/110224: Add the factor vol/vol_ph to phi, just as we do for
@@ -287,6 +326,28 @@ contains
           phi%heat = 0.0_dp
           phi%photo_in = 0.0_dp
           phi%photo_out = 0.0_dp
+#ifdef PL
+          pl_phi%photo_cell_HI = 0.0_dp
+          pl_phi%photo_cell_HeI = 0.0_dp
+          pl_phi%photo_cell_HeII = 0.0_dp
+          pl_phi%photo_out_HI = 0.0_dp
+          pl_phi%photo_out_HeI = 0.0_dp
+          pl_phi%photo_out_HeII = 0.0_dp
+          pl_phi%heat = 0.0_dp
+          pl_phi%photo_in = 0.0_dp
+          pl_phi%photo_out = 0.0_dp
+#endif
+#ifdef QUASARS
+          qpl_phi%photo_cell_HI = 0.0_dp
+          qpl_phi%photo_cell_HeI = 0.0_dp
+          qpl_phi%photo_cell_HeII = 0.0_dp
+          qpl_phi%photo_out_HI = 0.0_dp
+          qpl_phi%photo_out_HeI = 0.0_dp
+          qpl_phi%photo_out_HeII = 0.0_dp
+          qpl_phi%heat = 0.0_dp
+          qpl_phi%photo_in = 0.0_dp
+          qpl_phi%photo_out = 0.0_dp
+#endif
        endif
        
        ! Add photo-ionization rate to the global array 
@@ -301,10 +362,25 @@ contains
        phihe_grid(pos(1),pos(2),pos(3),0)=&
              phihe_grid(pos(1),pos(2),pos(3),0)+phi%photo_cell_HeI
        phihe_grid(pos(1),pos(2),pos(3),1)=&
-             phihe_grid(pos(1),pos(2),pos(3),1)+phi%photo_cell_HeII   
+             phihe_grid(pos(1),pos(2),pos(3),1)+phi%photo_cell_HeII
+
+#ifdef PL
+            pl_phih_grid(pos(1),pos(2),pos(3))= &
+            pl_phih_grid(pos(1),pos(2),pos(3))+pl_phi%photo_cell_HI
+#endif
+#ifdef QUASARS
+       qpl_phih_grid(pos(1),pos(2),pos(3))= &
+            qpl_phih_grid(pos(1),pos(2),pos(3))+qpl_phi%photo_cell_HI
+#endif   
        if (.not. isothermal) &
             phiheat(pos(1),pos(2),pos(3))=phiheat(pos(1),pos(2),pos(3))+phi%heat
-
+#ifdef PL
+            
+            pl_phiheat(pos(1),pos(2),pos(3))=pl_phiheat(pos(1),pos(2),pos(3))+pl_phi%heat
+#endif
+#ifdef QUASARS
+            qpl_phiheat(pos(1),pos(2),pos(3))=qpl_phiheat(pos(1),pos(2),pos(3))+qpl_phi%heat
+#endif
        ! Photon statistics: register number of photons leaving the grid
        ! Note: This is only the H0 photo-ionization rate
        if ( (any(rtpos(:) == last_l(:))) .or. &
@@ -363,6 +439,12 @@ contains
     real(kind=dp) :: convergence
     type(ionstates) :: ion    
     type(photrates) :: phi 
+#ifdef PL
+    type(photrates) :: pl_phi 
+#endif
+#ifdef QUASARS
+    type(photrates) :: qpl_phi 
+#endif
 
     ! Initialize local ionization states to global ones
     do nx=0,1
@@ -385,10 +467,23 @@ contains
 
     ! Use the collected photo-ionization rates
     phi%photo_cell_HI=phih_grid(pos(1),pos(2),pos(3))
+#ifdef PL
+    pl_phi%photo_cell_HI=pl_phih_grid(pos(1),pos(2),pos(3))
+#endif
+#ifdef QUASARS
+    qpl_phi%photo_cell_HI=qpl_phih_grid(pos(1),pos(2),pos(3))
+#endif
     phi%photo_cell_HeI=phihe_grid(pos(1),pos(2),pos(3),0)
     phi%photo_cell_HeII=phihe_grid(pos(1),pos(2),pos(3),1)
-    if(.not.isothermal) phi%heat=phiheat(pos(1),pos(2),pos(3))
-
+    if(.not.isothermal) then 
+        phi%heat=phiheat(pos(1),pos(2),pos(3))
+#ifdef PL
+        pl_phi%heat=pl_phiheat(pos(1),pos(2),pos(3))
+#endif
+#ifdef QUASARS
+        qpl_phi%heat=qpl_phiheat(pos(1),pos(2),pos(3))
+#endif
+    endif
     ! I think instead of calling here twice get_temp, it is perhaps better to pass t_new
     ! and t_old as arguments from/to do_chemistry. (?)
     call do_chemistry (dt, ndens_p, ion, phi, 0.0_dp, &

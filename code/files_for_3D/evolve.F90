@@ -45,8 +45,18 @@ module evolve
   use photonstatistics, only: report_photonstatistics
   use photonstatistics, only: update_grandtotal_photonstatistics
   use radiation_sizes, only: NumFreqBnd
- 
+#if defined(QUASARS) && defined(PL) 
+  use evolve_data, only: phih_grid, phihe_grid, phiheat, pl_phih_grid,&
+      pl_phiheat, qpl_phih_grid, qpl_phiheat
+#elif defined(QUASARS)
+  use evolve_data, only: phih_grid, phihe_grid, phiheat, qpl_phih_grid,&
+      qpl_phiheat
+#elif defined(PL)
+  use evolve_data, only: phih_grid, phihe_grid, phiheat, pl_phih_grid,&
+      pl_phih_grid
+#else
   use evolve_data, only: phih_grid, phihe_grid, phiheat
+#endif
   use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
   use evolve_data, only: photon_loss_all
 #ifdef MPI
@@ -274,6 +284,12 @@ contains
     write(iterdump) niter
     write(iterdump) photon_loss_all
     write(iterdump) phih_grid
+#ifdef PL
+    write(iterdump) pl_phih_grid
+#endif 
+#ifdef QUASARS
+    write(iterdump) qpl_phih_grid
+#endif
     write(iterdump) xh_av
     write(iterdump) xh_intermed
     write(iterdump) phihe_grid
@@ -281,6 +297,12 @@ contains
     write(iterdump) xhe_intermed
     if (.not.isothermal) then
        write(iterdump) phiheat
+#ifdef PL
+       write(iterdump) pl_phiheat
+#endif
+#ifdef QUASARS
+       write(iterdump) qpl_phiheat
+#endif
        write(iterdump) temperature_grid
     endif
     close(iterdump)
@@ -328,6 +350,12 @@ contains
           read(iterdump) niter
           read(iterdump) photon_loss_all
           read(iterdump) phih_grid
+#ifdef PL
+          read(iterdump) qpl_phih_grid
+#endif
+#ifdef QUASARS
+          read(iterdump) qpl_phih_grid
+#endif
           read(iterdump) xh_av
           read(iterdump) xh_intermed
           read(iterdump) phihe_grid
@@ -335,6 +363,12 @@ contains
           read(iterdump) xhe_intermed
           if (.not.isothermal) then
              read(iterdump) phiheat
+#ifdef PL
+             read(iterdump) pl_phiheat
+#endif
+#ifdef QUASARS
+             read(iterdump) qpl_phiheat
+#endif
              read(iterdump) temperature_grid
           endif
 
@@ -355,6 +389,14 @@ contains
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(phih_grid,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#ifdef PL
+       call MPI_BCAST(pl_phih_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
+#ifdef QUASARS
+       call MPI_BCAST(qpl_phih_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
        call MPI_BCAST(phihe_grid,mesh(1)*mesh(2)*mesh(3)*2, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xh_av,mesh(1)*mesh(2)*mesh(3)*2, &
@@ -370,6 +412,14 @@ contains
        if (.not.isothermal) then
           call MPI_BCAST(phiheat,mesh(1)*mesh(2)*mesh(3), &
                MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#ifdef PL
+          call MPI_BCAST(pl_phiheat,mesh(1)*mesh(2)*mesh(3), &
+               MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
+#ifdef QUASARS
+          call MPI_BCAST(qpl_phiheat,mesh(1)*mesh(2)*mesh(3), &
+               MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
           call MPI_BCAST(temperature_grid,mesh(1)*mesh(2)*mesh(3)*3, &
                MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        endif
@@ -391,6 +441,14 @@ contains
     phih_grid(:,:,:)=0.0
     phihe_grid(:,:,:,:)=0.0    
     phiheat(:,:,:)=0.0
+#ifdef PL
+    pl_phih_grid(:,:,:)=0.0
+    pl_phiheat(:,:,:)=0.0
+#endif
+#ifdef QUASARS
+    qpl_phih_grid(:,:,:)=0.0
+    qpl_phiheat(:,:,:)=0.0
+#endif
     ! reset photon loss counters
     photon_loss(:)=0.0
     LLS_loss = 0.0 ! make this a NumFreqBnd vector if needed later (GM/101129)
@@ -547,7 +605,21 @@ contains
          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
     ! Overwrite the processor local values with the accumulated value
     phih_grid(:,:,:)=buffer(:,:,:)
-
+    ! accumulate (sum) the MPI distributed phih_grid
+#ifdef PL
+    call MPI_ALLREDUCE(pl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+    ! Overwrite the processor local values with the accumulated value
+    pl_phih_grid(:,:,:)=buffer(:,:,:)
+    ! accumulate (sum) the MPI distributed pl_phih_grid
+#endif
+#ifdef QUASARS
+    call MPI_ALLREDUCE(qpl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+    ! Overwrite the processor local values with the accumulated value
+    qpl_phih_grid(:,:,:)=buffer(:,:,:)
+    ! accumulate (sum) the MPI distributed qpl_phih_grid
+#endif
      call MPI_ALLREDUCE(phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
     ! Overwrite the processor local values with the accumulated value
@@ -562,6 +634,14 @@ contains
          MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
     ! Overwrite the processor local values with the accumulated value
     phiheat(:,:,:)=buffer(:,:,:)    
+#ifdef PL
+    call MPI_ALLREDUCE(pl_phiheat, buffer, mesh(1)*mesh(2)*mesh(3), &
+         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+#endif
+#ifdef QUASARS
+    call MPI_ALLREDUCE(qpl_phiheat, buffer, mesh(1)*mesh(2)*mesh(3), &
+         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+#endif
         
     ! accumulate (sum) the MPI distributed sum of number of boxes
     call MPI_ALLREDUCE(sum_nbox, sum_nbox_all, 1, &
