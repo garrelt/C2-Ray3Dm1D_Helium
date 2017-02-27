@@ -53,7 +53,7 @@ module evolve
       qpl_phiheat
 #elif defined(PL)
   use evolve_data, only: phih_grid, phihe_grid, phiheat, pl_phih_grid,&
-      pl_phih_grid
+      pl_phiheat,pl_phih_grid
 #else
   use evolve_data, only: phih_grid, phihe_grid, phiheat
 #endif
@@ -351,7 +351,7 @@ contains
           read(iterdump) photon_loss_all
           read(iterdump) phih_grid
 #ifdef PL
-          read(iterdump) qpl_phih_grid
+          read(iterdump) pl_phih_grid
 #endif
 #ifdef QUASARS
           read(iterdump) qpl_phih_grid

@@ -326,7 +326,11 @@ contains
        ! calculated suppressed source list
        open(unit=49,file=sourcelistfilesuppress,status='unknown')
        ! Number of sources
+#ifdef QUASARS
        read(49,*) NumSrc, qpl
+#else
+       read(49,*) NumSrc
+#endif
        close(49)
     endif
     write(logf,*) "Number of sources, with suppression: ",NumSrc
@@ -481,7 +485,11 @@ contains
     ! Open the processed source list file
     open(unit=49,file=sourcelistfilesuppress,status='unknown')
     ! Write number of active sources positions
+#ifdef QUASARS
     write(49,*) NumSrc, qpl
+#else
+    write(49,*) NumSrc
+#endif
 
     ! Write out the source information
     do ns0=1,NumSrc

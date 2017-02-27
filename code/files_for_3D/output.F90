@@ -23,7 +23,7 @@ module output_module
   use sizes, only: mesh
   use grid, only: x, vol
   use material, only: xh, temperature_grid, ndens, xhe
-#if defined(QUASARS) && defined(PLS)
+#if defined(QUASARS) && defined(PL)
   use evolve_data, only: phih_grid, phiheat, pl_phih_grid, pl_phiheat, &
                   qpl_phih_grid, qpl_phiheat
 #elif defined(QUASARS)
@@ -374,7 +374,7 @@ contains
                k=1,mesh(3))
           close(53)
 
-#ifdef PLS
+#ifdef PL
           write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"HMXB_IonRates3D_"// &
                trim(adjustl(file1))//base_extension
