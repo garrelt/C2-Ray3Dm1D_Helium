@@ -180,8 +180,7 @@ Program C2Ray
 
   ! Initialize cosmology
   ! (always call bacause it initializes some of the things even if 
-  ! not doing cosmo.
-  write(*,*) nz0 
+  ! not doing cosmo. 
   call cosmology_init(zred_array(nz0),sim_time)
 
   if (rank == 0) &
