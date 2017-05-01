@@ -77,7 +77,8 @@ module c2ray_parameters
   !> Number of ionizing photons / second
   real(kind=dp),parameter :: pl_S_star_nominal=1e48_dp!1e-18_dp!1e48_dp
   !> nominal minimum and maximum frequency for power law source
-  real(kind=dp),parameter :: pl_MinFreq_nominal=eth0*ev2fr
+  !real(kind=dp),parameter :: pl_MinFreq_nominal=eth0*ev2fr
+  real(kind=dp),parameter :: pl_MinFreq_nominal=0.3*1e3*ev2fr
   real(kind=dp),parameter :: pl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
   !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
   !! 0.02 as their nominal value. Note that this depends on your integration
@@ -98,7 +99,8 @@ module c2ray_parameters
   !> Number of ionizing photons / second for quasars
   real(kind=dp),parameter :: qpl_S_star_nominal=1e48_dp
   !> nominal minimum and maximum frequency for quasar source
-  real(kind=dp),parameter :: qpl_MinFreq_nominal=eth0*ev2fr
+  !real(kind=dp),parameter :: qpl_MinFreq_nominal=eth0*ev2fr
+  real(kind=dp),parameter :: qpl_MinFreq_nominal=0.3*1e3*ev2fr
   real(kind=dp),parameter :: qpl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
 #endif
 
