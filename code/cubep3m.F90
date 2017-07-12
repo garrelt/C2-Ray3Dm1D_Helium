@@ -5,7 +5,7 @@
 !! 
 !! \b Author: Garrelt Mellema, Ilian Iliev
 !!
-!! \b Date: 09-Dec-2009 (22-May-2008, previous versions were not dated)
+!! \b Date: 11-Dec-2015 (09-Dec-2009 (22-May-2008, previous versions were not dated)
 !!
 !! \b Version: CUBEP3M simulations
 
@@ -41,6 +41,9 @@ module nbody
   real(kind=dp),parameter :: boxsize=244.0 !< Box size in Mpc/h comoving
   integer,parameter :: n_box=8000  !< cells/side (in N-body,fine grid)
 
+  !real(kind=dp),parameter :: boxsize=425.0  !< Box size in Mpc/h comoving
+  !integer,parameter :: n_box=10976  !< cells/side (in N-body,fine grid)
+
   !real(kind=dp),parameter :: boxsize=37.0  !< Box size in Mpc/h comoving
   !integer,parameter :: n_box=2048  !< cells/side (in N-body,fine grid)
 
@@ -71,6 +74,7 @@ module nbody
   character(len=*),parameter,private :: dir_LLS_path = "../" 
   !> Name of directory with files used for LLS
   character(len=*),parameter,private :: dir_LLS_name= "halos/"
+
   !> Format of density file (unformatted or binary)
 #ifdef IFORT
   ! ifort standard for "binary"
@@ -102,7 +106,7 @@ module nbody
   !> clumping file with header?
   logical,parameter :: clumpingheader=.true.
   !> LLS file with header?
-  logical,parameter :: LLSheader=.true.  
+  logical,parameter :: LLSheader=.true.
   !> unit of density in density file
   !! can be "grid", "particle", "M0Mpc3"
   character(len=*),parameter :: density_unit="grid"
@@ -131,11 +135,11 @@ module nbody
   integer, public :: NumZred               !< number of redshifts
   real(kind=dp),dimension(:),allocatable,public :: zred_array !< array of redshifts 
   integer,dimension(:),allocatable,public :: snap !< array of snapshot numbers (for compatibility)
-  character(len=8),public :: id_str       !< resolution dependent string
+  character(len=8),public :: id_str="unknown" !< resolution dependent string
 
   character(len=480),public :: dir_dens !< Path to directory with density files
-  character(len=480),public :: dir_clump !< Path to directory with density files
-  character(len=480),public :: dir_LLS !< Path to directory with LLS files  
+  character(len=480),public :: dir_clump !< Path to directory with clump files
+  character(len=480),public :: dir_LLS !< Path to directory with LLS files
   character(len=480),public :: dir_src !< Path to directory with source files
 
 #ifdef MPI

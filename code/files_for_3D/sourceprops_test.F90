@@ -42,7 +42,6 @@ module sourceprops
 #endif
 #ifdef QUASARS
   real(kind=dp),dimension(:),allocatable :: NormFluxQPL !< normalized ionizing flux of sources
-  integer :: NumQsr = 0 !< counter: number of quasar sources
 #endif
   integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
 
@@ -90,16 +89,20 @@ contains
     if (allocated(srcSeries)) deallocate(srcSeries)
     
     if (allocated(temparray)) deallocate(temparray)
-!    allocate(temparray(4))
-
-#if defined(QUASARS) && defined(PL)
-    allocate(temparray(6))
-#elif defined(QUASARS)
-    allocate(temparray(5))
-#elif defined(PL)
-    allocate(temparray(5))
-#else
     allocate(temparray(4))
+#ifdef PL
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(5))
+#endif
+#ifdef QUASARS
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(5))
+#endif
+#ifdef PL
+#ifdef QUASARS
+    if (allocated(temparray)) deallocate(temparray)
+    allocate(temparray(6))
+#endif
 #endif
 
     ! Rank 0 reads in sources
@@ -110,15 +113,14 @@ contains
 
        ! Establish number of sources
        read(sourcefile,*) NumSrc
-#ifdef QUASARS
-       NumQsr = NumSrc
-#endif
+
+   
+
     endif ! end of rank 0 test
     
 #ifdef MPI
     ! Distribute source number to all other nodes
     call MPI_BCAST(NumSrc,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
-    call MPI_BCAST(NumQsr,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
 
 #ifdef MPILOG
@@ -141,21 +143,25 @@ contains
        if (rank == 0) then
           do ns=1,NumSrc
 
+
               read(sourcefile,*) temparray
 
               srcpos(1,ns) = temparray(1)
               srcpos(2,ns) = temparray(2)
               srcpos(3,ns) = temparray(3)
               NormFlux(ns) = temparray(4)/S_star_nominal
-#if defined(QUASARS) && defined(PL)
-             NormFluxPL(ns) = temparray(5)/(pl_S_star_nominal)
-             NormFluxQPL(ns) = temparray(6)/qpl_S_star_nominal
-#elif defined(QUASARS)
-             NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
-#elif defined(PL)
-             NormFluxPL(ns)= temparray(5)/(pl_S_star_nominal)
+#ifdef PL
+              NormFluxPL(ns)= temparray(5)/pl_S_star_nominal
 #endif
-
+#ifdef QUASARS
+              NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
+#endif
+#ifdef PL
+#ifdef QUASARS
+             NormFluxPL(ns) = temparray(5)/pl_S_star_nominal
+             NormFluxQPL(ns) = temparray(6)/qpl_S_star_nominal
+#endif
+#endif
           enddo
           close(sourcefile)
           

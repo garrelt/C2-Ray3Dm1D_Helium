@@ -142,14 +142,14 @@ contains
     current_subboxsize = subboxsize !Reset subboxsize to original subboxsize in case there is no quasar
 #if defined(PL)
     current_subboxsize = max_subbox !Set subbox to maximum size to make sure x-rays are traced accross full box
-    if (rank==0) write(logf,*) "Power laws on so subboxsize set to maximum"
+    write(logf,*) "Power laws on so subboxsize set to maximum"
 #elif defined(QUASARS) && !defined(PL)
     if (NormFluxQPL(ns) > 0) then !Is there a quasar?
         current_subboxsize = max_subbox !Set subbox to maximum size to make sure x-rays are traced accross full box
         qnbox = 1 !always one as cannot be more than one bix box per quasar
-!        if (rank==0) write(logf,*) "Found quasar on line ", ns
-!    else
-!        qnbox = 0
+        write(logf,*) "Only putting big boxes around QSOs"
+    else
+        qnbox = 0
     endif
     sum_qnbox=sum_qnbox+qnbox !sum total number of big boxes on this processor
 !    if (rank==0) write(logf,*) "sum qnbox: ", sum_qnbox !Report

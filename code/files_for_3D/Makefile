@@ -1,4 +1,4 @@
-#Makefile for C2Ray_3D.
+# Makefile for C2Ray_3D.
 #
 # Author: Garrelt Mellema
 
@@ -36,37 +36,35 @@
 #-------------------------------------------------------
 
 # Compiler
-FC = gfortran # GNU compiler
-MPIFC = mpif90.openmpi # MPI compiler
+#FC = gfortran # GNU compiler
+#MPIFC = mpif90.openmpi # MPI compiler
 
 # F90 options (ifort)
-GFORTFLAGS = -cpp -O0 -g -DGFORT 
+#GFORTFLAGS = -cpp -O0 -g -DGFORT 
 #GFORTFLAGS = -O3 -DGFORT
 # Processor dependent optimization
-
-F90FLAGS1 = $(GFORTFLAGS) 
+#F90FLAGS1 = $(GFORTFLAGS) 
 
 # These flags should be added to the F90FLAGS1 depending on the executable
 # made. Specify this below on a per executable basis.
 #MPI_FLAGS = -I/usr/include/lam -DMPI # For LAM mpi (Stockholm)
-MPI_FLAGS = -DMPI # 
+#MPI_FLAGS = -DMPI # 
 #MPI_FLAGS = -DMPI -DMPILOG # Add more (MPI node) diagnostic output
 #OPENMP_FLAGS = -fopenmp -DMY_OPENMP # For Intel compiler
 
 #-------------------------------------------------------
 # Compiler
 # Intel: best tested
-##FC =ifort # Intel compiler
-##MPIFC = mpif90 # MPI compiler
+FC = ifort # Intel compiler
+MPIFC = mpif90 # MPI compiler
 
 # F90 options (ifort)
 #IFORTFLAGS = -DMPILOG -O0 -g -u -fpe0 -DIFORT -shared-intel -check all -traceback -fpp  #!<
-##IFORTFLAGS = -fpp -O3 -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback -vec_report
-#IFORTFLAGS = -fpp -O3 -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
-
+#IFORTFLAGS = -fpp -O3 -u -fpe0 -ipo -DIFORT -shared-intel -check all -traceback -vec_report
+IFORTFLAGS = -fpp -O3 -u -fpe0 -ipo -mcmodel=medium -shared-intel -DIFORT #-check all -traceback
 # Processor dependent optimization
 #F90FLAGS1 = $(IFORTFLAGS)  #!<
-##F90FLAGS1 = -xHost $(IFORTFLAGS)  #!<
+F90FLAGS1 = -xHost $(IFORTFLAGS)  #!<
 #F90FLAGS1 = -xW $(IFORTFLAGS) 
 #F90FLAGS1 = -xO $(IFORTFLAGS) 
 #F90FLAGS1 = -xT $(IFORTFLAGS) # Laptop 
@@ -77,9 +75,9 @@ MPI_FLAGS = -DMPI #
 # These flags should be added to the F90FLAGS1 depending on the executable
 # made. Specify this below on a per executable basis.
 #MPI_FLAGS = -I/usr/include/lam -DMPI # For LAM mpi (Stockholm)
-##MPI_FLAGS = -DMPI # 
+MPI_FLAGS = -DMPI # 
 #MPI_FLAGS = -DMPI -DMPILOG # Add more (MPI node) diagnostic output
-##OPENMP_FLAGS = -openmp -DMY_OPENMP # For Intel compiler
+OPENMP_FLAGS = -openmp -DMY_OPENMP # For Intel compiler
 
 #-------------------------------------------------------
 
@@ -199,7 +197,7 @@ C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) 
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
-C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) -DPL #-DQUASARS
+C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
 C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
@@ -310,7 +308,7 @@ C2Ray_3D_cubep3m_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CU
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_kyl_periodic: F90=$(FC)
-C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1)  #-DQUASARS -DPL
+C2Ray_3D_cubep3m_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DQUASARS -DPL
 C2Ray_3D_cubep3m_kyl_periodic:  $(UTILS1)  sizes.o $(CONSTANTS1)    ../no_mpi.o $(CUBEP3M1) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2_KYL) C2Ray.o
 
@@ -320,7 +318,7 @@ C2Ray_3D_cubep3m_periodic_mpi:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../mpi.o $(CU
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 
 C2Ray_3D_cubep3m_periodic_omp: F90=$(FC)
-C2Ray_3D_cubep3m_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)  
+C2Ray_3D_cubep3m_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) 
 C2Ray_3D_cubep3m_periodic_omp:  $(UTILS1)  sizes.o $(CONSTANTS1)   ../no_mpi.o $(CUBEP3M1) $(GENERAL1) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2)   no_mpi.o $(CUBEP3M2) $(GENERAL2) C2Ray.o
 

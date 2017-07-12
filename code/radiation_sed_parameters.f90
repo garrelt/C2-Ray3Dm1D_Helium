@@ -467,10 +467,6 @@ contains
           R_star = sqrt(S_scaling)*R_star
           L_star = S_scaling*L_star
           L_star_ion = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"B","L")
-
-          if (rank==0) write(logf,*) "S_star_unscaled: ", S_star_unscaled, &
-                                 ", S_scaling: ", S_scaling
-
        endif
     endif
        
@@ -492,14 +488,10 @@ contains
     ! needed to achieve either the specified ionizing photon rate or ionizing luminosity
     if (pl_S_star > 0.0) then
        ! Total power-law ionizing photon rate is specified (photon sense)
-       pl_S_star_unscaled = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","S") !at this point pl_scaling = 1.0
-
+       pl_S_star_unscaled = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","S")
        !pl_S_star_unscaled = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","S")
        pl_S_star_wanted = pl_S_star
        pl_scaling = pl_S_star_wanted/pl_S_star_unscaled
-       if (rank==0) write(logf,*) "pl_S_star_wanted: ", pl_S_star_wanted, &
-                                 ", pl_S_star_unscaled: ", pl_S_star_unscaled, &
-                                 ", pl_scaling: ", pl_scaling
        pl_ionizing_luminosity = integrate_sed(pl_MinFreq,pl_MaxFreq,"P","L")
        !pl_ionizing_luminosity = integrate_sed(freq_min(1),freq_max(NumFreqBnd),"P","L")
        Edd_Efficiency = pl_ionizing_luminosity / EddLum
