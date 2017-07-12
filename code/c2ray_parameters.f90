@@ -58,6 +58,55 @@ module c2ray_parameters
   !> Add photon losses back into volume or not
   logical,parameter :: add_photon_losses=.false. !.true.
 
+<<<<<<< HEAD
+=======
+  !> Parameters for nominal SED (BB)
+  !> Effective temperature (K); if set to zero, the code will ask
+  !! for SED parameters
+  real(kind=dp),parameter :: T_eff_nominal=5.0e4
+  !> Number of ionizing photons / second
+  real(kind=dp),parameter :: S_star_nominal=1e48_dp
+
+#ifdef PL
+  !> nominal Eddington efficiency
+  real(kind=dp),parameter :: EddLeff_nominal=1.0_dp
+  !> nominal power law index (for photon number)
+  real(kind=dp),parameter :: pl_index_nominal=2.5_dp
+  !> nominal black hole mass for Eddington luminosity (M0)
+  real(kind=dp),parameter :: mass_nominal=1.0e6_dp
+  !> Eddington luminosity per mass_nominal solar mass (erg/s)
+  real(kind=dp),parameter :: EddLum=1.38e38*mass_nominal
+  !> Number of ionizing photons / second
+  real(kind=dp),parameter :: pl_S_star_nominal=1e48_dp!1e-18_dp!1e48_dp
+  !> nominal minimum and maximum frequency for power law source
+  !real(kind=dp),parameter :: pl_MinFreq_nominal=eth0*ev2fr
+  real(kind=dp),parameter :: pl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: pl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
+  !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
+  !! 0.02 as their nominal value. Note that this depends on your integration
+  !! limits. Mesinger et al. use 300 eV as lowest energy.
+  !real,parameter :: xray_phot_per_atom = 0.02
+  real,parameter :: xray_phot_per_atom = 0.1
+#endif
+
+#ifdef QUASARS
+  !> nominal quasar Eddington efficiency
+  real(kind=dp),parameter :: qEddLeff_nominal=1.0_dp
+  !> nominal quasar index (for photon number)
+  real(kind=dp),parameter :: qpl_index_nominal=1.8_dp
+  !> nominal quasar black hole mass for Eddington luminosity (M0)
+  real(kind=dp),parameter :: qmass_nominal=1.0e6_dp
+  !> Eddington luminosity per qmass_nominal solar mass (erg/s)
+  real(kind=dp),parameter :: qEddLum=1.38e38*qmass_nominal
+  !> Number of ionizing photons / second for quasars
+  real(kind=dp),parameter :: qpl_S_star_nominal=1e48_dp
+  !> nominal minimum and maximum frequency for quasar source
+  !real(kind=dp),parameter :: qpl_MinFreq_nominal=eth0*ev2fr
+  real(kind=dp),parameter :: qpl_MinFreq_nominal=0.3*1e3*ev2fr
+  real(kind=dp),parameter :: qpl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
+#endif
+
+>>>>>>> origin/master_hannah
   !> Subgrid clumping\n
   !! 1: constant clumping (with clumping_factor)\n
   !! 2: 3.5Mpc PM, WMAP1 clumping\n
