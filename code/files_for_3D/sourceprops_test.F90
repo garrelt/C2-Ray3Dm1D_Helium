@@ -21,12 +21,13 @@ module sourceprops
   !use material, only: xh
   use grid, only: x,y,z
   use c2ray_parameters, only: phot_per_atom, lifetime, &
-       S_star_nominal, StillNeutral, Number_Sourcetypes
+       StillNeutral, Number_Sourcetypes
+  use radiation_sed_parameters, only: S_star
 #ifdef PL
-  use c2ray_parameters, only: pl_S_star_nominal
+  use radiation_sed_parameters, only: pl_S_star
 #endif
 #ifdef QUASARS
-  use c2ray_parameters, only: qpl_S_star_nominal
+  use radiation_sed_parameters, only: qpl_S_star
 #endif  
   implicit none
 
@@ -149,17 +150,17 @@ contains
               srcpos(1,ns) = temparray(1)
               srcpos(2,ns) = temparray(2)
               srcpos(3,ns) = temparray(3)
-              NormFlux(ns) = temparray(4)/S_star_nominal
+              NormFlux(ns) = temparray(4)/S_star
 #ifdef PL
-              NormFluxPL(ns)= temparray(5)/pl_S_star_nominal
+              NormFluxPL(ns)= temparray(5)/pl_S_star
 #endif
 #ifdef QUASARS
-              NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
+              NormFluxQPL(ns) = temparray(5)/qpl_S_star
 #endif
 #ifdef PL
 #ifdef QUASARS
-             NormFluxPL(ns) = temparray(5)/pl_S_star_nominal
-             NormFluxQPL(ns) = temparray(6)/qpl_S_star_nominal
+             NormFluxPL(ns) = temparray(5)/pl_S_star
+             NormFluxQPL(ns) = temparray(6)/qpl_S_star
 #endif
 #endif
           enddo
@@ -171,35 +172,35 @@ contains
           !srcpos(1:3,2)=(/ 51, 50, 50 /)
           !srcpos(1:3,3)=(/ 52, 50, 50 /)
           !srcpos(1:3,4)=(/ 53, 50, 50 /)
-          !NormFlux(1:4)=1e55_dp/S_star_nominal
+          !NormFlux(1:4)=1e55_dp/S_star
           !NormFluxPL(1:4)=0.0_dp
           
           !srcpos(1:3,5)=(/ 20, 10, 10 /)
-          !NormFlux(5)=1e57_dp/S_star_nominal
+          !NormFlux(5)=1e57_dp/S_star
           !NormFluxPL(5)=0.0_dp
           
           !srcpos(1:3,6)=(/ 70, 70, 50 /)
           !srcpos(1:3,7)=(/ 72, 70, 50 /)
           !srcpos(1:3,8)=(/ 70, 72, 50 /)
           !srcpos(1:3,9)=(/ 72, 72, 50 /)
-          !NormFlux(6:8)=1e55_dp/S_star_nominal
-          !NormFlux(9)=1e56_dp/S_star_nominal
+          !NormFlux(6:8)=1e55_dp/S_star
+          !NormFlux(9)=1e56_dp/S_star
           !NormFluxPL(6:9)=0.0
           
           !srcpos(1:3,10)=(/ 20, 10, 90 /)
-          !NormFlux(10)=1e54_dp/S_star_nominal
+          !NormFlux(10)=1e54_dp/S_star
           ! Note, no normalization is used for PL source
           !NormFluxPL(10)=3.0_dp
           
           write(logf,*) 'Total photon rate (BB)= ', &
-               sum(NormFlux)*S_star_nominal,' s^-1'
+               sum(NormFlux)*S_star,' s^-1'
 #ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
-               sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
+               sum(NormFluxPL)*pl_S_star,' s^-1'
 #endif
 #ifdef QUASARS
           write(logf,*) 'Total photon rate (Q)= ', &
-               sum(NormFluxQPL)*qpl_S_star_nominal,' s^-1'
+               sum(NormFluxQPL)*qpl_S_star,' s^-1'
 #endif
           ! Create array of source numbers for generating random order 
           do ns=1,NumSrc

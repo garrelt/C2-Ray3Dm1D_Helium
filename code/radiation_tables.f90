@@ -37,7 +37,7 @@ module radiation_tables
 
   use radiation_sed_parameters, only: sourcetype
   use radiation_sed_parameters, only: T_eff, R_star, R_star2, h_over_kT
-  use radiation_sed_parameters, only: spectrum_parms, spec_diag
+  use radiation_sed_parameters, only: spectrum_parms, normalize_seds, report_on_seds
 
   use radiation_sizes, only: cross_section_HI_powerlaw_index
   use radiation_sizes, only: cross_section_HeI_powerlaw_index
@@ -138,22 +138,21 @@ module radiation_tables
 
 contains
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                                                                                             !
-  subroutine rad_ini ()                                                                      !
-                                                                                             !
-    ! Ask for the parameters of the spectrum                                                 !
-    call spectrum_parms ()                                                                   ! 
-                                                                                             ! 
-    ! Initializes constants and tables for radiation processes                               ! 
-    ! (heating, cooling and ionization)                                                      !
-    call setup_scalingfactors ()                                                             !
-                                                                                             !
-    ! Initialize integration routines                                                        !
-    call romberg_initialisation (NumFreq)                                                    !
-                                                                                             !
-    ! Determine spectrum diagnostics                                                         !
-    call spec_diag ()                                                                        !
+  subroutine rad_ini ()                                                         
+
+    ! Ask for the parameters of the spectrum (SED)
+    call spectrum_parms ()
+
+    ! Initializes constants and tables for radiation processes  
+    ! (heating, cooling and ionization) 
+    call setup_scalingfactors ()
+
+    ! Initialize integration routines
+    call romberg_initialisation (NumFreq)
+
+    ! Normalize the SEDs and report
+    call normalize_seds ()
+    call report_on_seds ()
 
 #ifdef MPILOG
     write(logf,*) 'about to integrate'
