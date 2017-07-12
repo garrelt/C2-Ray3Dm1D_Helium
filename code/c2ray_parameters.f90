@@ -14,7 +14,7 @@ module c2ray_parameters
   ! This module collects parameters needed by C2-Ray
 
   use precision, only: dp
-  use cgsconstants, only: ev2fr
+  use cgsconstants, only: eth0,ev2fr
   use cgsphotoconstants, only: ion_freq_HeII
   use astroconstants, only: YEAR
   use sizes, only: mesh
@@ -23,7 +23,7 @@ module c2ray_parameters
 
   !> Which fraction of the cells can be left unconverged in order
   !! to improve performance (used in rad_evolve3d)
-  real(kind=dp),parameter :: convergence_fraction=2.5e-4
+  real(kind=dp),parameter :: convergence_fraction=1e-5!2.5e-4
 
   !> Set to true to let C2-Ray not change the temperature
   ! logical,parameter :: isothermal=.false.
@@ -54,12 +54,10 @@ module c2ray_parameters
   !! ray tracing is done. This	is a very crude	mean free path parameter
   !! which sets	up a photon wall at exactly this distance.
   integer,parameter :: max_subbox=1150
-  
+   
   !> Add photon losses back into volume or not
   logical,parameter :: add_photon_losses=.false. !.true.
 
-<<<<<<< HEAD
-=======
   !> Parameters for nominal SED (BB)
   !> Effective temperature (K); if set to zero, the code will ask
   !! for SED parameters
@@ -106,7 +104,6 @@ module c2ray_parameters
   real(kind=dp),parameter :: qpl_MaxFreq_nominal=ion_freq_HeII * 100.00_dp
 #endif
 
->>>>>>> origin/master_hannah
   !> Subgrid clumping\n
   !! 1: constant clumping (with clumping_factor)\n
   !! 2: 3.5Mpc PM, WMAP1 clumping\n
@@ -140,13 +137,8 @@ module c2ray_parameters
   !> Source properties: Number of different stellar source types 
   integer,parameter :: Number_Sourcetypes=2
   !> Source properties: Photon per atom for different source types (high to low mass)
-  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 /)
+  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 2.0, 8.2 /)
   !real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 , 0.0 /)
-  !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
-  !! 0.02 as their nominal value. Note that this depends on your integration
-  !! limits. Mesinger et al. use 300 eV as lowest energy.
-  real,parameter :: xray_phot_per_atom = 0.02
-  !real,parameter :: xray_phot_per_atom = 0.1
 
   !> Source properties: Life time of sources (if set at compile time)
   real,parameter :: lifetime=20e6*YEAR
