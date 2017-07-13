@@ -17,7 +17,7 @@ module sourceprops
   use cgsconstants, only: m_p
   use astroconstants, only: M_SOLAR, YEAR
   use cosmology_parameters, only: Omega_B, Omega0
-  use nbody, only: id_str, M_grid, dir_src, NumZred
+  use nbody, only: id_str, M_grid, dir_src, dir_usrc,NumZred
   use material, only: xh
   use grid, only: x,y,z
 #ifdef PL
@@ -155,7 +155,7 @@ contains
        sourcelistfile=trim(adjustl(dir_src))//&       
             trim(adjustl(z_str))//"-"//trim(adjustl(id_str))// &
             trim(adjustl(sourcelistfile_base))
-       sourcelistfilesuppress=trim(adjustl(dir_src))//&
+       sourcelistfilesuppress=trim(adjustl(dir_usrc))//&
             trim(adjustl(z_str))//"-"//trim(adjustl(id_str))// &
             trim(adjustl(sourcelistfilesuppress_base))
        

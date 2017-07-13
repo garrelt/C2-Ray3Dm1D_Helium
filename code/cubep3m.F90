@@ -66,6 +66,7 @@ module nbody
   character(len=*),parameter,private :: dir_src_path = "./" 
   !> Name of directory with source files
   character(len=*),parameter,private :: dir_src_name= "sources/"
+  character(len=*),parameter,private :: dir_usrc_name= "used_sources/"
   
   !> Path to directory containing directory with LLS files:
   character(len=*),parameter,private :: dir_LLS_path = "../" 
@@ -137,6 +138,7 @@ module nbody
   character(len=480),public :: dir_clump !< Path to directory with density files
   character(len=480),public :: dir_LLS !< Path to directory with LLS files  
   character(len=480),public :: dir_src !< Path to directory with source files
+  character(len=480),public :: dir_usrc !< Path to directory with used source files
 
 #ifdef MPI
   integer,private :: mympierror !< MPI error flag variable
@@ -170,11 +172,15 @@ contains
                //trim(adjustl(dir_LLS_name))     
           dir_src=value(1:len)//trim(adjustl(dir_src_path)) &
                //trim(adjustl(dir_src_name))
+          dir_usrc=value(1:len)//trim(adjustl(dir_src_path)) &
+               //trim(adjustl(dir_usrc_name))
+
        else
           dir_dens=trim(adjustl(dir_dens_path))//trim(adjustl(dir_dens_name))
           dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
           dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))
           dir_src=trim(adjustl(dir_src_path))//trim(adjustl(dir_src_name))
+          dir_usrc=trim(adjustl(dir_src_path))//trim(adjustl(dir_usrc_name))
        endif
     elseif (status == 1) then
        ! Assume that the whole path is set in the parameter
@@ -182,6 +188,7 @@ contains
        dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
        dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))       
        dir_src=trim(adjustl(dir_src_path))//trim(adjustl(dir_src_name))
+       dir_usrc=trim(adjustl(dir_src_path))//trim(adjustl(dir_usrc_name))
     elseif (status == -1) then
        ! Warning
        write(logf,*) "Data file system name is truncated"
@@ -191,6 +198,7 @@ contains
     dir_clump=trim(adjustl(dir_clump_path))//trim(adjustl(dir_clump_name))
     dir_LLS=trim(adjustl(dir_LLS_path))//trim(adjustl(dir_LLS_name))    
     dir_src=trim(adjustl(dir_src_path))//trim(adjustl(dir_src_name))
+    dir_usrc=trim(adjustl(dir_src_path))//trim(adjustl(dir_usrc_name))
 #endif
        
     ! Ask for redshift file
