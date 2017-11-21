@@ -197,7 +197,7 @@ C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) 
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
 C2Ray_3D_test_kyl_periodic_omp: F90=$(FC)
-C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)
+C2Ray_3D_test_kyl_periodic_omp: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS) -DPL
 C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1_KYL) C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2_KYL) C2Ray.o
 
