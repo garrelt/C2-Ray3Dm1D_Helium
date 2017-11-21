@@ -13,7 +13,8 @@ module column_density
 
   use precision, only: dp
   use sizes, only: Ndim, mesh
-  use evolve_data, only: coldensh_out, coldenshe_out
+  use evolve_data, only: coldensh_out
+  use evolve_data, only: coldenshe_out
 
   implicit none
 

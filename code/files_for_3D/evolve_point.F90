@@ -38,7 +38,8 @@ module evolve_point
   use sizes, only: Ndim, mesh
   use grid, only: vol,dr
   use density_module, only: ndens
-  use ionfractions_module, only: xh,xhe
+  use ionfractions_module, only: xh
+  use ionfractions_module, only: xhe
   use temperature_module, only: temper, temperature_grid
   use temperature_module, only: temperature_states_dbl
   use temperature_module, only: get_temperature_point, set_temperature_point
@@ -54,9 +55,12 @@ module evolve_point
   use tped, only: electrondens
   use doric_module, only: doric, prepare_doric_factors, coldens
 
-  use evolve_data, only: phih_grid, phihe_grid, phiheat
-  use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
-  use evolve_data, only: coldensh_out, coldenshe_out
+  use evolve_data, only: phih_grid, phiheat
+  use evolve_data, only: phihe_grid
+  use evolve_data, only: xh_av, xh_intermed
+  use evolve_data, only: xhe_av, xhe_intermed
+  use evolve_data, only: coldensh_out
+  use evolve_data, only: coldenshe_out
   use evolve_data, only: photon_loss_src_thread
   use evolve_data, only: last_l,last_r
   use evolve_data, only: tn
@@ -349,8 +353,8 @@ contains
     integer :: nx,nit ! loop counters
     real(kind=dp) :: de ! electron density
 !    real(kind=dp),dimension(0:1) :: yh,yh_av,yh0 ! ionization fractions
-    real(kind=dp) :: yh0_av_old, yhe0_av_old, yhe1_av_old, yhe2_av_old,yh1_av_old 
-    real(kind=dp) :: avg_temper, temper ! temperature
+    real(kind=dp) :: yh0_av_old, yh1_av_old 
+    real(kind=dp) :: yhe0_av_old, yhe1_av_old, yhe2_av_old 
     real(kind=dp) :: ndens_p ! local number density
     type(temperature_states_dbl) :: temperature_start, temperature_end
 

@@ -33,10 +33,11 @@ module evolve
   use c2ray_parameters, only: convergence_fraction
   use sizes, only: Ndim, mesh
 
-  use material, only: ndens
-  use material, only: xh,xhe
+  use density_module, only: ndens
+  use ionfractions_module, only: xh
+  use ionfractions_module, only: xhe
   use c2ray_parameters, only: isothermal
-  use material, only: set_final_temperature_point
+  use temperature_module, only: set_final_temperature_point
   use sourceprops, only: NumSrc
   use photonstatistics, only: photon_loss, LLS_loss
   use photonstatistics, only: state_before
@@ -44,8 +45,10 @@ module evolve
   use photonstatistics, only: report_photonstatistics
   use photonstatistics, only: update_grandtotal_photonstatistics
 
-  use evolve_data, only: phih_grid, phihe_grid, phiheat
-  use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
+  use evolve_data, only: phih_grid, phiheat
+  use evolve_data, only: phihe_grid
+  use evolve_data, only: xh_av, xh_intermed
+  use evolve_data, only: xhe_av, xhe_intermed
   use evolve_data, only: photon_loss_all
   use evolve_point, only: local_chemistry
   use evolve_source, only: sum_nbox,sum_nbox_all
@@ -227,7 +230,7 @@ contains
 
   subroutine write_iteration_dump (niter)
 
-    use material, only:temperature_grid
+    use temperature_module, only:temperature_grid
 
     integer,intent(in) :: niter  ! iteration counter
 
@@ -273,7 +276,7 @@ contains
 
   subroutine start_from_dump(restart,niter)
 
-    use material, only: temperature_grid
+    use temperature_module, only: temperature_grid
 
     integer,intent(in) :: restart  ! restart flag
     integer,intent(out) :: niter  ! iteration counter
@@ -284,10 +287,13 @@ contains
     integer :: mympierror
 #endif
 
+    ! Check restart variable
     if (restart == 0) then
+       ! Warn about incorrect call
        if (rank == 0) &
             write(logf,*) "Warning: start_from_dump called incorrectly"
     else
+       ! Restart from dumpfile
        if (rank == 0) then
 
           ! Report time
@@ -321,6 +327,8 @@ contains
           endif
 
           close(iterdump)
+          
+          ! Report to log file
           write(logf,*) "Read iteration ",niter," from dump file"
           write(logf,*) 'photon loss counter: ',photon_loss_all
           write(logf,*) "Intermediate result for mean ionization fraction: ", &
@@ -547,11 +555,13 @@ contains
     ! Overwrite the processor local values with the accumulated value
     phihe_grid(:,:,:,1)=buffer(:,:,:)
     
-    call MPI_ALLREDUCE(phiheat, buffer, mesh(1)*mesh(2)*mesh(3), &
-         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
-    ! Overwrite the processor local values with the accumulated value
-    phiheat(:,:,:)=buffer(:,:,:)    
-        
+    if (.not.isothermal) then
+       call MPI_ALLREDUCE(phiheat, buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+       ! Overwrite the processor local values with the accumulated value
+       phiheat(:,:,:)=buffer(:,:,:)    
+    endif
+
     ! accumulate (sum) the MPI distributed sum of number of boxes
     call MPI_ALLREDUCE(sum_nbox, sum_nbox_all, 1, &
          MPI_INTEGER, MPI_SUM, MPI_COMM_NEW, mympierror)
