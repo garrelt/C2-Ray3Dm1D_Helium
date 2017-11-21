@@ -5,7 +5,7 @@
 !! 
 !! \b Author: Garrelt Mellema, Ilian Iliev
 !!
-!! \b Date: 11-Dec-2015 (09-Dec-2009 (22-May-2008, previous versions were not dated)
+!! \b Date: 09-Dec-2009 (22-May-2008, previous versions were not dated)
 !!
 !! \b Version: CUBEP3M simulations
 
@@ -41,9 +41,6 @@ module nbody
   real(kind=dp),parameter :: boxsize=244.0 !< Box size in Mpc/h comoving
   integer,parameter :: n_box=8000  !< cells/side (in N-body,fine grid)
 
-  !real(kind=dp),parameter :: boxsize=425.0  !< Box size in Mpc/h comoving
-  !integer,parameter :: n_box=10976  !< cells/side (in N-body,fine grid)
-
   !real(kind=dp),parameter :: boxsize=37.0  !< Box size in Mpc/h comoving
   !integer,parameter :: n_box=2048  !< cells/side (in N-body,fine grid)
 
@@ -54,7 +51,7 @@ module nbody
   !integer,parameter :: n_box=6144  !< cells/side (in N-body,fine grid)
 
   !> Path to directory containing directory with density files:
-  character(len=*),parameter,private :: dir_dens_path = "../" 
+  character(len=*),parameter,private :: dir_dens_path = "./" 
   !> Name of directory with density files
   !character(len=180),parameter,private :: dir_dens_name= "coarser_densities/"
   character(len=*),parameter,private :: dir_dens_name= "coarser_densities/halos_removed/"
@@ -74,7 +71,6 @@ module nbody
   character(len=*),parameter,private :: dir_LLS_path = "../" 
   !> Name of directory with files used for LLS
   character(len=*),parameter,private :: dir_LLS_name= "halos/"
-
   !> Format of density file (unformatted or binary)
 #ifdef IFORT
   ! ifort standard for "binary"
@@ -106,7 +102,7 @@ module nbody
   !> clumping file with header?
   logical,parameter :: clumpingheader=.true.
   !> LLS file with header?
-  logical,parameter :: LLSheader=.true.
+  logical,parameter :: LLSheader=.true.  
   !> unit of density in density file
   !! can be "grid", "particle", "M0Mpc3"
   character(len=*),parameter :: density_unit="grid"
@@ -135,11 +131,11 @@ module nbody
   integer, public :: NumZred               !< number of redshifts
   real(kind=dp),dimension(:),allocatable,public :: zred_array !< array of redshifts 
   integer,dimension(:),allocatable,public :: snap !< array of snapshot numbers (for compatibility)
-  character(len=8),public :: id_str="unknown" !< resolution dependent string
+  character(len=8),public :: id_str       !< resolution dependent string
 
   character(len=480),public :: dir_dens !< Path to directory with density files
-  character(len=480),public :: dir_clump !< Path to directory with clump files
-  character(len=480),public :: dir_LLS !< Path to directory with LLS files
+  character(len=480),public :: dir_clump !< Path to directory with density files
+  character(len=480),public :: dir_LLS !< Path to directory with LLS files  
   character(len=480),public :: dir_src !< Path to directory with source files
 
 #ifdef MPI
@@ -221,6 +217,8 @@ contains
 #endif
 
     ! Set identifying string (resolution-dependent)
+    ! Note: this case statement should be redone to remove the
+    ! division n_box/mesh(1) which just complicates the statements
     ! Construct the file name
     select case (int(boxsize))
     case (37, 64)
@@ -274,14 +272,13 @@ contains
 !       case(12)
 !          id_str="coarse"
        end select
-!    case(244)
 ! II: This is for low-res, 125^3 tests ONLY!!!!!!
 !        asubbox=int(n_box/mesh(1))
 !        select case (asubbox)
-        !case(64)
-        !    id_str="coarsest"
-        !case(64)
-        !    id_str="coarsest"
+     !   case(64)
+     !       id_str="coarsest"
+    !        case(64)
+!            id_str="coarsest"
 !        end select
     end select
     if (rank == 0) write(unit=logf,fmt=*) "Type of resolution: ",id_str

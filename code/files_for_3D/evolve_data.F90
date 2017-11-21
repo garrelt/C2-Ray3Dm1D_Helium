@@ -42,6 +42,25 @@ module evolve_data
   real(kind=dp),dimension(:,:,:,:),allocatable :: phihe_grid
   !> Heating  rate on the entire grid
   real(kind=dp),dimension(:,:,:),allocatable :: phiheat
+#if defined(PL) || defined(QUASARS)
+  !> H Photo-ionization rate on the entire grid
+  real(kind=dp),dimension(:,:,:),allocatable :: bb_phih_grid
+  !> Heating  rate on the entire grid
+  real(kind=dp),dimension(:,:,:),allocatable :: bb_phiheat
+#endif
+#ifdef PL
+  !> H Photo-ionization rate on the entire grid
+  real(kind=dp),dimension(:,:,:),allocatable :: pl_phih_grid
+  !> Heating  rate on the entire grid
+  real(kind=dp),dimension(:,:,:),allocatable :: pl_phiheat
+#endif
+
+#ifdef QUASARS
+  !> H Photo-ionization rate on the entire grid
+  real(kind=dp),dimension(:,:,:),allocatable :: qpl_phih_grid
+  !> Heating  rate on the entire grid
+  real(kind=dp),dimension(:,:,:),allocatable :: qpl_phiheat
+#endif
   
   !> Time-averaged H ionization fraction
   real(kind=dp),dimension(:,:,:,:),allocatable :: xh_av
@@ -78,6 +97,26 @@ contains
     allocate(phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
     allocate(phiheat(mesh(1),mesh(2),mesh(3)))
     phiheat=0.0 ! Needs value for initial output
+#if defined(PL) || defined(QUASARS)
+    allocate(bb_phih_grid(mesh(1),mesh(2),mesh(3)))
+    bb_phih_grid=0.0 ! Needs value for initial output
+    allocate(bb_phiheat(mesh(1),mesh(2),mesh(3)))
+    bb_phiheat=0.0 ! Needs value for initial output
+#endif
+
+#ifdef PL
+    allocate(pl_phih_grid(mesh(1),mesh(2),mesh(3)))
+    pl_phih_grid=0.0 ! Needs value for initial output
+    allocate(pl_phiheat(mesh(1),mesh(2),mesh(3)))
+    pl_phiheat=0.0 ! Needs value for initial output
+#endif
+
+#ifdef QUASARS
+    allocate(qpl_phih_grid(mesh(1),mesh(2),mesh(3)))
+    qpl_phih_grid=0.0 ! Needs value for initial output
+    allocate(qpl_phiheat(mesh(1),mesh(2),mesh(3)))
+    qpl_phiheat=0.0 ! Needs value for initial output
+#endif
     
     allocate(xh_av(mesh(1),mesh(2),mesh(3),0:1))
     allocate(xhe_av(mesh(1),mesh(2),mesh(3),0:2))

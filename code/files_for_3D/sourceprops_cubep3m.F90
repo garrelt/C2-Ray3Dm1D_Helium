@@ -20,19 +20,17 @@ module sourceprops
   use nbody, only: id_str, M_grid, dir_src, NumZred
   use material, only: xh
   use grid, only: x,y,z
-  use c2ray_parameters, only: phot_per_atom, lifetime, &
-       StillNeutral, Number_Sourcetypes
-  use radiation_sed_parameters, only: S_star
 #ifdef PL
-  use c2ray_parameters, only: xray_phot_per_atom 
-  use sed_parameters, only: mass_nominal,EddLum
-  use radiation_sed_parameters, only:  pl_S_star, Edd_Efficiency
+  use c2ray_parameters, only: xray_phot_per_atom, pl_S_star_nominal,&
+       EddLeff_nominal,mass_nominal,EddLum
 #endif
 #ifdef QUASARS
-  use sed_parameters, only: qmass_nominal, qEddLum
-  use radiation_sed_parameters, only: qpl_S_star, qEdd_Efficiency, &
-       qpl_index, qpl_MinFreq, qpl_MaxFreq
+  use c2ray_parameters, only: qpl_S_star_nominal,qEddLeff_nominal,&
+      qmass_nominal,qEddLum, qpl_index_nominal, qpl_MinFreq_nominal,&
+      qpl_MaxFreq_nominal
 #endif
+  use c2ray_parameters, only: phot_per_atom, lifetime, S_star_nominal,&
+       StillNeutral, Number_Sourcetypes
 
   implicit none
 
@@ -43,10 +41,11 @@ module sourceprops
   integer,parameter :: LMACH=5
 
 #ifdef QUASARS
-  integer,parameter :: QSO=6
+  !> number of column containing quasar sources
+  integer,parameter :: QSO=7
   !> number of columns in source list with quasars
-  integer,parameter,private :: ncolumns_srcfile=6
-
+  integer,parameter,private :: ncolumns_srcfile=7
+  real (kind=dp) :: qpl
   !> base name of source list files
   character(len=100),parameter,private :: &
        sourcelistfile_base="_wsubgrid_wquasar_sources.dat"
@@ -81,7 +80,7 @@ module sourceprops
 #endif
 #ifdef QUASARS
  real(kind=dp),dimension(:),allocatable :: NormFluxQPL !< normalized ionizing flux of sources
- integer,private :: NumQsr !< counter: number of quasar sources
+ integer :: NumQsr !< counter: number of quasar sources
 #endif
   integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
   real(kind=dp),dimension(:),allocatable :: uv_array  !< list of UV flux evolution (for some sources models)
@@ -202,14 +201,14 @@ contains
           
           write(logf,*) 'Source lifetime=', lifetime2/(1e6*YEAR),' Myr'
           write(logf,*) 'Total photon rate (BB)= ', &
-               sum(NormFlux)*S_star,' s^-1'
+               sum(NormFlux)*S_star_nominal,' s^-1'
 #ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
-               sum(NormFluxPL)*pl_S_star,' s^-1'
+               sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
 #endif
 #ifdef QUASARS
           write(logf,*) 'Total photon rate (Q)= ', &
-               sum(NormFluxQPL)*qpl_S_star,' s^-1'
+               sum(NormFluxQPL)*qpl_S_star_nominal,' s^-1'
 #endif
           
        endif ! of rank 0 test
@@ -261,8 +260,11 @@ contains
     if (restart == 0 .or. restart == 1) then
        open(unit=50,file=sourcelistfile,status='old')
        ! Number of sources
+#ifdef QUASARS
+       read(50,*) NumSrc0, qpl
+#else
        read(50,*) NumSrc0
-       
+#endif
        ! Report
        write(logf,*) "Total number of source locations, no suppression: ", &
             NumSrc0
@@ -273,6 +275,9 @@ contains
        NumMassiveSrc = 0
        NumSupprbleSrc = 0
        NumSupprsdSrc = 0
+#ifdef QUASARS
+       NumQsr = 0
+#endif
        do ns0=1,NumSrc0
           ! If you change the following lines, also change it below in
           ! read_in_sources
@@ -321,7 +326,11 @@ contains
        ! calculated suppressed source list
        open(unit=49,file=sourcelistfilesuppress,status='unknown')
        ! Number of sources
+#ifdef QUASARS
+       read(49,*) NumSrc, qpl
+#else
        read(49,*) NumSrc
+#endif
        close(49)
     endif
     write(logf,*) "Number of sources, with suppression: ",NumSrc
@@ -420,8 +429,15 @@ contains
        open(unit=49,file=sourcelistfilesuppress,status="old")
        write(logf,*) "Reading ",NumSrc," sources from ", &
             trim(adjustl(sourcelistfilesuppress))
+#ifdef QUASARS
+       read(49,*) NumSrc, qpl
+       if (qpl/=qpl_index_nominal-1) then
+          write(logf,*) "Warning: wrong power law index for quasars"
+          stop 
+       endif
+#else
        read(49,*) NumSrc
-
+#endif
        ! Data in saved source list depends on what sources were
        ! recorded / are being used.
 #if defined(QUASARS) && defined(PL)
@@ -469,7 +485,11 @@ contains
     ! Open the processed source list file
     open(unit=49,file=sourcelistfilesuppress,status='unknown')
     ! Write number of active sources positions
+#ifdef QUASARS
+    write(49,*) NumSrc, qpl
+#else
     write(49,*) NumSrc
+#endif
 
     ! Write out the source information
     do ns0=1,NumSrc
@@ -524,12 +544,12 @@ contains
 #ifdef MPILOG
     if (rank /=0) then
        write(logf,*) 'Source lifetime=', lifetime2/(1e6*YEAR),' Myr'
-       write(logf,*) 'S_star = ',S_star
+       write(logf,*) 'S_star_nominal=',S_star_nominal
 #ifdef PL
-       write(logf,*) 'pl_S_star = ',pl_S_star
+       write(logf,*) 'pl_S_star_nominal=',pl_S_star_nominal
 #endif
 #ifdef QUASARS
-       write(logf,*) 'qpl_S_star = ',qpl_S_star
+       write(logf,*) 'qpl_S_star_nominal=',qpl_S_star_nominal
 #endif
     endif
 #endif
@@ -548,7 +568,7 @@ contains
           NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
 #endif
 #ifdef QUASARS
-          NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star)
+          NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star_nominal)
 #endif
        enddo
 
@@ -564,13 +584,13 @@ contains
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
              NormFlux(ns)=(1.0+cumfrac)*uv_array(nz)/lifetime2*SrcMass(ns,0)/ &
-                  (total_SrcMass*S_star)
+                  (total_SrcMass*S_star_nominal)
              ! Calculate normalized luminosity of power law source
 #ifdef PL
              NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
 #endif
 #ifdef QUASARS
-             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star)
+             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star_nominal)
 #endif
           enddo
           ! Subtract extra photons from cumulated photons
@@ -590,13 +610,13 @@ contains
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
              NormFlux(ns)=uv_array(nz)* &
-                  SrcMass(ns,0)/(total_SrcMass*S_star)
+                  SrcMass(ns,0)/(total_SrcMass*S_star_nominal)
              ! Calculate normalized luminosity of power law source
 #ifdef PL
              NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
 #endif
 #ifdef QUASARS
-             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star)
+             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star_nominal)
 #endif
 
           enddo
@@ -620,9 +640,9 @@ contains
   function Luminosity_from_mass (Mass)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called S_star.
+    ! in terms of a standard ionizing photon rate, called S_star_nominal.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of S_star.
+    ! with an ionizing photon rate of S_star_nominal.
 
     ! Mass is supposed to be total mass of the source MULTIPLIED with
     ! the efficiency factor (f) which is the product of the star formation
@@ -636,7 +656,7 @@ contains
     real(kind=dp) :: Mass !< mass in units of grid masses
     real(kind=dp) :: Luminosity_from_mass
 
-    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/S_star
+    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/S_star_nominal
 
   end function Luminosity_from_mass
 
@@ -645,9 +665,9 @@ contains
   function PL_Luminosity_from_mass (Mass)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called S_star.
+    ! in terms of a standard ionizing photon rate, called S_star_nominal.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of S_star.
+    ! with an ionizing photon rate of S_star_nominal.
 
     ! Mass is supposed to be total mass of the source MULTIPLIED with
     ! the efficiency factor (f) which is the product of the star formation
@@ -664,7 +684,7 @@ contains
     real(kind=dp) :: Mass !< mass in units of grid masses
     real(kind=dp) :: PL_Luminosity_from_mass
 
-    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/pl_S_star
+    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/pl_S_star_nominal
 
   end function PL_Luminosity_from_mass
 #endif
@@ -673,9 +693,9 @@ contains
   function QPL_Luminosity_convert (Lum)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called qpl_S_star.
+    ! in terms of a standard ionizing photon rate, called qpl_S_star_nominal.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of qpl_S_star.
+    ! with an ionizing photon rate of qpl_S_star_nominal.
 
     ! The luminosity is given in ergs/second at 2kev, needs to be converted
     ! to the total number of photons per second.
@@ -690,11 +710,11 @@ contains
     real(kind=dp) :: alpha
     
     !Convert luminosity to total number of photons per second
-    Emin = qpl_MinFreq/(ev2fr) !in ev
-    Emax = qpl_MaxFreq/(ev2fr) !in ev
+    Emin = qpl_MinFreq_nominal/(ev2fr) !in ev
+    Emax = qpl_MaxFreq_nominal/(ev2fr) !in ev
     delta_E = (Emax - Emin)*ev2erg !Needs to be in ergs as luminosity is given in ergs
 
-    alpha = qpl_index - 1.0
+    alpha = qpl_index_nominal - 1.0
 
     QPL_Luminosity_convert = -1.0/delta_E * Lum/(2000**(-alpha)) * &
                 1.0/alpha*(Emax**(-alpha) - Emin**(-alpha))
@@ -703,7 +723,7 @@ contains
 !    if (QPL_Luminosity_convert /= 0.0) write(*,*) "number of photons: ", QPL_Luminosity_convert
 
     !Normalise
-    QPL_Luminosity_convert = QPL_Luminosity_convert/qpl_S_star
+    QPL_Luminosity_convert = QPL_Luminosity_convert/qpl_S_star_nominal
 
   end function QPL_Luminosity_convert
 #endif

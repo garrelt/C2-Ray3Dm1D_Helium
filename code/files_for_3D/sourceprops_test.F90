@@ -21,13 +21,12 @@ module sourceprops
   !use material, only: xh
   use grid, only: x,y,z
   use c2ray_parameters, only: phot_per_atom, lifetime, &
-       StillNeutral, Number_Sourcetypes
-  use radiation_sed_parameters, only: S_star
+       S_star_nominal, StillNeutral, Number_Sourcetypes
 #ifdef PL
-  use radiation_sed_parameters, only: pl_S_star
+  use c2ray_parameters, only: pl_S_star_nominal
 #endif
 #ifdef QUASARS
-  use radiation_sed_parameters, only: qpl_S_star
+  use c2ray_parameters, only: qpl_S_star_nominal
 #endif  
   implicit none
 
@@ -43,6 +42,7 @@ module sourceprops
 #endif
 #ifdef QUASARS
   real(kind=dp),dimension(:),allocatable :: NormFluxQPL !< normalized ionizing flux of sources
+  integer :: NumQsr = 0 !< counter: number of quasar sources
 #endif
   integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
 
@@ -90,20 +90,16 @@ contains
     if (allocated(srcSeries)) deallocate(srcSeries)
     
     if (allocated(temparray)) deallocate(temparray)
-    allocate(temparray(4))
-#ifdef PL
-    if (allocated(temparray)) deallocate(temparray)
-    allocate(temparray(5))
-#endif
-#ifdef QUASARS
-    if (allocated(temparray)) deallocate(temparray)
-    allocate(temparray(5))
-#endif
-#ifdef PL
-#ifdef QUASARS
-    if (allocated(temparray)) deallocate(temparray)
+!    allocate(temparray(4))
+
+#if defined(QUASARS) && defined(PL)
     allocate(temparray(6))
-#endif
+#elif defined(QUASARS)
+    allocate(temparray(5))
+#elif defined(PL)
+    allocate(temparray(5))
+#else
+    allocate(temparray(4))
 #endif
 
     ! Rank 0 reads in sources
@@ -114,14 +110,15 @@ contains
 
        ! Establish number of sources
        read(sourcefile,*) NumSrc
-
-   
-
+#ifdef QUASARS
+       NumQsr = NumSrc
+#endif
     endif ! end of rank 0 test
     
 #ifdef MPI
     ! Distribute source number to all other nodes
     call MPI_BCAST(NumSrc,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
+    call MPI_BCAST(NumQsr,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
 
 #ifdef MPILOG
@@ -144,25 +141,21 @@ contains
        if (rank == 0) then
           do ns=1,NumSrc
 
-
               read(sourcefile,*) temparray
 
               srcpos(1,ns) = temparray(1)
               srcpos(2,ns) = temparray(2)
               srcpos(3,ns) = temparray(3)
-              NormFlux(ns) = temparray(4)/S_star
-#ifdef PL
-              NormFluxPL(ns)= temparray(5)/pl_S_star
+              NormFlux(ns) = temparray(4)/S_star_nominal
+#if defined(QUASARS) && defined(PL)
+             NormFluxPL(ns) = temparray(5)/(pl_S_star_nominal)
+             NormFluxQPL(ns) = temparray(6)/qpl_S_star_nominal
+#elif defined(QUASARS)
+             NormFluxQPL(ns) = temparray(5)/qpl_S_star_nominal
+#elif defined(PL)
+             NormFluxPL(ns)= temparray(5)/(pl_S_star_nominal)
 #endif
-#ifdef QUASARS
-              NormFluxQPL(ns) = temparray(5)/qpl_S_star
-#endif
-#ifdef PL
-#ifdef QUASARS
-             NormFluxPL(ns) = temparray(5)/pl_S_star
-             NormFluxQPL(ns) = temparray(6)/qpl_S_star
-#endif
-#endif
+
           enddo
           close(sourcefile)
           
@@ -172,35 +165,35 @@ contains
           !srcpos(1:3,2)=(/ 51, 50, 50 /)
           !srcpos(1:3,3)=(/ 52, 50, 50 /)
           !srcpos(1:3,4)=(/ 53, 50, 50 /)
-          !NormFlux(1:4)=1e55_dp/S_star
+          !NormFlux(1:4)=1e55_dp/S_star_nominal
           !NormFluxPL(1:4)=0.0_dp
           
           !srcpos(1:3,5)=(/ 20, 10, 10 /)
-          !NormFlux(5)=1e57_dp/S_star
+          !NormFlux(5)=1e57_dp/S_star_nominal
           !NormFluxPL(5)=0.0_dp
           
           !srcpos(1:3,6)=(/ 70, 70, 50 /)
           !srcpos(1:3,7)=(/ 72, 70, 50 /)
           !srcpos(1:3,8)=(/ 70, 72, 50 /)
           !srcpos(1:3,9)=(/ 72, 72, 50 /)
-          !NormFlux(6:8)=1e55_dp/S_star
-          !NormFlux(9)=1e56_dp/S_star
+          !NormFlux(6:8)=1e55_dp/S_star_nominal
+          !NormFlux(9)=1e56_dp/S_star_nominal
           !NormFluxPL(6:9)=0.0
           
           !srcpos(1:3,10)=(/ 20, 10, 90 /)
-          !NormFlux(10)=1e54_dp/S_star
+          !NormFlux(10)=1e54_dp/S_star_nominal
           ! Note, no normalization is used for PL source
           !NormFluxPL(10)=3.0_dp
           
           write(logf,*) 'Total photon rate (BB)= ', &
-               sum(NormFlux)*S_star,' s^-1'
+               sum(NormFlux)*S_star_nominal,' s^-1'
 #ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
-               sum(NormFluxPL)*pl_S_star,' s^-1'
+               sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
 #endif
 #ifdef QUASARS
           write(logf,*) 'Total photon rate (Q)= ', &
-               sum(NormFluxQPL)*qpl_S_star,' s^-1'
+               sum(NormFluxQPL)*qpl_S_star_nominal,' s^-1'
 #endif
           ! Create array of source numbers for generating random order 
           do ns=1,NumSrc
