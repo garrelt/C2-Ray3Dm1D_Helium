@@ -20,17 +20,19 @@ module sourceprops
   use nbody, only: id_str, M_grid, dir_src, NumZred
   use material, only: xh
   use grid, only: x,y,z
+  use c2ray_parameters, only: phot_per_atom, lifetime, &
+       StillNeutral, Number_Sourcetypes
+  use radiation_sed_parameters, only: S_star
 #ifdef PL
-  use c2ray_parameters, only: xray_phot_per_atom, pl_S_star_nominal,&
-       EddLeff_nominal,mass_nominal,EddLum
+  use c2ray_parameters, only: xray_phot_per_atom 
+  use sed_parameters, only: mass_nominal,EddLum
+  use radiation_sed_parameters, only:  pl_S_star, Edd_Efficiency
 #endif
 #ifdef QUASARS
-  use c2ray_parameters, only: qpl_S_star_nominal,qEddLeff_nominal,&
-       qmass_nominal,qEddLum, qpl_index_nominal, qpl_MinFreq_nominal,&
-       qpl_MaxFreq_nominal
+  use sed_parameters, only: qmass_nominal, qEddLum
+  use radiation_sed_parameters, only: qpl_S_star, qEdd_Efficiency, &
+       qpl_index, qpl_MinFreq, qpl_MaxFreq
 #endif
-  use c2ray_parameters, only: phot_per_atom, lifetime, S_star_nominal,&
-       StillNeutral, Number_Sourcetypes
 
   implicit none
 
@@ -200,14 +202,14 @@ contains
 
           write(logf,*) 'Source lifetime=', lifetime2/(1e6*YEAR),' Myr'
           write(logf,*) 'Total photon rate (BB)= ', &
-               sum(NormFlux)*S_star_nominal,' s^-1'
+               sum(NormFlux)*S_star,' s^-1'
 #ifdef PL
           write(logf,*) 'Total photon rate (PL)= ', &
-               sum(NormFluxPL)*pl_S_star_nominal,' s^-1'
+               sum(NormFluxPL)*pl_S_star,' s^-1'
 #endif
 #ifdef QUASARS
           write(logf,*) 'Total photon rate (Q)= ', &
-               sum(NormFluxQPL)*qpl_S_star_nominal,' s^-1'
+               sum(NormFluxQPL)*qpl_S_star,' s^-1'
 #endif
 
        endif ! of rank 0 test
@@ -523,12 +525,12 @@ contains
 #ifdef MPILOG
     if (rank /=0) then
        write(logf,*) 'Source lifetime=', lifetime2/(1e6*YEAR),' Myr'
-       write(logf,*) 'S_star_nominal=',S_star_nominal
+       write(logf,*) 'S_star = ',S_star
 #ifdef PL
-       write(logf,*) 'pl_S_star_nominal=',pl_S_star_nominal
+       write(logf,*) 'pl_S_star = ',pl_S_star
 #endif
 #ifdef QUASARS
-       write(logf,*) 'qpl_S_star_nominal=',qpl_S_star_nominal
+       write(logf,*) 'qpl_S_star = ',qpl_S_star
 #endif
     endif
 #endif
@@ -547,7 +549,7 @@ contains
           NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
 #endif
 #ifdef QUASARS
-          NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star_nominal)
+          NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star)
 #endif
        enddo
 
@@ -563,13 +565,13 @@ contains
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
              NormFlux(ns)=(1.0+cumfrac)*uv_array(nz)/lifetime2*SrcMass(ns,0)/ &
-                  (total_SrcMass*S_star_nominal)
+                  (total_SrcMass*S_star)
              ! Calculate normalized luminosity of power law source
 #ifdef PL
              NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
 #endif
 #ifdef QUASARS
-             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star_nominal)
+             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star)
 #endif
           enddo
           ! Subtract extra photons from cumulated photons
@@ -589,13 +591,13 @@ contains
           ! Only set NormFlux when data is available!
           do ns=1,NumSrc
              NormFlux(ns)=uv_array(nz)* &
-                  SrcMass(ns,0)/(total_SrcMass*S_star_nominal)
+                  SrcMass(ns,0)/(total_SrcMass*S_star)
              ! Calculate normalized luminosity of power law source
 #ifdef PL
              NormFluxPL(ns)=PL_Luminosity_from_mass(NormFluxPL(ns))/lifetime2
 #endif
 #ifdef QUASARS
-             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star_nominal)
+             NormFluxQPL(ns)=QPL_Luminosity_convert(NormFluxQPL(ns)) !NormFluxQPL(ns)/(qpl_S_star)
 #endif
 
           enddo
@@ -619,9 +621,9 @@ contains
   function Luminosity_from_mass (Mass)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called S_star_nominal.
+    ! in terms of a standard ionizing photon rate, called S_star.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of S_star_nominal.
+    ! with an ionizing photon rate of S_star.
 
     ! Mass is supposed to be total mass of the source MULTIPLIED with
     ! the efficiency factor (f) which is the product of the star formation
@@ -635,7 +637,7 @@ contains
     real(kind=dp) :: Mass !< mass in units of grid masses
     real(kind=dp) :: Luminosity_from_mass
 
-    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/S_star_nominal
+    Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/S_star
 
   end function Luminosity_from_mass
 
@@ -644,9 +646,9 @@ contains
   function PL_Luminosity_from_mass (Mass)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called S_star_nominal.
+    ! in terms of a standard ionizing photon rate, called S_star.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of S_star_nominal.
+    ! with an ionizing photon rate of S_star.
 
     ! Mass is supposed to be total mass of the source MULTIPLIED with
     ! the efficiency factor (f) which is the product of the star formation
@@ -663,7 +665,7 @@ contains
     real(kind=dp) :: Mass !< mass in units of grid masses
     real(kind=dp) :: PL_Luminosity_from_mass
 
-    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/pl_S_star_nominal
+    PL_Luminosity_from_mass = Mass*M_grid*Omega_B/(Omega0*m_p)/pl_S_star
 
   end function PL_Luminosity_from_mass
 #endif
@@ -672,9 +674,9 @@ contains
   function QPL_Luminosity_convert (Lum)
 
     ! The normalized flux (luminosity) for normal sources is expressed
-    ! in terms of a standard ionizing photon rate, called qpl_S_star_nominal.
+    ! in terms of a standard ionizing photon rate, called qpl_S_star.
     ! In radiation the tables have been calculated for a spectrum
-    ! with an ionizing photon rate of qpl_S_star_nominal.
+    ! with an ionizing photon rate of qpl_S_star.
 
     ! The luminosity is given in ergs/second at 2kev, needs to be converted
     ! to the total number of photons per second.
@@ -689,11 +691,11 @@ contains
     real(kind=dp) :: alpha
 
     !Convert luminosity to total number of photons per second
-    Emin = qpl_MinFreq_nominal/(ev2fr) !in ev
-    Emax = qpl_MaxFreq_nominal/(ev2fr) !in ev
+    Emin = qpl_MinFreq/(ev2fr) !in ev
+    Emax = qpl_MaxFreq/(ev2fr) !in ev
     delta_E = (Emax - Emin)*ev2erg !Needs to be in ergs as luminosity is given in ergs
 
-    alpha = qpl_index_nominal - 1.0
+    alpha = qpl_index - 1.0
 
     QPL_Luminosity_convert = -1.0/delta_E * Lum/(2000**(-alpha)) * &
          1.0/alpha*(Emax**(-alpha) - Emin**(-alpha))
@@ -702,7 +704,7 @@ contains
     !    if (QPL_Luminosity_convert /= 0.0) write(*,*) "number of photons: ", QPL_Luminosity_convert
 
     !Normalise
-    QPL_Luminosity_convert = QPL_Luminosity_convert/qpl_S_star_nominal
+    QPL_Luminosity_convert = QPL_Luminosity_convert/qpl_S_star
 
   end function QPL_Luminosity_convert
 #endif
