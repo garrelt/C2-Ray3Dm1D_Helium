@@ -106,8 +106,7 @@ module cgsconstants
   real(kind=dp) :: arech0
   !> Hydrogen 0 B recombination parameter
   real(kind=dp) :: brech0
-  
-  
+
   !> Helium   0 A recombination parameter
   real(kind=dp) :: areche0
   !> Helium   0 B recombination parameter
@@ -131,9 +130,9 @@ module cgsconstants
   real(kind=dp) :: colli_HeII
   !> Fraction fo He++ -> He+ recombination photons that goes into 2photon decay
   real(kind=dp) :: v
-  
+
 contains
-  
+
   !> This subroutine contains all temperature dependent recombination and 
   !! collisional ionization rates. It should be called every time after the
   !! temperature is recalculated.
@@ -151,7 +150,7 @@ contains
 
   end subroutine ini_rec_colion_factors
 
-  ! -----------------------------------------------------------------------------------------------------------
+  ! ---------------------------------------------------------------------------
 
   subroutine  ini_hydrogen_recombination (temperature)
     
@@ -174,7 +173,7 @@ contains
 
   end subroutine ini_hydrogen_recombination
 
-  !------------------------------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
 
   subroutine ini_helium0_recombination (temperature)
 
@@ -212,7 +211,7 @@ contains
 
   end subroutine ini_helium0_recombination
 
-  !----------------------------------------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
 
   subroutine ini_helium1_recombination (temperature)
 
@@ -239,7 +238,7 @@ contains
 
   end subroutine ini_helium1_recombination
 
-  !-----------------------------------------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
 
   subroutine ini_hydrogen_helium_collisional_ionization (temperature)
 
@@ -265,7 +264,7 @@ contains
 
   end subroutine ini_hydrogen_helium_collisional_ionization
 
-  !---------------------------------------------------------------------------------------------------------------------
+  !----------------------------------------------------------------------------
 
   subroutine ini_recombinations_collisional_ionizations_constant
 

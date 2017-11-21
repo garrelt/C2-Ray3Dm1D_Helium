@@ -32,5 +32,4 @@ module astroconstants
   real(kind=dp),parameter :: lightyear=9.463e17 !< lightyear
   real(kind=dp),parameter :: AU=1.49597870E+13 !< Astronomical Unit
 
-
 end module astroconstants

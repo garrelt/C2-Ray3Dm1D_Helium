@@ -26,13 +26,10 @@ module c2ray_parameters
   real(kind=dp),parameter :: convergence_fraction=2.5e-4
 
   !> Set to true to let C2-Ray not change the temperature
-  ! logical,parameter :: isothermal=.false.
+  logical,parameter :: isothermal=.true.
 
   !> A really small number
   real(kind=dp),parameter :: epsilon=1.0e-20_dp
-
-  !> Set to true to let C2-Ray not change the temperature
-  logical,parameter :: isothermal=.true.
 
   !> Convergence criterion for per source calculation (evolve0d)
   !real(kind=dp),parameter :: minimum_fractional_change = 1.0e-3
@@ -57,9 +54,9 @@ module c2ray_parameters
   !! ray tracing is done. This	is a very crude	mean free path parameter
   !! which sets	up a photon wall at exactly this distance.
   integer,parameter :: max_subbox=1150
-  
+
   !> Add photon losses back into volume or not
-  logical,parameter :: add_photon_losses=.false. !.true.
+  logical,parameter :: add_photon_losses=.false.
 
   !> Parameters for nominal SED (BB)
   !> Effective temperature (K); if set to zero, the code will ask
@@ -91,7 +88,7 @@ module c2ray_parameters
   integer,parameter :: type_of_clumping=1
   !> Clumping factor if constant
   real,parameter :: clumping_factor=1.0
-  
+
   !> Include LLS?
   logical,parameter :: use_LLS=.false.
   !> Type of LLS approach
