@@ -39,6 +39,12 @@ module evolve
   use material, only: set_final_temperature_point
   use material, only: protect_ionization_fractions
   use sourceprops, only: NumSrc
+#ifdef PL
+  use sourceprops, only: NumPLSrc
+#endif  
+#ifdef QUASARS
+  use sourceprops, only: NumQSrc
+#endif  
   use photonstatistics, only: photon_loss, LLS_loss
   use photonstatistics, only: state_before
   use photonstatistics, only: calculate_photon_statistics
@@ -136,7 +142,7 @@ contains
        conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
     else
        ! Reload xh_av,xh_intermed,photon_loss,niter
-       call start_from_dump(restart,niter)
+       call start_from_dump(restart,niter,source_type)
        call global_pass (conv_flag,dt)
     endif
 
@@ -151,6 +157,30 @@ contains
          "Time before starting iteration: ", timestamp_wallclock ()
 
     ! Iterate to reach convergence for multiple sources
+    ! Process different groups of sources separately
+    call process_source_type(NumSrc,"B")
+#ifdef QUASARS
+    call process_source_type(NumQsrc,"Q")
+#endif
+#ifdef PL
+    call process_source_type(NumPLSrc,"P")
+#endif
+    
+    ! Calculate photon statistics
+    call calculate_photon_statistics (dt,xh,xh_av,xhe,xhe_av) 
+    call report_photonstatistics (dt)
+    call update_grandtotal_photonstatistics (dt)
+
+  end subroutine evolve3D
+
+  ! ===========================================================================
+
+  subroutine process_source_type(source_numbers,source_type)
+
+    integer, intent(in) :: source_numbers !< total number of sources 
+    character(len=1),intent(in) :: source_type !< type of source
+    
+    ! Iterate to reach convergence for multiple sources
     do
        ! Update xh if converged and exit
        ! This should be < and NOT <= for the case of few sources:
@@ -159,12 +189,12 @@ contains
        ! work together.
        ! GM/130819: We additionally force to do at least two iterations by
        ! testing for niter.
-
+       
        if (conv_flag < conv_criterion .and. niter > 1) then
           xh(:,:,:,:)=xh_intermed(:,:,:,:)
           xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
           call set_final_temperature_point
-
+          
           ! Report
           if (rank == 0) then
              write(logf,*) "Multiple sources convergence reached"
@@ -180,22 +210,22 @@ contains
              exit
           endif
        endif
- 
+       
        ! Iteration loop counter
        niter=niter+1
-
+       
        ! Set all photo-ionization rates to zero
        call set_rates_to_zero
-
+       
        ! Pass over all sources
-       if (NumSrc > 0) then
-          call pass_all_sources (niter,dt)
-
+       if (source_numbers > 0) then
+          call pass_all_sources (niter,dt,source_type)
+          
           ! Report subbox statistics
           if (rank == 0) &
                write(logf,*) "Average number of subboxes: ", &
                real(sum_nbox_all)/real(NumSrc)
-
+          
           if (rank == 0) then
              call system_clock(wallclock2,countspersec)
              ! Write iteration dump if more than 15 minutes have passed.
@@ -206,35 +236,32 @@ contains
                   wallclock2-wallclock1, 15.0*60.0*countspersec
              if (wallclock2-wallclock1 > 15*60*countspersec .or. &
                   wallclock2-wallclock1 < 0 ) then
-                call write_iteration_dump(niter)
+                call write_iteration_dump(niter,source_type)
                 wallclock1=wallclock2
              endif
           endif
           
        endif
-
+       
        ! Do a global pass applying all the rates
-       call global_pass (conv_flag,dt)
-
+       call global_pass (conv_flag,dt,source_type)
+       
        ! Report time
        if (rank == 0) write(timefile,"(A,I3,A,F8.1)") &
             "Time after iteration ",niter," : ", timestamp_wallclock ()
+
     enddo
-
-    ! Calculate photon statistics
-    call calculate_photon_statistics (dt,xh,xh_av,xhe,xhe_av) 
-    call report_photonstatistics (dt)
-    call update_grandtotal_photonstatistics (dt)
-
-  end subroutine evolve3D
+    
+  end subroutine process_source_type
 
   ! ===========================================================================
 
-  subroutine write_iteration_dump (niter)
+  subroutine write_iteration_dump (niter,source_type)
 
     use material, only:temperature_grid
 
     integer,intent(in) :: niter  ! iteration counter
+    character(len=1),intent(in) :: source_type
 
     integer :: ndump=0
     
@@ -255,6 +282,7 @@ contains
          status="unknown")
 
     write(iterdump) niter
+    write(iterdump) source_type
     write(iterdump) photon_loss_all
     write(iterdump) phih_grid
     write(iterdump) xh_av
@@ -276,12 +304,13 @@ contains
 
   ! ===========================================================================
 
-  subroutine start_from_dump(restart,niter)
+  subroutine start_from_dump(restart,niter,source_type)
 
     use material, only: temperature_grid
 
     integer,intent(in) :: restart  ! restart flag
     integer,intent(out) :: niter  ! iteration counter
+    character(len=1),intent(out) :: source_type
 
     character(len=20) :: iterfile
 
@@ -309,6 +338,7 @@ contains
                form="unformatted",status="old")
 
           read(iterdump) niter
+          read(iterdump) source_type
           read(iterdump) photon_loss_all
           read(iterdump) phih_grid
           read(iterdump) xh_av
@@ -334,6 +364,8 @@ contains
        ! Distribute the input parameters to the other nodes
        call MPI_BCAST(niter,1, &
             MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
+       call MPI_BCAST(source_type,1, &
+            MPI_CHARACTER,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(photon_loss_all,NumFreqBnd, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(phih_grid,mesh(1)*mesh(2)*mesh(3), &
@@ -382,13 +414,14 @@ contains
 
   ! ===========================================================================
 
-  subroutine pass_all_sources(niter,dt)
+  subroutine pass_all_sources(niter,dt,source_type)
     
     ! For random permutation of sources:
     use  m_ctrper, only: ctrper
 
     integer,intent(in) :: niter  ! iteration counter
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
+    character(len=1),intent(in) :: source_type !< type of source
 
     if (rank == 0) write(logf,*) 'Doing all sources '
 
@@ -409,7 +442,7 @@ contains
 #endif
     
     ! Ray trace the whole grid for all sources.
-    call do_grid (dt,niter)
+    call do_grid (dt,niter,source_type)
 
 #ifdef MPI
     ! Collect (sum) the rates from all the MPI processes

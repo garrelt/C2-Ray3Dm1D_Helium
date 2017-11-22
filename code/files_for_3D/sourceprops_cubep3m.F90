@@ -78,10 +78,11 @@ module sourceprops
   real(kind=dp),dimension(:),allocatable :: NormFlux !< normalized ionizing flux of sources
 #ifdef PL
   real(kind=dp),dimension(:),allocatable :: NormFluxPL !< normalized ionizing flux of sources
+  integer :: NumPLSrc !< counter: number of power law sources
 #endif
 #ifdef QUASARS
  real(kind=dp),dimension(:),allocatable :: NormFluxQPL !< normalized ionizing flux of sources
- integer,private :: NumQsr !< counter: number of quasar sources
+ integer :: NumQsrc !< counter: number of quasar sources
 #endif
   integer,dimension(:),allocatable :: srcSeries  !< a randomized list of sources
   real(kind=dp),dimension(:),allocatable :: uv_array  !< list of UV flux evolution (for some sources models)
@@ -98,7 +99,6 @@ module sourceprops
   integer,private :: NumMassiveSrc !< counter: number of massive sources
   integer,private :: NumSupprbleSrc !< counter: number of suppressible sources
   integer,private :: NumSupprsdSrc !< counter: number of suppressed sources
-  integer,private :: NumPlSrc !< counter: number of power law sources
   real(kind=dp),private :: cumfrac
 
   character(len=512),private :: sourcelistfile,sourcelistfilesuppress
@@ -179,6 +179,8 @@ contains
        allocate(SrcMass(NumSrc,0:Number_Sourcetypes))
        allocate(NormFlux(0:NumSrc)) ! 0 will hold lost photons
 #ifdef PL
+       ! Number of PL source is equal to number of stellar sources
+       NumPLSrc=NumSrc 
        allocate(NormFluxPL(NumSrc))
 #endif
 #ifdef QUASARS
@@ -297,7 +299,7 @@ contains
           if (srclist(HMACH) /= 0.0) NumMassiveSrc=NumMassiveSrc+1
           if (srclist(LMACH) /= 0.0) NumSupprbleSrc=NumSupprbleSrc+1
 #ifdef QUASARS
-          if (srclist(QSO) /= 0.0) NumQsr = NumQsr+1 
+          if (srclist(QSO) /= 0.0) NumQsrc = NumQsrc+1 
 #endif
           ! How many suppressed?
           if (srclist(LMACH) /= 0.0) then
@@ -312,7 +314,7 @@ contains
        write(logf,*) "Number of suppressed sources: ",NumSupprsdSrc
        write(logf,*) "Number of massive sources: ",NumMassiveSrc
 #ifdef QUASARS
-       write(logf,*) "Number of quasar sources: ",NumQsr
+       write(logf,*) "Number of quasar sources: ",NumQsrc
 #endif
        if (NumSupprbleSrc > 0) write(logf,*) "Suppressed fraction: ", &
             real(NumSupprsdSrc)/real(NumSupprbleSrc)

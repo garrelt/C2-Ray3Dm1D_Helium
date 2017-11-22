@@ -29,6 +29,12 @@ module master_slave_processing
   use file_admin, only: logf,timefile,iterdump, results_dir, dump_dir
   use clocks, only: timestamp_wallclock
   use sourceprops, only: NumSrc, srcpos
+#ifdef QUASARS
+  use sourceprops, only: NumQSrc, srcpos
+#endif
+#ifdef PL
+  use sourceprops, only: NumPLSrc, srcpos
+#endif  
   use evolve_source, only: do_source
   
   implicit none
@@ -50,19 +56,20 @@ contains
 
   !> Does the ray-tracing over the sources by distributing
   !! the sources evenly over the available MPI processes-
-  subroutine do_grid (dt,niter)
+  subroutine do_grid (dt,niter,source_type)
 
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     integer,intent(in) :: niter !< interation counter, passed on to evolve0D
-
+    character(len=1),intent(in) :: source_type
+    
     ! Ray trace the whole grid for all sources.
     ! We can do this in two ways, depending on
     ! the number of processors. For many processors
     ! the master-slave setup should be more efficient.
     if (npr > min_numproc_master_slave) then
-       call do_grid_master_slave (dt,niter)
+       call do_grid_master_slave (dt,niter,source_type)
     else
-       call do_grid_static (dt,niter)
+       call do_grid_static (dt,niter,source_type)
     endif
     
   end subroutine do_grid
@@ -71,13 +78,14 @@ contains
 
   !> Does the ray-tracing over the sources by distributing
   !! the sources evenly over the available MPI processes-
-  subroutine do_grid_static (dt,niter)
+  subroutine do_grid_static (dt,niter,source_type)
 
     ! Does the ray-tracing over the sources by distributing
     ! the sources evenly over the available MPI processes-
     
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     integer,intent(in) :: niter !< interation counter, passed on to evolve0D
+    character(len=1),intent(in) :: source_type
 
     integer :: ns1
 
@@ -90,7 +98,16 @@ contains
        write(logf,*) ' at:',srcpos(:,ns1)
        flush(logf)
 #endif
-       call do_source(dt,ns1,niter)
+       select case(source_type)
+       case ("B") if (NormFlux(ns1) > 0.0) call do_source(dt,ns1,niter,source_type)
+#ifdef PL
+       case ("P") if (NormFluxPL(ns1) > 0.0) call do_source(dt,ns1,niter,source_type)
+#endif
+#ifdef QUASARS
+       case("Q") if (NormFluxQPL(ns1) > 0.0) call do_source(dt,ns1,niter, &
+            source_type)
+#endif
+       end select
     enddo
 
   end subroutine do_grid_static
@@ -100,7 +117,7 @@ contains
   !> Ray tracing the entire grid for all the sources using the
   !! master-slave model for distributing the sources over the
   !! MPI processes.
-  subroutine do_grid_master_slave (dt,niter)
+  subroutine do_grid_master_slave (dt,niter,source_type)
 
     ! Ray tracing the entire grid for all the sources using the
     ! master-slave model for distributing the sources over the
@@ -108,11 +125,12 @@ contains
 
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     integer,intent(in) :: niter !< interation counter, passed on to evolve0D
+    character(len=1),intent(in) :: source_type
 
     if (rank == 0) then
-       call do_grid_master ()
+       call do_grid_master (source_type)
     else
-       call do_grid_slave (dt,niter)
+       call do_grid_slave (dt,niter,source_type)
     endif
 
   end subroutine do_grid_master_slave
@@ -121,13 +139,15 @@ contains
 
   !> The master task in the master-slave setup for distributing
   !! the ray-tracing over the sources over the MPI processes.
-  subroutine do_grid_master ()
+  subroutine do_grid_master (source_type)
 
     ! The master task in the master-slave setup for distributing
     ! the ray-tracing over the sources over the MPI processes.
 
+    character(len=1),intent(in) :: source_type
+
     integer :: ns1
-    integer :: sources_done,whomax,who,answer
+    integer :: sources_done,sources_to_be_done,whomax,who,answer
     ! counter for master-slave process
     integer,dimension(:),allocatable :: counts
 #ifdef MPI
@@ -136,25 +156,87 @@ contains
 
 #ifdef MPI
     ! Source Loop - Master Slave with rank=0 as Master
+
+    ! Initialize counter of sources processed
     sources_done = 0
-          
+
+    ! Initialize the total number of source of the current type to be processed
+    ! The total source list is NumSrc long; the assumption here is that all of
+    ! these are B (stellar) sources. If this is not the case, the code needs
+    ! to be changed.
+    select case (source_type)
+    case ("B") sources_to_be_done=NumSrc
+    case ("P") sources_to_be_done=NumPLSrc
+    case ("Q") sources_to_be_done=NumQSrc
+    end select
+
+    ! Counter for stepping through the source list
     ns1 = 0
     
     ! Allocate counter for master-slave process
     if (.not.(allocated(counts))) allocate(counts(0:npr-1))
 
     ! send tasks to slaves 
-    
+
+    ! First try to send all slaves a task.
+    ! The number of slaves is limited either by the length of the source
+    ! list or the number of MPI processes
     whomax = min(NumSrc,npr-1)
-    do who=1,whomax
-       if (ns1 <= NumSrc) then
-          ns1=ns1+1
-          call MPI_Send (ns1, 1, MPI_INTEGER, who, 1,  &
-               MPI_COMM_NEW, mympierror)
-       endif
-    enddo
     
-    do while (sources_done < NumSrc)
+    who=1
+    do while (who <= whomax)
+       if (ns1 < NumSrc) then
+          ns1=ns1+1
+          select case(source_type)
+          case ("B")
+             ! Find the first non-zero entry for this type of source
+             do while (NormFlux(ns1) <= 0.0 .and. ns1 < NumSrc)
+                ns1=ns1+1
+             enddo
+             ! If one is found send this source to the processor who
+             if (NormFlux(ns1) > 0.0) then
+                who=who+1
+                call MPI_Send (ns1, 1, MPI_INTEGER, &
+                     who, 1, MPI_COMM_NEW, mympierror)
+             else
+                write(logf,*) "Failed to find any sources of type B", &
+                     " in source list of length", ns1
+             endif
+#ifdef PL
+          case ("P")
+             ! Find the first non-zero entry for this type of source
+             do while (NormFluxPL(ns1) <= 0.0 .and. ns1 < NumSrc)
+                ns1=ns1+1
+             enddo
+             ! If one is found send this source to the processor who
+             if (NormFluxPL(ns1) > 0.0) then
+                who=who+1
+                call MPI_Send (ns1, 1, MPI_INTEGER, &
+                     who, 1, MPI_COMM_NEW, mympierror)
+             else
+                write(logf,*) "Failed to find any sources of type P", &
+                     " in source list of length", ns1
+             endif
+#endif
+#ifdef QUASARS
+          case ("Q")
+             ! Find the first non-zero entry for this type of source
+             do while (NormFluxQPL(ns1) <= 0.0 .and. ns1 < NumSrc)
+                ns1=ns1+1
+             enddo
+             ! If one is found send this source to the processor who
+             if (NormFluxQPL(ns1) > 0.0) then
+                who=who+1
+                call MPI_Send (ns1, 1, MPI_INTEGER, &
+                     who, 1, MPI_COMM_NEW, mympierror)
+             else
+                write(logf,*) "Failed to find any sources of type Q", &
+                     " in source list of length", ns1
+             endif
+#endif
+          end select
+          
+    do while (sources_done < source_to_be_done)
        
        ! wait for an answer from a slave. 
        
@@ -172,19 +254,45 @@ contains
        
        ! Report on the sending on nth source
        if (mod(ns1,check_progress) == 0) &
-            write(logf,"(A,I8,A,I6)") &
-            "Sending source ",ns1," to processor ",who
+            write(logf,"(A,I8,A,I6,A)") &
+            "At position ",ns1," in source list; processor ",who, &
+            " just returned an answer."
 
        ! put the slave on work again,
        ! but only if not all tasks have been sent.
        ! we use the value of num to detect this */
        if (ns1 < NumSrc) then
           ns1=ns1+1
-          call MPI_Send (ns1, 1, MPI_INTEGER, &
-               who,		&	
-               1,		&	
-               MPI_COMM_NEW, &
-               mympierror)
+          select case(source_type)
+          case ("B")
+             do while (NormFlux(ns1) <= 0.0 .and. ns1 < NumSrc)
+                ns1=ns1+1
+             enddo
+             if (NormFlux(ns1) > 0.0) then
+                call MPI_Send (ns1, 1, MPI_INTEGER, &
+                     who, 1, MPI_COMM_NEW, mympierror)
+             endif
+#ifdef PL
+          case ("P")
+             do while (NormFluxPL(ns1) <= 0.0 .and. ns1 < NumSrc)
+                ns1=ns1+1
+             enddo
+             if (NormFluxPL(ns1) > 0.0) then
+                call MPI_Send (ns1, 1, MPI_INTEGER, &
+                     who, 1, MPI_COMM_NEW, mympierror)
+             endif
+#endif
+#ifdef QUASARS
+          case ("Q")
+             do while (NormFluxQPL(ns1) <= 0.0 .and. ns1 < NumSrc)
+                ns1=ns1+1
+             enddo
+             if (NormFluxQPL(ns1) > 0.0) then
+                call MPI_Send (ns1, 1, MPI_INTEGER, &
+                     who, 1, MPI_COMM_NEW, mympierror)
+             endif
+#endif
+          end select
        endif
     enddo
     
