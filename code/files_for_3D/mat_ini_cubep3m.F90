@@ -31,8 +31,10 @@ module material
   ! temper - temperature of grid cell under consideration
   ! temperature_grid - temperature (K) of entire grid (only used if not isothermal)
   ! temper_val - initial temperature and the one used if isothermal  
+  ! temper_hii - temperature assumed for stellar HII regions  
   real(kind=dp) :: temper
   real(kind=dp) :: temper_val
+  real(kind=dp) :: temper_hii = 1e4
   real(kind=si),dimension(:,:,:,:),allocatable :: temperature_grid
   ! xh - ionization fractions for one cell
   real(kind=dp),dimension(:,:,:),allocatable :: ndens
