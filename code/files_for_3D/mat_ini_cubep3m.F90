@@ -36,8 +36,14 @@ module material
   real(kind=si),dimension(:,:,:,:),allocatable :: temperature_grid
   ! xh - ionization fractions for one cell
   real(kind=dp),dimension(:,:,:),allocatable :: ndens
-  real(kind=dp),dimension(:,:,:,:),allocatable :: xh
-  real(kind=dp),dimension(:,:,:,:),allocatable :: xhe
+  ! Hydrogen ionization fractions associated with the "neutral IGM"
+  real(kind=dp),dimension(:,:,:,:),allocatable :: xh_x
+  ! Hydrogen ionization fraction associated with (BB) stars
+  real(kind=dp),dimension(:,:,:),allocatable :: xh_bb
+  ! Helium ionization fractions associated with the "neutral IGM"
+  real(kind=dp),dimension(:,:,:,:),allocatable :: xhe_x
+  ! Helium ionization fraction associated with (BB) stars
+  real(kind=dp),dimension(:,:,:),allocatable :: xhe_bb
   logical isothermal
   real,public :: clumping
   real,dimension(:,:,:),allocatable :: clumping_grid
@@ -201,17 +207,21 @@ contains
  
        
        ! Allocate ionization fraction arrays
-       allocate(xh(mesh(1),mesh(2),mesh(3),0:1))
-       allocate(xhe(mesh(1),mesh(2),mesh(3),0:2))
+       allocate(xh_x(mesh(1),mesh(2),mesh(3),0:1))
+       allocate(xh_bb(mesh(1),mesh(2),mesh(3)))
+       allocate(xhe_x(mesh(1),mesh(2),mesh(3),0:2))
+       allocate(xhe_bb(mesh(1),mesh(2),mesh(3)))
        ! Assign ionization fractions. For z = 40 - 20 RECFAST gives 
        ! an average ionization fraction of about 2e-4 for H and
        ! 1e-15 for He. We use this here.
        ! In case of a restart this will be overwritten in xfrac_ini
-       xh(:,:,:,1)=2e-4
-       xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
-       xhe(:,:,:,1)=1e-15_dp
-       xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)
-       xhe(:,:,:,2)=0.0
+       xh_x(:,:,:,1)=2e-4
+       xh_x(:,:,:,0)=1.0_dp-xh_x(:,:,:,1)
+       xhe_x(:,:,:,1)=1e-15_dp
+       xhe_x(:,:,:,0)=1.0_dp-xhe_x(:,:,:,1)
+       xhe_x(:,:,:,2)=0.0
+       xh_bb(:,:,:)=xh_x(:,:,:,1)
+       xhe_bb(:,:,:)=xhe_x(:,:,:,1)
        ! Initialize LLS parametets
        call LLS_init ()       
     endif
@@ -370,23 +380,19 @@ contains
     character(len=6) :: zred_str
     integer :: m1,m2,m3
     ! Array needed to read in 4B reals
-    real(kind=dp),dimension(:,:,:),allocatable :: xh1_real
-    real(kind=dp),dimension(:,:,:),allocatable :: xhe1_real
-    real(kind=dp),dimension(:,:,:),allocatable :: xhe2_real
-    !real(kind=si),dimension(:,:,:),allocatable :: xh1_real
+    real(kind=dp),dimension(:,:,:),allocatable :: xfrac_real
+    !real(kind=si),dimension(:,:,:),allocatable :: xfrac_real
 
     if (rank == 0) then
-       allocate(xh1_real(mesh(1),mesh(2),mesh(3)))
-       allocate(xhe1_real(mesh(1),mesh(2),mesh(3)))
-       allocate(xhe2_real(mesh(1),mesh(2),mesh(3)))
+       allocate(xfrac_real(mesh(1),mesh(2),mesh(3)))
        write(zred_str,"(f6.3)") zred_now
 !       xfrac_file= "./xfrac3d_"//trim(adjustl(zred_str))//".bin"
        xfrac_file= trim(adjustl(results_dir))// &
             !"Ifront3_"//trim(adjustl(zred_str))//".bin"
             "xfrac3d_"//trim(adjustl(zred_str))//".bin"
-         xfrac_file_He1= trim(adjustl(results_dir))// &
+       xfrac_file_He1= trim(adjustl(results_dir))// &
             "xfrac3dHe1_"//trim(adjustl(zred_str))//".bin"   
-         xfrac_file_He2= trim(adjustl(results_dir))// &
+       xfrac_file_He2= trim(adjustl(results_dir))// &
             "xfrac3dHe2_"//trim(adjustl(zred_str))//".bin"
 
        write(unit=logf,fmt="(2A)") "Reading ionization fractions from ", &
@@ -400,15 +406,14 @@ contains
           write(logf,*) "Warning: file with ionization fractions unusable"
           write(logf,*) "mesh found in file: ",m1,m2,m3
        else
-          read(20) xh1_real
+          read(20) xfrac_real
           ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xh(:,:,:,1)=xh1_real(:,:,:)
+          xh(:,:,:,1)=xfrac_real(:,:,:)
           !xh(:,:,:,1)=real(xh1_real(:,:,:),dp)
           xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
        endif
        ! close file
        close(20)
-       deallocate(xh1_real)
 
 !**** He1
        ! Open ionization fractions file
@@ -419,13 +424,13 @@ contains
           write(logf,*) "Warning: file with ionization fractions unusable"
           write(logf,*) "mesh found in file: ",m1,m2,m3
        else
-          read(20) xhe1_real
+          read(20) xfrac_real
           ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xhe(:,:,:,1)=xhe1_real(:,:,:)
+          xhe(:,:,:,1)=xfrac_real(:,:,:)
        endif
        ! close file
        close(20)
-       deallocate(xhe1_real)
+       
 !**** He2
        ! Open ionization fractions file
        open(unit=20,file=xfrac_file_He2,form="unformatted",status="old")       
@@ -435,14 +440,14 @@ contains
           write(logf,*) "Warning: file with ionization fractions unusable"
           write(logf,*) "mesh found in file: ",m1,m2,m3
        else
-          read(20) xhe2_real
+          read(20) xfrac_real
           ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xhe(:,:,:,2)=xhe2_real(:,:,:)
+          xhe(:,:,:,2)=xfrac_real(:,:,:)
           xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)-xhe(:,:,:,2)
        endif
        ! close file
        close(20)
-       deallocate(xhe2_real)
+       deallocate(xfrac_real)
     endif
 
 #ifdef MPI       
