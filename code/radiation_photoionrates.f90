@@ -108,7 +108,7 @@ contains
   function photoion_rates (colum_in_HI,colum_out_HI, &
        colum_in_HeI,colum_out_HeI, &
        colum_in_HeII,colum_out_HeII, &
-       vol,nsrc,i_state)
+       vol,nsrc,i_state,source_type)
 
     use sourceprops, only: NormFlux
 #ifdef PL
@@ -134,12 +134,15 @@ contains
     ! Volume of shell cell
     real(kind=dp), intent(in) :: vol
 
-    ! Ionization state of cell
-    real(kind=dp), intent(in) :: i_state
-
     ! Number of the source
     integer, intent(in) :: nsrc 
 
+    ! Ionization state of cell
+    real(kind=dp), intent(in) :: i_state
+
+    ! Source type
+    character(len=1),intent(in) :: source_type
+    
     integer :: i_subband
     real(kind=dp) :: colum_cell_HI
     real(kind=dp) :: colum_cell_HeI
@@ -163,6 +166,19 @@ contains
     ! to zero. The structure phi is ultimately copied to the result of this function
     call set_photrates_to_zero (phi)
 
+    ! Set the variable Normalized_Flux to the appropriate value for the
+    ! source_type we are considering. This assumes we are calculating each
+    ! source type with separate calls to this routine.
+    select case (source_type)
+    case ("B") Normalized_Flux=NormFlux(nsrc)
+#ifdef PL
+    case ("P") Normalized_Flux=NormFluxPL(nsrc)
+#endif    
+#ifdef QUASARS
+    case ("Q") Normalized_Flux=NormFluxQPL(nsrc)
+#endif    
+    end select
+    
     ! Set the column densities (HI, HeI, HeII) of the current cell
     colum_cell_HI = colum_out_HI-colum_in_HI
     colum_cell_HeI = colum_out_HeI-colum_in_HeI
@@ -201,35 +217,22 @@ contains
             scaling_HeII(i_subband), &
             colum_cell_HI,colum_cell_HeI,colum_cell_HeII,i_subband)
     enddo
+
     ! Find the photo-ionization rates by looking up the values in
     ! the (appropriate) photo-ionization tables and add to the
     ! rates
-    if (NormFlux(nsrc) > 0.0) &  
+    if (Normalized_Flux > 0.0) &  
          phi = phi + photo_lookuptable(tau_pos_in,tau_pos_out, &
          tau_in_all,tau_out_all, &
-         NormFlux(nsrc),"B",vol, &
+         Normalized_Flux,source_type"B",vol, &
          scaling_HI,scaling_HeI,scaling_HeII)
-    !if (colum_in_HI == 0.0) write(logf,*) "After photolookup: ", &
-    !     phi%photo_cell_HI, phi%photo_cell_HeI, &
-    !              phi%photo_cell_HeII, phi%heat
-#ifdef PL
-    if (NormFluxPL(nsrc) > 0.0) &  
-         phi = phi + photo_lookuptable(tau_pos_in,tau_pos_out, &
-         tau_in_all,tau_out_all, &
-         NormFluxPL(nsrc),"P",vol, &
-         scaling_HI,scaling_HeI,scaling_HeII)
-#endif    
-#ifdef QUASARS
-    if (NormFluxQPL(nsrc) > 0.0) &
-         phi = phi + photo_lookuptable(tau_pos_in,tau_pos_out, &
-         tau_in_all,tau_out_all, &
-         NormFluxQPL(nsrc),"Q",vol, &
-         scaling_HI,scaling_HeI,scaling_HeII)
-#endif
+
     ! Find the heating rates rates by looking up the values in
     ! the (appropriate) photo-ionization tables and using the
     ! secondary ionization. Add them to the rates.
-    if (.not.isothermal) then
+    ! WE DO NOT CALCULATE THE HEATING RATE FOR BB SOURCES BUT ASSUME
+    ! A TEMPERATURE INSTEAD!
+    if (.not.isothermal .and. source_type .ne. "B") then
        
        ! The optical depths (HI, HeI, HeII) at current cell
        ! These are only needed in heat_lookuptable
@@ -244,31 +247,12 @@ contains
        !        phi%photo_cell_HI, phi%photo_cell_HeI, &
        !        phi%photo_cell_HeII, phi%heat
        !endif
-       if (NormFlux(nsrc) > 0.0) & 
+       if (Normalized_Flux > 0.0) &  
             phi = phi + heat_lookuptable(tau_pos_in,tau_pos_out, &
             tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFlux(nsrc),"B", &
-            vol,i_state, &
+            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,Normalized_Flux, &
+            source_type, vol,i_state, &
             scaling_HI,scaling_HeI,scaling_HeII)
-       !if (colum_in_HI == 0.0) write(logf,*) "After heatlookup: ", &
-       !     phi%photo_cell_HI, phi%photo_cell_HeI, &
-       !     phi%photo_cell_HeII, phi%heat
-#ifdef PL
-       if (NormFluxPL(nsrc) > 0.0) &  
-            phi = phi + heat_lookuptable(tau_pos_in,tau_pos_out, &
-            tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFluxPL(nsrc),"P", &
-            vol,i_state, &
-            scaling_HI,scaling_HeI,scaling_HeII)
-#endif       
-#ifdef QUASARS
-       if (NormFluxQPL(nsrc) > 0.0) &
-            phi = phi + heat_lookuptable(tau_pos_in,tau_pos_out, &
-            tau_in_all,tau_out_all, &
-            tau_cell_HI,tau_cell_HeI,tau_cell_HeII,NormFluxQPL(nsrc),"Q", &
-            vol,i_state, &
-            scaling_HI,scaling_HeI,scaling_HeII)
-#endif
     endif
 
     ! Assign result of function

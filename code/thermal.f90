@@ -19,7 +19,7 @@ module thermalevolution
 contains
 
   ! calculates the thermal evolution of one grid point
-  subroutine thermal (dt,end_temper,avg_temper,ndens_electron,ndens_atom,ion,phi)!,pos)
+  subroutine thermal (dt,end_temper,avg_temper,ndens_electron,ndens_atom,ion,phi,source_type)!,pos)
 
     ! The time step
     real(kind=dp), intent(in) :: dt
@@ -37,6 +37,7 @@ contains
     type(ionstates), intent(in) :: ion
     ! mesh position of cell 
     !integer, intent(in) :: pos
+    character(len=1),intent(in) :: source_type
  
     ! initial temperature
     real(kind=dp) :: initial_temp

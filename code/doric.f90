@@ -90,6 +90,10 @@ contains
 
     pfrac= 0.96_dp ! see Osterbrock, 1989
     heliumfraction=abu_he/(1.0_dp-abu_he)    ! He/H
+    ! GM/171123: Should ffrac not depend on the helium neutral fraction
+    ! ion%he(0) ????????? This factor has to do with the helium recombinations
+    ! not hydrogen!!! Friedrich et al. is not clear, check the original OTS
+    ! papers.
     ffrac= max(min(10.0_dp*ion%h(0),1.0_dp),0.01_dp) 
     !vfrac= 0.285_dp 		           ! taken from Hummer and Seaton, 1964 table five
     ! This is a function of temperature, moved to

@@ -262,37 +262,61 @@ contains
 
           ! Construct file name
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"xfrac3d_"//trim(adjustl(file1))// &
+          file1=trim(adjustl(results_dir))//"xfrac3d_cold"//trim(adjustl(file1))// &
                base_extension
 
           ! Open, write and close
           open(unit=52,file=file1,form="unformatted",status="unknown")
           write(52) mesh(1),mesh(2),mesh(3)
-          write(52) (((xh(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
+          write(52) (((xh_cold(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(52)
 
           ! Construct file name
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"xfrac3dHe1_"// &
+          file1=trim(adjustl(results_dir))//"xfrac3d_hot"//trim(adjustl(file1))// &
+               base_extension
+
+          ! Open, write and close
+          open(unit=52,file=file1,form="unformatted",status="unknown")
+          write(52) mesh(1),mesh(2),mesh(3)
+          write(52) (((xh_hot(i,j,k),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(52)
+
+          ! Construct file name
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"xfrac3dHe1_cold"// &
                trim(adjustl(file1))//base_extension
 
           ! Open, write and close
           open(unit=62,file=file1,form="unformatted",status="unknown")
           write(62) mesh(1),mesh(2),mesh(3)
-          write(62) (((xhe(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
+          write(62) (((xhe_cold(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(62)
 
           ! Construct file name
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"xfrac3dHe2_"// &
+          file1=trim(adjustl(results_dir))//"xfrac3dHe1_hot"// &
+               trim(adjustl(file1))//base_extension
+
+          ! Open, write and close
+          open(unit=62,file=file1,form="unformatted",status="unknown")
+          write(62) mesh(1),mesh(2),mesh(3)
+          write(62) (((xhe_hot(i,j,k),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(62)
+
+          ! Construct file name
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"xfrac3dHe2_cold"// &
                trim(adjustl(file1))//base_extension
 
           ! Open, write and close
           open(unit=72,file=file1,form="unformatted",status="unknown")
           write(72) mesh(1),mesh(2),mesh(3)
-          write(72) (((xhe(i,j,k,2),i=1,mesh(1)),j=1,mesh(2)), &
+          write(72) (((xhe_cold(i,j,k,2),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(72)
 

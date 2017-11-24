@@ -34,7 +34,8 @@ module evolve
   use sizes, only: Ndim, mesh
 
   use material, only: ndens
-  use material, only: xh,xhe
+  use material, only: xh_bb,xhe_bb
+  use material, only: xh_x,xhe_x
   use material, only: isothermal
   use material, only: set_final_temperature_point
   use material, only: protect_ionization_fractions
@@ -129,22 +130,8 @@ contains
     ! Initialize wall clock counter (for dumps)
     call system_clock(wallclock1)
 
-     ! Initial state (for photon statistics)
-    call state_before (xh,xhe)
-
-    ! initialize average and intermediate results to initial values
-    if (restart == 0) then
-       xh_av(:,:,:,:)=xh(:,:,:,:)
-       xh_intermed(:,:,:,:)=xh(:,:,:,:)
-       xhe_av(:,:,:,:)=xhe(:,:,:,:)
-       xhe_intermed(:,:,:,:)=xhe(:,:,:,:)
-       niter=0 ! iteration starts at zero
-       conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
-    else
-       ! Reload xh_av,xh_intermed,photon_loss,niter
-       call start_from_dump(restart,niter,source_type)
-       call global_pass (conv_flag,dt)
-    endif
+    ! Initial state (for photon statistics)
+    call state_before (xh_bb,xhe_bb)
 
     ! Set the conv_criterion, if there are few sources we should make
     ! sure that things are converged around these sources.
@@ -156,10 +143,44 @@ contains
     if (rank == 0) write(timefile,"(A,F8.1)") &
          "Time before starting iteration: ", timestamp_wallclock ()
 
+    if (restart /= 0) check_dump_for_sourcetype(restart,niter,source_type)
+    ! 
     ! Iterate to reach convergence for multiple sources
     ! Process different groups of sources separately
-    call process_source_type(NumSrc,"B")
+    ! initialize average and intermediate results to initial values
+    if (restart == 0) then
+       source_type="B"
+       xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh_cold(:,:,:,0)
+       xh_av(:,:,:,1)=xh_hot(:,:,:)*xh_cold(:,:,:,1)
+       xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
+       xhe_av(:,:,:,1)=xhe_hot(:,:,:)*xhe_cold(:,:,:,1)
+       xhe_av(:,:,:,2)=xhe_cold(:,:,:,2)
+       xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
+       xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
+       niter=0 ! iteration starts at zero
+       conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
+    else
+       ! Reload xh_av,xh_intermed,photon_loss,niter
+       call start_from_dump(restart,niter,source_type)
+       call global_pass (conv_flag,dt,source_type)
+    endif
+
+    if (source_type == "B") call process_source_type(NumSrc,"B")
 #ifdef QUASARS
+    
+    ! initialize average and intermediate results to initial values
+    if (restart == 0 .or. source_type="B") then
+       source_type="Q"
+       xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh_cold(:,:,:,0)
+       xh_av(:,:,:,1)=xh_hot(:,:,:)*xh_cold(:,:,:,1)
+       xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
+       xhe_av(:,:,:,1)=xhe_hot(:,:,:)*xhe_cold(:,:,:,1)
+       xhe_av(:,:,:,2)=xhe_cold(:,:,:,2)
+       xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
+       xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
+       niter=0 ! iteration starts at zero
+       conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
+    endif
     call process_source_type(NumQsrc,"Q")
 #endif
 #ifdef PL
@@ -191,9 +212,25 @@ contains
        ! testing for niter.
        
        if (conv_flag < conv_criterion .and. niter > 1) then
+          if (source_type == "B" ) then
+             do k=1,mesh(3)
+                do j=1,mesh(2)
+                   do i=1,mesh(1)
+                      if (xh_hot(i,j,k) <= limit_partial_cells) then 
+                         if (xh_hot_intermed(i,j,k) > limit_partial_cells) then
+                            xh_hot(i,j,k)=1.0
+                            temperature_grid(i,j,k,0)=temper_hii
+                         else
+                            xh_hot(i,j,k)=xh_hot_intermed(i,j,k)
+                         endif
+                      endif
+                   enddo
+                enddo
+             enddo
+          endif
           xh(:,:,:,:)=xh_intermed(:,:,:,:)
           xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
-          call set_final_temperature_point
+          call set_final_temperature_point ()
           
           ! Report
           if (rank == 0) then
@@ -399,6 +436,53 @@ contains
   end subroutine start_from_dump
 
   ! ===========================================================================
+
+  subroutine check_dump_for_sourcetype(restart,niter,source_type)
+
+    integer,intent(in) :: restart  ! restart flag
+    integer,intent(out) :: niter  ! iteration counter
+    character(len=1),intent(out) :: source_type
+
+    character(len=20) :: iterfile
+
+    if (restart == 0) then
+       if (rank == 0) &
+            write(logf,*) "Warning: start_from_dump called incorrectly"
+    else
+       if (rank == 0) then
+
+          ! Set file to read (depending on restart flag)
+          select case (restart)
+          case (1) 
+             iterfile="iterdump1.bin"
+          case (2) 
+             iterfile="iterdump2.bin"
+          case (3) 
+             iterfile="iterdump.bin"
+          end select
+
+          open(unit=iterdump,file=trim(adjustl(dump_dir))//iterfile, &
+               form="unformatted",status="old")
+
+          read(iterdump) niter
+          read(iterdump) source_type
+          close(iterdump)
+
+          write(logf,*) "Read iteration ",niter," from dump file"
+          write(logf,*) "Source type of this dump: ",source_type
+       endif
+       
+#ifdef MPI       
+       ! Distribute the input parameters to the other nodes
+       call MPI_BCAST(source_type,1, &
+            MPI_CHARACTER,0,MPI_COMM_NEW,mympierror)
+#endif
+
+    endif
+
+  end subroutine check_dump_for_sourcetype
+
+  ! ===========================================================================
   
   subroutine set_rates_to_zero
     
@@ -451,7 +535,8 @@ contains
     ! Only if the do_chemistry routine was called with local option
     ! where the ionization fractions changed during the pass over
     ! all sources
-    if (local_chemistry) call mpi_accumulate_ionization_fractions
+    ! DISABLED in this version
+    !!if (local_chemistry) call mpi_accumulate_ionization_fractions
 #else
     photon_loss_all(:)=photon_loss(:)
     sum_nbox_all=sum_nbox
