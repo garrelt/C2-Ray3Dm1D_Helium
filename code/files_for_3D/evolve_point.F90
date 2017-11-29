@@ -121,17 +121,15 @@ contains
     real(kind=dp),dimension(0:1) :: coldenshe_in,coldenshe_out_temp
     real(kind=dp) :: ndens_p
     
-    type(photrates) :: phi, dummiphi
-#if defined(PL) || defined(QUASARS)
-    real(kind=dp),dimension(2) :: bb_phi
-#endif
+    type(photrates) :: bb_phi
 #ifdef PL
-    real(kind=dp),dimension(2) :: pl_phi
+    type(photrates) :: pl_phi
 #endif
 #ifdef QUASARS
-    real(kind=dp),dimension(2) :: qpl_phi
+    type(photrates) :: qpl_phi
 #endif
     type(ionstates) :: ion
+    logical :: simple_flag
 
     ! Map pos to mesh pos, assuming a periodic mesh
     do idim=1,Ndim
@@ -214,10 +212,6 @@ contains
 
        ! Add the (time averaged) column density of this cell
        ! to the total column density (for this source)
-       ! and add the LLS column density to this.
-       ! GM/110224: No! This messes up phi since phi is based
-       !  upon the difference between the in and out column density.
-       !  Instead add the LLS to coldensh_in, see above
        coldensh_out(pos(1),pos(2),pos(3))=coldensh_in + &
             coldens(path,ion%h_av(0),ndens_p,(1.0_dp-abu_he))
 
@@ -231,41 +225,46 @@ contains
        ! column densities.
 
        if (phase == "H") then
+          ! For the H or hot phase we only need the H ionizing photoionization
+          ! rate from "soft" stellar or "B" sources.
+          ! This is used elsewehere to calculate the extent of the ionized
+          ! regions and helps to establish which cells are only partly inside an
+          ! ionized (hot) region. These cells need to be treated differently.
+
           ! Limit the calculation to a certain maximum column density (hydrogen)
           if (coldensh_in < max_coldensh) then 
 
              coldenshe_out_temp=coldenshe_out(pos(1),pos(2),pos(3),:)
              ! photoion_rates the structure of rates (photo and heating)
-             simple_flag=.true.
-             phi=photoion_rates(coldensh_in, &
+             simple_flag=.true. ! only get the H photoion rate
+             bb_phi=photoion_rates(coldensh_in, &
                   coldensh_out(pos(1),pos(2),pos(3)), &
                   coldenshe_in(0),coldenshe_out_temp(0), &
                   coldenshe_in(1),coldenshe_out_temp(1), &
                   vol_ph,ns,ion%h_av(1),"B",simple_flag)
 
-             ! Divide the photo-ionization rates by the appropriate neutral density
-             ! (part of the photon-conserving rate prescription)
-             phi%photo_cell_HI=phi%photo_cell_HI/(ion%h_av(0)*ndens_p*(1.0_dp-abu_he))
+             ! Divide the photo-ionization rates by the appropriate neutral
+             ! density (part of the photon-conserving rate prescription)
+             call divide_rate_by_density (bb_phi,ion,ndens_p)
+
              ! Calculate the losses due to LLSs.
              ! GM/110224: Add the factor vol/vol_ph to phi, just as we do for
              ! the photon losses.
-             ! GM/110302: Use phi%h_in (not out) here since this is where we draw
-             ! the photons from, above.
+             ! GM/110302: Use phi%h_in (not out) here since this is where we
+             ! draw the photons from, above.
              if (use_LLS) call total_LLS_loss(phi%photo_in_HI*vol/vol_ph, &
-                  coldensh_LLS * path/dr(1))          
+                  coldensh_LLS * path/dr(1))
 
           else
              
              ! If the H0 column density is above the maximum, set rates to zero
-             phi%photo_cell_HI = 0.0_dp
-             phi%photo_out_HI = 0.0_dp
-             phi%photo_in = 0.0_dp
-             phi%photo_out = 0.0_dp
+             call set_photrates_to_zero (bb_phi)
 
           endif
-       
-          bb_phih_grid(pos(1),pos(2),pos(3))= &
-            phih_grid(pos(1),pos(2),pos(3))+phi%photo_cell_HI
+
+          ! Add value to grid of values
+          bb_phih_grid(pos(1),pos(2),pos(3)) = &
+            phih_grid(pos(1),pos(2),pos(3))+bb_phi%photo_cell_HI
 
           ! Photon statistics: register number of photons leaving the grid
           ! Note: This is only the H0 photo-ionization rate
@@ -275,10 +274,13 @@ contains
                   phi%photo_out*vol/vol_ph
              !photon_loss_src(1,tn)=photon_loss_src(1,tn) + phi%h_out*vol/vol_ph
           endif
+          
        else
-           ! Limit the calculation to a certain maximum column density (hydrogen)
+          ! If not for the "hot" phase we need to find all the photoionization
+          ! and heating rates, for all types of sources.
+
           coldenshe_out_temp=coldenshe_out(pos(1),pos(2),pos(3),:)
-          simple_flag=.false.
+          simple_flag=.false. ! get all the rates
 
           if (coldensh_in < max_coldensh) then 
 
@@ -292,33 +294,36 @@ contains
           else
              
              ! If the H0 column density is above the maximum, set rates to zero
-             bb_phi%photo_cell_HI = 0.0_dp
-             bb_phi%photo_out_HI = 0.0_dp
-             bb_phi%photo_in = 0.0_dp
-             bb_phi%photo_out = 0.0_dp
+             call set_photrates_to_zero (bb_phi)
 
           endif
        
+#ifdef QUASARS
           ! photoion_rates the structure of rates (photo and heating)
           qpl_phi=photoion_rates(coldensh_in, &
                coldensh_out(pos(1),pos(2),pos(3)), &
                coldenshe_in(0),coldenshe_out_temp(0), &
                coldenshe_in(1),coldenshe_out_temp(1), &
                vol_ph,ns,ion%h_av(1),"Q",simple_flag)
+#endif
+#ifdef PL
+          ! photoion_rates the structure of rates (photo and heating)
+          pl_phi=photoion_rates(coldensh_in, &
+               coldensh_out(pos(1),pos(2),pos(3)), &
+               coldenshe_in(0),coldenshe_out_temp(0), &
+               coldenshe_in(1),coldenshe_out_temp(1), &
+               vol_ph,ns,ion%h_av(1),"P",simple_flag)
+#endif
           
           ! Divide the photo-ionization rates by the appropriate neutral density
           ! (part of the photon-conserving rate prescription)
-          bb_phi%photo_cell_HI=bb_phi%photo_cell_HI/(ion%h_av(0)*ndens_p*(1.0_dp-abu_he))
-          bb_phi%photo_cell_HeI=bb_phi%photo_cell_HeI/(ion%he_av(0)*ndens_p*abu_he)
-          bb_phi%photo_cell_HeII=bb_phi%photo_cell_HeII/(ion%he_av(1)*ndens_p*abu_he)
-
-          ! Divide the photo-ionization rates by the appropriate neutral density
-          ! (part of the photon-conserving rate prescription)
-          qpl_phi%photo_cell_HI=bb_phi%photo_cell_HI/(ion%h_av(0)*ndens_p*(1.0_dp-abu_he))
-          qpl_phi%photo_cell_HeI=bb_phi%photo_cell_HeI/(ion%he_av(0)*ndens_p*abu_he)
-          qpl_phi%photo_cell_HeII=bb_phi%photo_cell_HeII/(ion%he_av(1)*ndens_p*abu_he)
-
-             
+          call divide_rate_by_density (bb_phi,ion,ndens_p)
+#ifdef QUASARS
+          call divide_rate_by_density (qpl_phi,ion,ndens_p)
+#endif
+#ifdef PL
+          call divide_rate_by_density (pl_phi,ion,ndens_p)
+#endif
           ! Calculate the losses due to LLSs.
           ! GM/110224: Add the factor vol/vol_ph to phi, just as we do for
           ! the photon losses.
@@ -326,19 +331,36 @@ contains
           ! the photons from, above.
           if (use_LLS) call total_LLS_loss(bb_phi%photo_in_HI*vol/vol_ph, &
                coldensh_LLS * path/dr(1))          
-          
+
+          ! Add values to grid of values
           bb_phih_grid(pos(1),pos(2),pos(3))= &
                bb_phih_grid(pos(1),pos(2),pos(3))+bb_phi%photo_cell_HI
           bb_phihe_grid(pos(1),pos(2),pos(3),0)=&
              bb_phihe_grid(pos(1),pos(2),pos(3),0)+bb_phi%photo_cell_HeI
           bb_phihe_grid(pos(1),pos(2),pos(3),1)=&
                bb_phihe_grid(pos(1),pos(2),pos(3),1)+bb_phi%photo_cell_HeII
+          bb_phiheat_grid(pos(1),pos(2),pos(3),1)=&
+               bb_phiheat_grid(pos(1),pos(2),pos(3),1)+bb_phi%heat
+#ifdef QUASARS
           qpl_phih_grid(pos(1),pos(2),pos(3))= &
                qpl_phih_grid(pos(1),pos(2),pos(3))+qpl_phi%photo_cell_HI
           qpl_phihe_grid(pos(1),pos(2),pos(3),0)=&
              qpl_phihe_grid(pos(1),pos(2),pos(3),0)+qpl_phi%photo_cell_HeI
           qpl_phihe_grid(pos(1),pos(2),pos(3),1)=&
                qpl_phihe_grid(pos(1),pos(2),pos(3),1)+qpl_phi%photo_cell_HeII
+          qpl_phiheat_grid(pos(1),pos(2),pos(3),1)=&
+               qpl_phiheat_grid(pos(1),pos(2),pos(3),1)+qpl_phi%heat
+#endif
+#ifdef PL
+          pl_phih_grid(pos(1),pos(2),pos(3))= &
+               pl_phih_grid(pos(1),pos(2),pos(3))+pl_phi%photo_cell_HI
+          pl_phihe_grid(pos(1),pos(2),pos(3),0)=&
+             pl_phihe_grid(pos(1),pos(2),pos(3),0)+pl_phi%photo_cell_HeI
+          pl_phihe_grid(pos(1),pos(2),pos(3),1)=&
+               pl_phihe_grid(pos(1),pos(2),pos(3),1)+pl_phi%photo_cell_HeII
+          pl_phiheat_grid(pos(1),pos(2),pos(3),1)=&
+               pl_phiheat_grid(pos(1),pos(2),pos(3),1)+pl_phi%heat
+#endif          
           ! Photon statistics: register number of photons leaving the grid
           ! Note: This is only the H0 photo-ionization rate
           if ( (any(rtpos(:) == last_l(:))) .or. &
@@ -354,9 +376,26 @@ contains
 
   ! =======================================================================
 
+  subroutine divide_rate_by_density (this_phi,ion,numdens)
+
+    type(photrates) :: this_phi
+    type(ionstates) :: ion
+    real(kind=dp) :: numdens
+    
+    this_phi%photo_cell_HI=this_phi%photo_cell_HI/ &
+         (ion%h_av(0)*numdens*(1.0_dp-abu_he))
+    this_phi%photo_cell_HeI=this_phi%photo_cell_HeI/ &
+         (ion%he_av(0)*numdens*abu_he)
+    this_phi%photo_cell_HeII=this_phi%photo_cell_HeII/&
+         (ion%he_av(1)*ndens_p*abu_he)
+    
+  end subroutine divide_rate_by_density
+
+  ! =======================================================================
+
   !> Calculates the evolution of the ionization state for
   !! one cell (mesh position pos) and multiple sources.
-  subroutine evolve0D_global(dt,pos,conv_flag,sourcetype)
+  subroutine evolve0D_global(dt,pos,conv_flag,phase)
 
     ! Calculates the evolution of the hydrogen + helium ionization state for
     ! one cell (pos) and multiple sources.
@@ -375,7 +414,7 @@ contains
     real(kind=dp),intent(in) :: dt ! time step
     integer,dimension(Ndim),intent(in) :: pos ! position on mesh
     integer,intent(inout) :: conv_flag ! convergence counter
-    character(len=1),intent(in) :: sourcetype
+    character(len=1),intent(in) :: phase
 
     real(kind=dp),parameter :: epsilon_dx=1e-5
     real(kind=dp),parameter :: limit_partial_cells=0.999
@@ -383,25 +422,28 @@ contains
     ! Initialize convergence check variable to zero
     conv_flag_check=0
     
-    if (source_type == "B") then
+    if (phase == "H") then
+       call evolve0D_global_partial(dt,pos,conv_flag)
+
+
+       ! Note: We also need to check Gamma somewhere...
        ! Check Gamma: if low then there are no stellar photons to
        ! worry about or to process.
-       if (phih_grid(pos(1),pos(2),pos(3)) > epsilon_dx/dt) then
+       !!if (bb_phih_grid(pos(1),pos(2),pos(3)) > epsilon_dx/dt) then
           ! Check for partially ionized regions (cells with ionization
           ! fronts). If a cell contains an IF we process it with the
           ! special evolve0D_global_partial routine. If a cell is
           ! fully ionized, we process it with the  evolve0D_global_full
           ! routine
-          if (xh_hot(pos(1),pos(2),pos(3)) > limit_partial_cells) then
-             call evolve0D_global_full(dt,pos,conv_flag,sourcetype)
-          else
-             call evolve0D_global_partial(dt,pos,conv_flag,sourcetype)
-          endif
-       endif
+          !!!if (xh_hot(pos(1),pos(2),pos(3)) <= limit_partial_cells) then
+          !!!endif
+       !!!endif
+
+       
     else
-       ! Other sources are always processed with the evolve0D_global_full
+       ! The other phase is always processed with the evolve0D_global_full
        ! routine.
-       call evolve0D_global_full(dt,pos,conv_flag,sourcetype)
+       call evolve0D_global_full(dt,pos,conv_flag)
     endif
 
   end subroutine evolve0D_global
@@ -410,7 +452,7 @@ contains
 
   !> Calculates the evolution of ionized partial volume of a cell containing
   !! an ionization front of a stellar (soft spectrum / BB) sources
-  subroutine evolve0D_global_partial(dt,pos,conv_flag,sourcetype)
+  subroutine evolve0D_global_partial(dt,pos,conv_flag)
 
     ! Author: Garrelt Mellema
 
@@ -434,9 +476,9 @@ contains
 
     ! Grow the ionized region (partial volume) as if there were no
     ! recombinations
-    deltht=phih_grid(pos(1),pos(2),pos(3))*dt
+    deltht=bb_phih_grid(pos(1),pos(2),pos(3))*dt
     ee=exp(-deltht)
-    xh_hot_intermed(pos(1),pos(2),pos(3)) = 1.0+ &
+    xh_hot_intermed(pos(1),pos(2),pos(3)) = 1.0 + &
          (xh_hot(pos(1),pos(2),pos(3)-1.0) * ee
 
     ! Determine average ionized region size (partial volume) over the time step
@@ -451,32 +493,13 @@ contains
     xh_hot_av(pos(1),pos(2),pos(3)) = 1.0 + &
          (xh_hot(pos(1),pos(2),pos(3))-1.0) * avg_factor
 
-    ! Modify the ion fractions in the global arrays.
-    ! We assume that the partial volume (xh_hot) is fully
-    ! ionized H+ and He+
-    ! THESE LINES MAY BE WRONG!!!!!!
-    xh_av(pos(1),pos(2),pos(3),0) = &
-         xh_av(pos(1),pos(2),pos(3),0) * &
-         (1.0-xh_hot_av(pos(1),pos(2),pos(3)))
-    !xh_av(pos(1),pos(2),pos(3),1) = &
-    !     xh_av(pos(1),pos(2),pos(3),1) * &
-    !     xh_hot_av(pos(1),pos(2),pos(3))
-
-    xhe_av(pos(1),pos(2),pos(3),0) = &
-         xhe_av(pos(1),pos(2),pos(3),0) * &
-         (1.0-xh_hot_av(pos(1),pos(2),pos(3)))
-    xhe_av(pos(1),pos(2),pos(3),1) = &
-         xhe_av(pos(1),pos(2),pos(3),1) * &
-         xh_hot_av(pos(1),pos(2),pos(3))
-    ! xhe(:,:,:,2) is not changed here.
-
   end subroutine evolve0D_global_partial
 
   ! =======================================================================
 
   !> Calculates the evolution of the ionization state for
   !! one cell (mesh position pos) and multiple sources.
-  subroutine evolve0D_global_full(dt,pos,conv_flag,sourcetype)
+  subroutine evolve0D_global_full(dt,pos,conv_flag,phase_type)
 
     ! Calculates the evolution of the hydrogen + helium ionization state for
     ! one cell (pos) and multiple sources.
@@ -495,7 +518,7 @@ contains
     real(kind=dp),intent(in) :: dt ! time step
     integer,dimension(Ndim),intent(in) :: pos ! position on mesh
     integer,intent(inout) :: conv_flag ! convergence counter
-    character(len=1),intent(in) :: sourcetype
+    character(len=1),intent(in) :: phasetype
 
     integer :: nx,nit ! loop counters
     integer :: conv_flag_check
@@ -539,11 +562,53 @@ contains
          temp_av_old,temper_old)
     
     ! Use the collected photo-ionization rates
-    phi%photo_cell_HI=phih_grid(pos(1),pos(2),pos(3))
-    phi%photo_cell_HeI=phihe_grid(pos(1),pos(2),pos(3),0)
-    phi%photo_cell_HeII=phihe_grid(pos(1),pos(2),pos(3),1)
-             
-    if (.not.isothermal) phi%heat=phiheat(pos(1),pos(2),pos(3))
+    bb_phi%photo_cell_HI=bb_phih_grid(pos(1),pos(2),pos(3))
+    bb_phi%photo_cell_HeI=bb_phihe_grid(pos(1),pos(2),pos(3),0)
+    bb_phi%photo_cell_HeII=bb_phihe_grid(pos(1),pos(2),pos(3),1)
+    if (.not.isothermal) bb_phi%heat=bb_phiheat_grid(pos(1),pos(2),pos(3))
+
+#ifdef QUASARS
+    qpl_phi%photo_cell_HI=qpl_phih_grid(pos(1),pos(2),pos(3))
+    qpl_phi%photo_cell_HeI=qpl_phihe_grid(pos(1),pos(2),pos(3),0)
+    qpl_phi%photo_cell_HeII=qpl_phihe_grid(pos(1),pos(2),pos(3),1)
+    if (.not.isothermal) qpl_phi%heat=qpl_phiheat_grid(pos(1),pos(2),pos(3))
+#endif
+
+#ifdef PL
+    pl_phi%photo_cell_HI=pl_phih_grid(pos(1),pos(2),pos(3))
+    pl_phi%photo_cell_HeI=pl_phihe_grid(pos(1),pos(2),pos(3),0)
+    pl_phi%photo_cell_HeII=pl_phihe_grid(pos(1),pos(2),pos(3),1)
+    if (.not.isothermal) pl_phi%heat=pl_phiheat_grid(pos(1),pos(2),pos(3))
+#endif    
+
+    ! Construct phi taking into account the hot phase
+    ! First test if there are stellar photons and also check whether
+    ! the fraction of the cell which is a stellar HII region ("hot") is small
+    if (bb_phih_grid(pos(1),pos(2),pos(3)) > epsilon_dx/dt .and.
+       xh_hot(pos(1),pos(2),pos(3)) <= limit_partial_cells) then
+       ! This cell is partly "hot" and needs to be processed separately
+       ! The bb photons have already been used to make the hot HII region,
+       ! here we only process the "cold" phase which is affected by x-rays
+       special(pos(1),pos(2),pos(3))=.true.
+#ifdef QUASARS
+       phi=qpl_phi
+#endif
+#ifdef PL
+       phi=pl_phi
+#endif
+    else
+       ! Other cells are either not received by stellar photons, or are
+       ! fully ionized, or are recombining...
+       phi=bb_phi
+#ifdef QUASARS
+       phi=phi+qpl_phi
+#endif
+#ifdef PL
+       phi=phi+pl_phi
+#endif
+       special(pos(1),pos(2),pos(3))=.false.
+    endif
+    
     ! I think instead of calling here twice get_temp, it is perhaps better to pass t_new
     ! and t_old as arguments from/to do_chemistry. (?)
     call do_chemistry (dt, ndens_p, ion, phi, 0.0_dp, &
@@ -641,8 +706,9 @@ contains
     type(ionstates) :: ion
 
     ! Initialize local temperature
-    call get_temperature_point (pos(1),pos(2),pos(3),temper_inter,avg_temper,temper1)
-    temper0   =temper1
+    call get_temperature_point (pos(1),pos(2),pos(3), &
+         temper_inter,avg_temper,temper1)
+    temper0 = temper1
   
     ! Initialize local clumping (if type of clumping is appropriate)
     if (type_of_clumping == 5) call clumping_point (pos(1),pos(2),pos(3))
@@ -662,16 +728,6 @@ contains
        ! Calculate (mean) electron density
        de=electrondens(ndens_p,ion%h_av,ion%he_av)
        
-       ! Find total photo-ionization rate
-       ! (direct plus photon losses)
-       ! DO THIS HERE, yh_av is changing
-       ! (if the cell is ionized, add a fraction of the lost photons)
-       !if (xh_intermed(pos(1),pos(2),pos(3),1) > 0.5)
-       !phi%photo_cell_HI=phih_cell
-       !phi%photo_cell_HeI=phihe_cell(0)
-       !phi%photo_cell_HeII=phihe_cell(1)
-       !phi%heat=phihv_cell
-
        ! initialize the collisional ionization and recombinations rates 
        ! (temperature dependent)
        if (.not.isothermal) call ini_rec_colion_factors(avg_temper)

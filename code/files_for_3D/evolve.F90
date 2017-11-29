@@ -34,8 +34,8 @@ module evolve
   use sizes, only: Ndim, mesh
 
   use material, only: ndens
-  use material, only: xh_bb,xhe_bb
-  use material, only: xh_x,xhe_x
+  use material, only: xh_hot
+  use material, only: xh,xhe
   use material, only: isothermal
   use material, only: set_final_temperature_point
   use material, only: protect_ionization_fractions
@@ -53,8 +53,15 @@ module evolve
   use photonstatistics, only: update_grandtotal_photonstatistics
   use radiation_sizes, only: NumFreqBnd
  
-  use evolve_data, only: phih_grid, phihe_grid, phiheat
+  use evolve_data, only: bb_phih_grid, bb_phihe_grid, bb_phiheat_grid
+#ifdef QUASARS
+  use evolve_data, only: qpl_phih_grid, qpl_phihe_grid, qpl_phiheat_grid
+#endif
+#ifdef PL
+  use evolve_data, only: pl_phih_grid, pl_phihe_grid, pl_phiheat_grid
+#endif
   use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
+  use evolve_data, only: xhot_av, xhot_intermed
   use evolve_data, only: photon_loss_all
 #ifdef MPI
   use evolve_data, only: buffer
@@ -125,6 +132,9 @@ contains
     ! Minimum number of cells which are allowed to be non-converged
     integer :: conv_criterion 
 
+    ! Phase which is being processed
+    character(len=1) :: phase_type
+    
     ! End of declarations
 
     ! Initialize wall clock counter (for dumps)
@@ -143,13 +153,14 @@ contains
     if (rank == 0) write(timefile,"(A,F8.1)") &
          "Time before starting iteration: ", timestamp_wallclock ()
 
-    if (restart /= 0) check_dump_for_sourcetype(restart,niter,source_type)
+    !if (restart /= 0) check_dump_for_sourcetype(restart,niter,source_type)
     ! 
     ! Iterate to reach convergence for multiple sources
     ! Process different groups of sources separately
     ! initialize average and intermediate results to initial values
     if (restart == 0) then
-       source_type="B"
+       x_hot_av(:,:,:)=x_hot(:,:,:)
+       x_hot_intermed(:,:,:)=x_hot(:,:,:)
        xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh_cold(:,:,:,0)
        xh_av(:,:,:,1)=xh_hot(:,:,:)*xh_cold(:,:,:,1)
        xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
@@ -158,35 +169,24 @@ contains
        xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
        xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
        niter=0 ! iteration starts at zero
-       conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
+       conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence
+       phase_type="H"
     else
        ! Reload xh_av,xh_intermed,photon_loss,niter
-       call start_from_dump(restart,niter,source_type)
-       call global_pass (conv_flag,dt,source_type)
+       call start_from_dump(restart,niter,phase_type)
+       call global_pass (conv_flag,dt,phase_type)
     endif
 
-    if (source_type == "B") call process_source_type(NumSrc,"B")
-#ifdef QUASARS
-    
-    ! initialize average and intermediate results to initial values
-    if (restart == 0 .or. source_type="B") then
-       source_type="Q"
-       xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh_cold(:,:,:,0)
-       xh_av(:,:,:,1)=xh_hot(:,:,:)*xh_cold(:,:,:,1)
-       xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
-       xhe_av(:,:,:,1)=xhe_hot(:,:,:)*xhe_cold(:,:,:,1)
-       xhe_av(:,:,:,2)=xhe_cold(:,:,:,2)
-       xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
-       xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
+
+    if (phase_type == "H") then
+       call process_phase("H")
        niter=0 ! iteration starts at zero
        conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
+       call process_phase("C")
+    else
+       call process_phase("C")
     endif
-    call process_source_type(NumQsrc,"Q")
-#endif
-#ifdef PL
-    call process_source_type(NumPLSrc,"P")
-#endif
-    
+
     ! Calculate photon statistics
     call calculate_photon_statistics (dt,xh,xh_av,xhe,xhe_av) 
     call report_photonstatistics (dt)
@@ -196,10 +196,9 @@ contains
 
   ! ===========================================================================
 
-  subroutine process_source_type(source_numbers,source_type)
+  subroutine process_phase(phase_type)
 
-    integer, intent(in) :: source_numbers !< total number of sources 
-    character(len=1),intent(in) :: source_type !< type of source
+    character(len=1),intent(in) :: phase_type !< type of phase ("hot" or "cold")
     
     ! Iterate to reach convergence for multiple sources
     do
@@ -212,26 +211,14 @@ contains
        ! testing for niter.
        
        if (conv_flag < conv_criterion .and. niter > 1) then
-          if (source_type == "B" ) then
-             do k=1,mesh(3)
-                do j=1,mesh(2)
-                   do i=1,mesh(1)
-                      if (xh_hot(i,j,k) <= limit_partial_cells) then 
-                         if (xh_hot_intermed(i,j,k) > limit_partial_cells) then
-                            xh_hot(i,j,k)=1.0
-                            temperature_grid(i,j,k,0)=temper_hii
-                         else
-                            xh_hot(i,j,k)=xh_hot_intermed(i,j,k)
-                         endif
-                      endif
-                   enddo
-                enddo
-             enddo
+          if (phase_type == "H" ) then
+             xh_hot(:,:,:)=xh_hot_intermed(:,:,:)
+          else
+             xh(:,:,:,:)=xh_intermed(:,:,:,:)
+             xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
+             call set_final_temperature_point ()
           endif
-          xh(:,:,:,:)=xh_intermed(:,:,:,:)
-          xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
-          call set_final_temperature_point ()
-          
+
           ! Report
           if (rank == 0) then
              write(logf,*) "Multiple sources convergence reached"
@@ -256,7 +243,7 @@ contains
        
        ! Pass over all sources
        if (source_numbers > 0) then
-          call pass_all_sources (niter,dt,source_type)
+          call pass_all_sources (niter,dt,phase_type)
           
           ! Report subbox statistics
           if (rank == 0) &
@@ -273,7 +260,7 @@ contains
                   wallclock2-wallclock1, 15.0*60.0*countspersec
              if (wallclock2-wallclock1 > 15*60*countspersec .or. &
                   wallclock2-wallclock1 < 0 ) then
-                call write_iteration_dump(niter,source_type)
+                call write_iteration_dump(niter,phase_type)
                 wallclock1=wallclock2
              endif
           endif
@@ -281,24 +268,24 @@ contains
        endif
        
        ! Do a global pass applying all the rates
-       call global_pass (conv_flag,dt,source_type)
+       call global_pass (conv_flag,dt,phase_type)
        
        ! Report time
        if (rank == 0) write(timefile,"(A,I3,A,F8.1)") &
             "Time after iteration ",niter," : ", timestamp_wallclock ()
-
+       
     enddo
     
-  end subroutine process_source_type
+  end subroutine process_phase
 
   ! ===========================================================================
 
-  subroutine write_iteration_dump (niter,source_type)
+  subroutine write_iteration_dump (niter,phase_type)
 
     use material, only:temperature_grid
 
     integer,intent(in) :: niter  ! iteration counter
-    character(len=1),intent(in) :: source_type
+    character(len=1),intent(in) :: phase_type
 
     integer :: ndump=0
     
@@ -319,16 +306,36 @@ contains
          status="unknown")
 
     write(iterdump) niter
-    write(iterdump) source_type
+    write(iterdump) phase_type
     write(iterdump) photon_loss_all
-    write(iterdump) phih_grid
+    write(iterdump) bb_phih_grid
+#ifdef QUASARS
+    write(iterdump) qpl_phih_grid
+#endif
+#ifdef PL         
+    write(iterdump) pl_phih_grid
+#endif
+    write(iterdump) xh_hot_av
+    write(iterdump) xh_hot_intermed
     write(iterdump) xh_av
     write(iterdump) xh_intermed
-    write(iterdump) phihe_grid
+    write(iterdump) bb_phihe_grid
+#ifdef QUASARS
+    write(iterdump) qpl_phihe_grid
+#endif
+#ifdef PL         
+    write(iterdump) pl_phihe_grid
+#endif
     write(iterdump) xhe_av
     write(iterdump) xhe_intermed
     if (.not.isothermal) then
-       write(iterdump) phiheat
+       write(iterdump) bb_phiheat
+#ifdef QUASARS
+       write(iterdump) qpl_phiheat
+#endif
+#ifdef PL
+       write(iterdump) pl_phiheat
+#endif
        write(iterdump) temperature_grid
     endif
     close(iterdump)
@@ -341,13 +348,13 @@ contains
 
   ! ===========================================================================
 
-  subroutine start_from_dump(restart,niter,source_type)
+  subroutine start_from_dump(restart,niter,phase_type)
 
     use material, only: temperature_grid
 
     integer,intent(in) :: restart  ! restart flag
     integer,intent(out) :: niter  ! iteration counter
-    character(len=1),intent(out) :: source_type
+    character(len=1),intent(out) :: phase_type
 
     character(len=20) :: iterfile
 
@@ -375,16 +382,36 @@ contains
                form="unformatted",status="old")
 
           read(iterdump) niter
-          read(iterdump) source_type
+          read(iterdump) phase_type
           read(iterdump) photon_loss_all
-          read(iterdump) phih_grid
+          read(iterdump) bb_phih_grid
+#ifdef QUASARS
+          read(iterdump) qpl_phih_grid
+#endif
+#ifdef PL         
+          read(iterdump) pl_phih_grid
+#endif
+          read(iterdump) xh_hot_av
+          read(iterdump) xh_hot_intermed
           read(iterdump) xh_av
           read(iterdump) xh_intermed
-          read(iterdump) phihe_grid
+          read(iterdump) bb_phihe_grid
+#ifdef QUASARS
+          read(iterdump) qpl_phihe_grid
+#endif
+#ifdef PL         
+          read(iterdump) pl_phihe_grid
+#endif
           read(iterdump) xhe_av
           read(iterdump) xhe_intermed
           if (.not.isothermal) then
-             read(iterdump) phiheat
+             read(iterdump) bb_phiheat
+#ifdef QUASARS
+             read(iterdump) qpl_phiheat
+#endif
+#ifdef PL
+             read(iterdump) pl_phiheat
+#endif
              read(iterdump) temperature_grid
           endif
 
@@ -401,27 +428,54 @@ contains
        ! Distribute the input parameters to the other nodes
        call MPI_BCAST(niter,1, &
             MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(source_type,1, &
+       call MPI_BCAST(phase_type,1, &
             MPI_CHARACTER,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(photon_loss_all,NumFreqBnd, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(phih_grid,mesh(1)*mesh(2)*mesh(3), &
+       call MPI_BCAST(bb_phih_grid,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(phihe_grid,mesh(1)*mesh(2)*mesh(3)*2, &
+#ifdef QUASARS
+       call MPI_BCAST(qpl_phih_grid,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
+#ifdef PL
+       call MPI_BCAST(pl_phih_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
+       call MPI_BCAST(bb_phihe_grid,mesh(1)*mesh(2)*mesh(3)*2, &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#ifdef QUASARS
+       call MPI_BCAST(qpl_phihe_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
+#ifdef PL
+       call MPI_BCAST(pl_phihe_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
        call MPI_BCAST(xh_av,mesh(1)*mesh(2)*mesh(3)*2, &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+       call MPI_BCAST(xhot_av,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xhe_av,mesh(1)*mesh(2)*mesh(3)*3, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xh_intermed,mesh(1)*mesh(2)*mesh(3)*2, &
-            MPI_DOUBLE_PRECISION,0,&
-            MPI_COMM_NEW,mympierror)
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+       call MPI_BCAST(xhot_intermed,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xhe_intermed,mesh(1)*mesh(2)*mesh(3)*3, &
             MPI_DOUBLE_PRECISION,0,&
             MPI_COMM_NEW,mympierror)
        if (.not.isothermal) then
-          call MPI_BCAST(phiheat,mesh(1)*mesh(2)*mesh(3), &
+          call MPI_BCAST(bb_phiheat_grid,mesh(1)*mesh(2)*mesh(3), &
                MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#ifdef QUASARS
+       call MPI_BCAST(qpl_phiheat_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
+#ifdef PL
+       call MPI_BCAST(pl_phiheat_grid,mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
+#endif
           call MPI_BCAST(temperature_grid,mesh(1)*mesh(2)*mesh(3)*3, &
                MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        endif
@@ -436,60 +490,23 @@ contains
   end subroutine start_from_dump
 
   ! ===========================================================================
-
-  subroutine check_dump_for_sourcetype(restart,niter,source_type)
-
-    integer,intent(in) :: restart  ! restart flag
-    integer,intent(out) :: niter  ! iteration counter
-    character(len=1),intent(out) :: source_type
-
-    character(len=20) :: iterfile
-
-    if (restart == 0) then
-       if (rank == 0) &
-            write(logf,*) "Warning: start_from_dump called incorrectly"
-    else
-       if (rank == 0) then
-
-          ! Set file to read (depending on restart flag)
-          select case (restart)
-          case (1) 
-             iterfile="iterdump1.bin"
-          case (2) 
-             iterfile="iterdump2.bin"
-          case (3) 
-             iterfile="iterdump.bin"
-          end select
-
-          open(unit=iterdump,file=trim(adjustl(dump_dir))//iterfile, &
-               form="unformatted",status="old")
-
-          read(iterdump) niter
-          read(iterdump) source_type
-          close(iterdump)
-
-          write(logf,*) "Read iteration ",niter," from dump file"
-          write(logf,*) "Source type of this dump: ",source_type
-       endif
-       
-#ifdef MPI       
-       ! Distribute the input parameters to the other nodes
-       call MPI_BCAST(source_type,1, &
-            MPI_CHARACTER,0,MPI_COMM_NEW,mympierror)
-#endif
-
-    endif
-
-  end subroutine check_dump_for_sourcetype
-
-  ! ===========================================================================
   
   subroutine set_rates_to_zero
     
     ! reset global rates to zero for this iteration
-    phih_grid(:,:,:)=0.0
-    phihe_grid(:,:,:,:)=0.0    
-    phiheat(:,:,:)=0.0
+    bb_phih_grid(:,:,:)=0.0
+    bb_phihe_grid(:,:,:,:)=0.0    
+    bb_phiheat(:,:,:)=0.0
+#ifdef QUASARS
+    qpl_phih_grid(:,:,:)=0.0
+    qpl_phihe_grid(:,:,:,:)=0.0    
+    qpl_phiheat(:,:,:)=0.0
+#endif
+#ifdef PL
+    pl_phih_grid(:,:,:)=0.0
+    pl_phihe_grid(:,:,:,:)=0.0    
+    pl_phiheat(:,:,:)=0.0
+#endif
     ! reset photon loss counters
     photon_loss(:)=0.0
     LLS_loss = 0.0 ! make this a NumFreqBnd vector if needed later (GM/101129)
@@ -498,14 +515,14 @@ contains
 
   ! ===========================================================================
 
-  subroutine pass_all_sources(niter,dt,source_type)
+  subroutine pass_all_sources(niter,dt,phase_type)
     
     ! For random permutation of sources:
     use  m_ctrper, only: ctrper
 
     integer,intent(in) :: niter  ! iteration counter
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
-    character(len=1),intent(in) :: source_type !< type of source
+    character(len=1),intent(in) :: phase_type !< type of phase
 
     if (rank == 0) write(logf,*) 'Doing all sources '
 
@@ -526,11 +543,11 @@ contains
 #endif
     
     ! Ray trace the whole grid for all sources.
-    call do_grid (dt,niter,source_type)
+    call do_grid (dt,niter,phase_type)
 
 #ifdef MPI
     ! Collect (sum) the rates from all the MPI processes
-    call mpi_accumulate_grid_quantities
+    call mpi_accumulate_grid_quantities (phase_type)
 
     ! Only if the do_chemistry routine was called with local option
     ! where the ionization fractions changed during the pass over
@@ -550,11 +567,12 @@ contains
 
   ! ===========================================================================
 
-  subroutine global_pass (conv_flag,dt)
+  subroutine global_pass (conv_flag,dt,phase_type)
 
     ! Flag variable (passed back from evolve0D_global)
     integer,intent(out) :: conv_flag
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
+    character(len=1),intent(in) :: phase_type !< type of phase
 
     integer :: i,j,k  ! mesh position
 
@@ -596,7 +614,7 @@ contains
        do j=1,mesh(2)
           do i=1,mesh(1)
              pos=(/ i,j,k /)
-             call evolve0D_global(dt,pos,conv_flag)
+             call evolve0D_global(dt,pos,conv_flag,phase_type)
           enddo
        enddo
     enddo
@@ -620,8 +638,10 @@ contains
 
   ! ===========================================================================
 
-  subroutine mpi_accumulate_grid_quantities
+  subroutine mpi_accumulate_grid_quantities(phase_type)
     
+    character(len=1),intent(in) :: phase_type !< type of phase
+
     real(kind=dp) :: LLS_loss_all
     
 #ifdef MPI
@@ -637,30 +657,79 @@ contains
        LLS_loss = LLS_loss_all
     endif
 
-    ! accumulate (sum) the MPI distributed phih_grid
-    call MPI_ALLREDUCE(phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
-         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
-    ! Overwrite the processor local values with the accumulated value
-    phih_grid(:,:,:)=buffer(:,:,:)
-
-     call MPI_ALLREDUCE(phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
-         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
-    ! Overwrite the processor local values with the accumulated value
-    phihe_grid(:,:,:,0)=buffer(:,:,:)
-
-    call MPI_ALLREDUCE(phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
-         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
-    ! Overwrite the processor local values with the accumulated value
-    phihe_grid(:,:,:,1)=buffer(:,:,:)
-    
-    call MPI_ALLREDUCE(phiheat, buffer, mesh(1)*mesh(2)*mesh(3), &
-         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
-    ! Overwrite the processor local values with the accumulated value
-    phiheat(:,:,:)=buffer(:,:,:)    
-        
     ! accumulate (sum) the MPI distributed sum of number of boxes
     call MPI_ALLREDUCE(sum_nbox, sum_nbox_all, 1, &
          MPI_INTEGER, MPI_SUM, MPI_COMM_NEW, mympierror)
+
+    ! accumulate (sum) the MPI distributed phih_grid
+    call MPI_ALLREDUCE(bb_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+         MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+    ! Overwrite the processor local values with the accumulated value
+    bb_phih_grid(:,:,:)=buffer(:,:,:)
+
+    if (phase_type /= "H") then
+       call MPI_ALLREDUCE(bb_phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
+       ! Overwrite the processor local values with the accumulated value
+       bb_phihe_grid(:,:,:,0)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(bb_phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
+       ! Overwrite the processor local values with the accumulated value
+       bb_phihe_grid(:,:,:,1)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(bb_phiheat_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+       ! Overwrite the processor local values with the accumulated value
+       bb_phiheat_grid(:,:,:)=buffer(:,:,:)    
+       
+#ifdef QUASARS
+       ! accumulate (sum) the MPI distributed phih_grid
+       call MPI_ALLREDUCE(qpl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+       ! Overwrite the processor local values with the accumulated value
+       qpl_phih_grid(:,:,:)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(qpl_phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
+       ! Overwrite the processor local values with the accumulated value
+       qpl_phihe_grid(:,:,:,0)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(qpl_phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
+       ! Overwrite the processor local values with the accumulated value
+       qpl_phihe_grid(:,:,:,1)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(qpl_phiheat_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+       ! Overwrite the processor local values with the accumulated value
+       qpl_phiheat_grid(:,:,:)=buffer(:,:,:)    
+#endif
+       
+#ifdef PL
+       ! accumulate (sum) the MPI distributed phih_grid
+       call MPI_ALLREDUCE(pl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+       ! Overwrite the processor local values with the accumulated value
+       pl_phih_grid(:,:,:)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(pl_phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
+       ! Overwrite the processor local values with the accumulated value
+       pl_phihe_grid(:,:,:,0)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(pl_phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
+       ! Overwrite the processor local values with the accumulated value
+       pl_phihe_grid(:,:,:,1)=buffer(:,:,:)
+       
+       call MPI_ALLREDUCE(pl_phiheat_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+            MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
+       ! Overwrite the processor local values with the accumulated value
+       pl_phiheat_grid(:,:,:)=buffer(:,:,:)    
+#endif
+    endif
+
 #endif
 
   end subroutine mpi_accumulate_grid_quantities
