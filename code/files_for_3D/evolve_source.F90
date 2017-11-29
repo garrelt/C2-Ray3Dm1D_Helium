@@ -63,7 +63,7 @@ contains
   
   !> Does the ray-tracing over the entire 3D grid for one source.
   !! The number of this source in the current list is ns1.
-  subroutine do_source(dt,ns1,niter)
+  subroutine do_source(dt,ns1,niter,phase_type)
 
     ! Does the ray-tracing over the entire 3D grid for one source.
     ! The number of this source in the current list is ns1.
@@ -71,6 +71,7 @@ contains
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     integer, intent(in) :: ns1 !< number of the source being done
     integer,intent(in) :: niter !< interation counter, passed on to evolve0D
+    character(len=1),intent(in) :: phase_type
 
     integer :: naxis,nplane,nquadrant
     integer :: ns
@@ -121,10 +122,12 @@ contains
     nbox=0 ! subbox counter
     total_source_flux=NormFlux(ns)*S_star
 #ifdef PL    
-    total_source_flux=total_source_flux + NormFluxPL(ns)*pl_S_star
+    if (phase_type /= "H") &
+         total_source_flux=total_source_flux + NormFluxPL(ns)*pl_S_star
 #endif
 #ifdef QUASARS
-    total_source_flux=total_source_flux+NormFluxQPL(ns)*qpl_S_star 
+    if (phase_type /= "H") &
+         total_source_flux=total_source_flux+NormFluxQPL(ns)*qpl_S_star 
 #endif     
     photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
     last_r(:)=srcpos(:,ns) ! to pass the first while test
@@ -151,7 +154,7 @@ contains
           ! First do source point (on first pass)
           if (nbox == 1) then
              rtpos(:)=srcpos(:,ns)
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           endif
 
           ! do independent areas of the mesh in parallel using OpenMP
@@ -168,21 +171,21 @@ contains
           ! Then do the the axes
           !$omp do schedule(dynamic,1)
           do naxis=1,6
-             call evolve1D_axis(dt,ns,niter,naxis)
+             call evolve1D_axis(dt,ns,niter,naxis,phase_type)
           enddo
           !$omp end do
 
           ! Then the source planes
           !$omp do schedule (dynamic,1)
           do nplane=1,12
-             call evolve2D_plane(dt,ns,niter,nplane)
+             call evolve2D_plane(dt,ns,niter,nplane,phase_type)
           end do
           !$omp end do
 
           ! Then the quadrants
           !$omp do schedule (dynamic,1)
           do nquadrant=1,8
-             call evolve3D_quadrant(dt,ns,niter,nquadrant)
+             call evolve3D_quadrant(dt,ns,niter,nquadrant,phase_type)
           end do
           !$omp end do
 
@@ -199,13 +202,13 @@ contains
           !    (srcpos(3)-plane and above)
           do k=srcpos(3,ns),last_r(3)
              rtpos(3)=k
-             call evolve2D(dt,rtpos,ns,niter)
+             call evolve2D(dt,rtpos,ns,niter,phase_type)
           end do
           
           ! 2. transfer in the lower part of the grid (below srcpos(3))
           do k=srcpos(3,ns)-1,last_l(3),-1
              rtpos(3)=k
-             call evolve2D(dt,rtpos,ns,niter)
+             call evolve2D(dt,rtpos,ns,niter,phase_type)
           end do
 
           ! No OpenMP threads so we use position 1
@@ -241,7 +244,7 @@ contains
 
   !> Traverse a z-plane (z=rtpos(3)) by sweeping in the x and y
   !! directions.
-  subroutine evolve2D(dt,rtpos,ns,niter)
+  subroutine evolve2D(dt,rtpos,ns,niter,phase_type)
 
     ! Traverse a z-plane (z=rtpos(3)) by sweeping in the x and y
     ! directions.
@@ -251,6 +254,7 @@ contains
                                                  !! intent(in)
     integer,intent(in) :: ns           !< current source
     integer,intent(in) :: niter        !< passed on to evolve0D
+    character(len=1),intent(in) :: phase_type
 
     integer :: i,j ! mesh positions
     
@@ -259,11 +263,11 @@ contains
        rtpos(2)=j
        do i=srcpos(1,ns),last_r(1)
           rtpos(1)=i
-          call evolve0D(dt,rtpos,ns,niter) ! `positive' i
+          call evolve0D(dt,rtpos,ns,niter,phase_type) ! `positive' i
        end do
        do i=srcpos(1,ns)-1,last_l(1),-1
           rtpos(1)=i
-          call evolve0D(dt,rtpos,ns,niter) ! `negative' i
+          call evolve0D(dt,rtpos,ns,niter,phase_type) ! `negative' i
           
        end do
     end do
@@ -273,11 +277,11 @@ contains
        rtpos(2)=j
        do i=srcpos(1,ns),last_r(1)
           rtpos(1)=i
-          call evolve0D(dt,rtpos,ns,niter) ! `positive' i
+          call evolve0D(dt,rtpos,ns,niter,phase_type) ! `positive' i
        end do
        do i=srcpos(1,ns)-1,last_l(1),-1
           rtpos(1)=i
-          call evolve0D(dt,rtpos,ns,niter) ! `negative' i
+          call evolve0D(dt,rtpos,ns,niter,phase_type) ! `negative' i
        end do
     end do
 
@@ -287,12 +291,13 @@ contains
 
   ! Ray tracing for the axes going through the source point
   ! should be called after having done the source point
-  subroutine evolve1D_axis(dt,ns,niter,naxis)
+  subroutine evolve1D_axis(dt,ns,niter,naxis,phase_type)
 
     real(kind=dp),intent(in) :: dt      ! passed on to evolve0D
     integer,intent(in) :: ns           ! current source
     integer,intent(in) :: niter        ! passed on to evolve0D
     integer,intent(in) :: naxis        ! axis to do
+    character(len=1),intent(in) :: phase_type
 
     integer :: i,j,k
     integer,dimension(Ndim) :: rtpos ! mesh position
@@ -303,14 +308,14 @@ contains
        rtpos(2:3)=srcpos(2:3,ns)
        do i=srcpos(1,ns)+1,last_r(1)
           rtpos(1)=i
-          call evolve0D(dt,rtpos,ns,niter) !# `positive' i
+          call evolve0D(dt,rtpos,ns,niter,phase_type) !# `positive' i
        enddo
     case(2)
        ! sweep in -i direction
        rtpos(2:3)=srcpos(2:3,ns)
        do i=srcpos(1,ns)-1,last_l(1),-1
           rtpos(1)=i
-          call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+          call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
        end do
     case(3)
        ! sweep in +j direction
@@ -318,7 +323,7 @@ contains
        rtpos(3)=srcpos(3,ns)
        do j=srcpos(2,ns)+1,last_r(2)
           rtpos(2)=j
-          call evolve0D(dt,rtpos,ns,niter) !# `positive' j
+          call evolve0D(dt,rtpos,ns,niter,phase_type) !# `positive' j
        end do
     case(4)
        ! sweep in -j direction
@@ -326,21 +331,21 @@ contains
        rtpos(3)=srcpos(3,ns)
        do j=srcpos(2,ns)-1,last_l(2),-1
           rtpos(2)=j
-          call evolve0D(dt,rtpos,ns,niter) !# `negative' j
+          call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' j
        end do
     case(5)
        ! sweep in +k direction
        rtpos(1:2)=srcpos(1:2,ns)
        do k=srcpos(3,ns)+1,last_r(3)
           rtpos(3)=k
-          call evolve0D(dt,rtpos,ns,niter) !# `positive' k
+          call evolve0D(dt,rtpos,ns,niter,phase_type) !# `positive' k
        end do
     case(6)
        ! sweep in -k direction
        rtpos(1:2)=srcpos(1:2,ns)
        do k=srcpos(3,ns)-1,last_l(3),-1
           rtpos(3)=k
-          call evolve0D(dt,rtpos,ns,niter) !# `negative' k
+          call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' k
        end do
     end select
     
@@ -350,7 +355,7 @@ contains
 
   !> Ray tracing for planes containing the source point
   !! should be called after evolve1D_axis
-  subroutine evolve2D_plane(dt,ns,niter,nplane)
+  subroutine evolve2D_plane(dt,ns,niter,nplane,phase_type)
 
     ! find column density for the axes going through the source point
     ! should be called after having done the source point
@@ -359,6 +364,7 @@ contains
     integer,intent(in) :: ns           ! current source
     integer,intent(in) :: niter        ! passed on to evolve0D
     integer,intent(in) :: nplane        ! plane to do
+    character(len=1),intent(in) :: phase_type
 
     integer :: i,j,k
     integer,dimension(Ndim) :: rtpos ! mesh position
@@ -371,7 +377,7 @@ contains
           rtpos(2)=j
           do i=srcpos(1,ns)+1,last_r(1)
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(2)
@@ -381,7 +387,7 @@ contains
           rtpos(2)=j
           do i=srcpos(1,ns)+1,last_r(1)
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(3)
@@ -391,7 +397,7 @@ contains
           rtpos(2)=j
           do i=srcpos(1,ns)-1,last_l(1),-1
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(4)
@@ -401,7 +407,7 @@ contains
           rtpos(2)=j
           do i=srcpos(1,ns)-1,last_l(1),-1
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(5)
@@ -411,7 +417,7 @@ contains
           rtpos(3)=k
           do i=srcpos(1,ns)+1,last_r(1)
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(6)
@@ -421,7 +427,7 @@ contains
           rtpos(3)=k
           do i=srcpos(1,ns)-1,last_l(1),-1
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(7)
@@ -431,7 +437,7 @@ contains
           rtpos(3)=k
           do i=srcpos(1,ns)-1,last_l(1),-1
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(8)
@@ -441,7 +447,7 @@ contains
           rtpos(3)=k
           do i=srcpos(1,ns)+1,last_r(1)
              rtpos(1)=i
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(9) 
@@ -451,7 +457,7 @@ contains
           rtpos(3)=k
           do j=srcpos(2,ns)+1,last_r(2)
              rtpos(2)=j
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(10) 
@@ -461,7 +467,7 @@ contains
           rtpos(3)=k
           do j=srcpos(2,ns)-1,last_l(2),-1
              rtpos(2)=j
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(11) 
@@ -471,7 +477,7 @@ contains
           rtpos(3)=k
           do j=srcpos(2,ns)+1,last_r(2)
              rtpos(2)=j
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
     case(12) 
@@ -481,7 +487,7 @@ contains
           rtpos(3)=k
           do j=srcpos(2,ns)-1,last_l(2),-1
              rtpos(2)=j
-             call evolve0D(dt,rtpos,ns,niter)
+             call evolve0D(dt,rtpos,ns,niter,phase_type)
           enddo
        enddo
        
@@ -493,7 +499,7 @@ contains
 
   !> Ray tracing for the 8 octants 
   !! should be called after evolve2D_plane
-  subroutine evolve3D_quadrant(dt,ns,niter,nquadrant)
+  subroutine evolve3D_quadrant(dt,ns,niter,nquadrant,phase_type)
 
     ! find column density for a z-plane srcpos(3) by sweeping in x and y
     ! directions
@@ -502,6 +508,7 @@ contains
     integer,intent(in) :: ns           ! current source
     integer,intent(in) :: niter        ! passed on to evolve0D
     integer,intent(in) :: nquadrant    ! which quadrant to do    
+    character(len=1),intent(in) :: phase_type
 
     integer :: i,j,k
     integer,dimension(Ndim) :: rtpos ! mesh position
@@ -515,7 +522,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)+1,last_r(1)
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter)
+                call evolve0D(dt,rtpos,ns,niter,phase_type)
              end do
           enddo
        enddo
@@ -527,7 +534,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)-1,last_l(1),-1
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
              end do
           end do
        enddo
@@ -539,7 +546,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)+1,last_r(1)
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
              end do
           end do
        enddo
@@ -551,7 +558,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)-1,last_l(1),-1
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
              end do
           end do
        enddo
@@ -563,7 +570,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)+1,last_r(1)
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `positive' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `positive' i
              end do
           enddo
        enddo
@@ -575,7 +582,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)-1,last_l(1),-1
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
              end do
           end do
        enddo
@@ -587,7 +594,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)+1,last_r(1)
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
              end do
           end do
        enddo
@@ -599,7 +606,7 @@ contains
              rtpos(2)=j
              do i=srcpos(1,ns)-1,last_l(1),-1
                 rtpos(1)=i
-                call evolve0D(dt,rtpos,ns,niter) !# `negative' i
+                call evolve0D(dt,rtpos,ns,niter,phase_type) !# `negative' i
              end do
           end do
        enddo

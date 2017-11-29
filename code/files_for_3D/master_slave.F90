@@ -138,7 +138,7 @@ contains
     character(len=1),intent(in) :: phase_type
 
     integer :: ns1
-    integer :: sources_done,sources_to_be_done,whomax,who,answer
+    integer :: sources_done,whomax,who,answer
     ! counter for master-slave process
     integer,dimension(:),allocatable :: counts
 #ifdef MPI
@@ -164,14 +164,14 @@ contains
     ! list or the number of MPI processes
     whomax = min(NumSrc,npr-1)
     do who=1,whomax
-       if (ns1 < NumSrc) then
+       if (ns1 <= NumSrc) then
           ns1=ns1+1
           call MPI_Send (ns1, 1, MPI_INTEGER, &
                who, 1, MPI_COMM_NEW, mympierror)
        endif
     enddo
 
-    do while (sources_done < source_to_be_done)
+    do while (sources_done < NumSrc)
        
        ! wait for an answer from a slave. 
        
