@@ -39,6 +39,7 @@ module evolve
   use material, only: isothermal
   use material, only: set_final_temperature_point
   use material, only: protect_ionization_fractions
+  use material, only: special
   use sourceprops, only: NumSrc
 #ifdef PL
   use sourceprops, only: NumPLSrc
@@ -61,7 +62,7 @@ module evolve
   use evolve_data, only: pl_phih_grid, pl_phihe_grid, pl_phiheat_grid
 #endif
   use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
-  use evolve_data, only: xhot_av, xhot_intermed
+  use evolve_data, only: xh_hot_av, xh_hot_intermed
   use evolve_data, only: photon_loss_all
 #ifdef MPI
   use evolve_data, only: buffer
@@ -77,6 +78,18 @@ module evolve
   save
 
   private
+
+  ! Minimum number of cells which are allowed to be non-converged
+  integer :: conv_criterion 
+  ! Flag variable (passed back from evolve0D_global)
+  integer :: conv_flag
+
+  ! Wall clock counting
+  ! 8 bytes to beat the maxcount
+  integer(kind=8) :: wallclock1
+  integer(kind=8) :: wallclock2
+  integer(kind=8) :: countspersec
+
 
   public :: evolve3D
 
@@ -119,18 +132,7 @@ contains
 
     ! Loop variables
     integer :: niter  ! iteration counter
-
-    ! Wall clock counting
-    ! 8 bytes to beat the maxcount
-    integer(kind=8) :: wallclock1
-    integer(kind=8) :: wallclock2
-    integer(kind=8) :: countspersec
-
-    ! Flag variable (passed back from evolve0D_global)
-    integer :: conv_flag
-
-    ! Minimum number of cells which are allowed to be non-converged
-    integer :: conv_criterion 
+    integer :: i,j,k
 
     ! Phase which is being processed
     character(len=1) :: phase_type
@@ -141,7 +143,7 @@ contains
     call system_clock(wallclock1)
 
     ! Initial state (for photon statistics)
-    call state_before (xh_bb,xhe_bb)
+    call state_before (xh,xhe)
 
     ! Set the conv_criterion, if there are few sources we should make
     ! sure that things are converged around these sources.
@@ -159,13 +161,31 @@ contains
     ! Process different groups of sources separately
     ! initialize average and intermediate results to initial values
     if (restart == 0) then
-       x_hot_av(:,:,:)=x_hot(:,:,:)
-       x_hot_intermed(:,:,:)=x_hot(:,:,:)
-       xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh_cold(:,:,:,0)
-       xh_av(:,:,:,1)=xh_hot(:,:,:)*xh_cold(:,:,:,1)
+       do k=1,mesh(3)
+          do j=1,mesh(2)
+             do i=1,mesh(1)
+                if (special(i,j,k)) then
+                   xh_av(i,j,k,0)=(1.0_dp-xh_hot(i,j,k))*xh(i,j,k,0)
+                   xhe_av(i,j,k,1)=xh_hot(i,j,k)*xhe(i,j,k,1)
+                else
+                   xh_av(i,j,k,0)=xh(i,j,k,0)
+                   xhe_av(i,j,k,1)=xhe(i,j,k,1)
+                endif
+             enddo
+          enddo
+       enddo
+       !where(special == .true.)
+       !   xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh(:,:,:,0)
+       !   xhe_av(:,:,:,1)=xh_hot(:,:,:)*xhe(:,:,:,1)
+       !elsewhere
+       !   xh_av(:,:,:,0)=xh(:,:,:,0)
+       !   xhe_av(:,:,:,1)=xhe(:,:,:,1)
+       !endwhere
+       xh_hot_av(:,:,:)=xh_hot(:,:,:)
+       xh_hot_intermed(:,:,:)=xh_hot(:,:,:)
+       xh_av(:,:,:,1)=xh_hot(:,:,:)*xh(:,:,:,1)
        xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
-       xhe_av(:,:,:,1)=xhe_hot(:,:,:)*xhe_cold(:,:,:,1)
-       xhe_av(:,:,:,2)=xhe_cold(:,:,:,2)
+       xhe_av(:,:,:,2)=xhe(:,:,:,2)
        xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
        xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
        niter=0 ! iteration starts at zero
@@ -179,12 +199,12 @@ contains
 
 
     if (phase_type == "H") then
-       call process_phase("H")
+       call process_phase(niter,dt,"H")
        niter=0 ! iteration starts at zero
        conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence 
-       call process_phase("C")
+       call process_phase(niter,dt,"C")
     else
-       call process_phase("C")
+       call process_phase(niter,dt,"C")
     endif
 
     ! Calculate photon statistics
@@ -196,8 +216,10 @@ contains
 
   ! ===========================================================================
 
-  subroutine process_phase(phase_type)
+  subroutine process_phase(niter,dt,phase_type)
 
+    integer,intent(inout) :: niter  ! iteration counter
+    real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     character(len=1),intent(in) :: phase_type !< type of phase ("hot" or "cold")
     
     ! Iterate to reach convergence for multiple sources
@@ -242,7 +264,7 @@ contains
        call set_rates_to_zero
        
        ! Pass over all sources
-       if (source_numbers > 0) then
+       if (NumSrc > 0) then
           call pass_all_sources (niter,dt,phase_type)
           
           ! Report subbox statistics
@@ -329,12 +351,12 @@ contains
     write(iterdump) xhe_av
     write(iterdump) xhe_intermed
     if (.not.isothermal) then
-       write(iterdump) bb_phiheat
+       write(iterdump) bb_phiheat_grid
 #ifdef QUASARS
-       write(iterdump) qpl_phiheat
+       write(iterdump) qpl_phiheat_grid
 #endif
 #ifdef PL
-       write(iterdump) pl_phiheat
+       write(iterdump) pl_phiheat_grid
 #endif
        write(iterdump) temperature_grid
     endif
@@ -405,12 +427,12 @@ contains
           read(iterdump) xhe_av
           read(iterdump) xhe_intermed
           if (.not.isothermal) then
-             read(iterdump) bb_phiheat
+             read(iterdump) bb_phiheat_grid
 #ifdef QUASARS
-             read(iterdump) qpl_phiheat
+             read(iterdump) qpl_phiheat_grid
 #endif
 #ifdef PL
-             read(iterdump) pl_phiheat
+             read(iterdump) pl_phiheat_grid
 #endif
              read(iterdump) temperature_grid
           endif
@@ -454,13 +476,13 @@ contains
 #endif
        call MPI_BCAST(xh_av,mesh(1)*mesh(2)*mesh(3)*2, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(xhot_av,mesh(1)*mesh(2)*mesh(3), &
+       call MPI_BCAST(xh_hot_av,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xhe_av,mesh(1)*mesh(2)*mesh(3)*3, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xh_intermed,mesh(1)*mesh(2)*mesh(3)*2, &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
-       call MPI_BCAST(xhot_intermed,mesh(1)*mesh(2)*mesh(3), &
+       call MPI_BCAST(xh_hot_intermed,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION,0,MPI_COMM_NEW,mympierror)
        call MPI_BCAST(xhe_intermed,mesh(1)*mesh(2)*mesh(3)*3, &
             MPI_DOUBLE_PRECISION,0,&
@@ -496,16 +518,16 @@ contains
     ! reset global rates to zero for this iteration
     bb_phih_grid(:,:,:)=0.0
     bb_phihe_grid(:,:,:,:)=0.0    
-    bb_phiheat(:,:,:)=0.0
+    bb_phiheat_grid(:,:,:)=0.0
 #ifdef QUASARS
     qpl_phih_grid(:,:,:)=0.0
     qpl_phihe_grid(:,:,:,:)=0.0    
-    qpl_phiheat(:,:,:)=0.0
+    qpl_phiheat_grid(:,:,:)=0.0
 #endif
 #ifdef PL
     pl_phih_grid(:,:,:)=0.0
     pl_phihe_grid(:,:,:,:)=0.0    
-    pl_phiheat(:,:,:)=0.0
+    pl_phiheat_grid(:,:,:)=0.0
 #endif
     ! reset photon loss counters
     photon_loss(:)=0.0

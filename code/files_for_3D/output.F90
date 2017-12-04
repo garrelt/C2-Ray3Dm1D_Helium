@@ -22,8 +22,14 @@ module output_module
   use material, only: isothermal
   use sizes, only: mesh
   use grid, only: x, vol
-  use material, only: xh, temperature_grid, ndens, xhe
-  use evolve_data, only: phih_grid, phiheat
+  use material, only: xh, temperature_grid, ndens, xhe, xh_hot, special
+  use evolve_data, only: bb_phih_grid, bb_phihe_grid, bb_phiheat_grid
+#ifdef PL
+  use evolve_data, only: pl_phih_grid, pl_phihe_grid, pl_phiheat_grid
+#endif
+#ifdef QUASARS
+  use evolve_data, only: qpl_phih_grid, qpl_phihe_grid, qpl_phiheat_grid
+#endif
   use sourceprops, only: srcpos
   use photonstatistics, only: do_photonstatistics, total_ion, totrec
   use photonstatistics, only: totcollisions, dh0, dhe0, dhe2, grtotal_ion
@@ -268,7 +274,7 @@ contains
           ! Open, write and close
           open(unit=52,file=file1,form="unformatted",status="unknown")
           write(52) mesh(1),mesh(2),mesh(3)
-          write(52) (((xh_cold(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
+          write(52) (((xh(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(52)
 
@@ -286,25 +292,25 @@ contains
 
           ! Construct file name
           write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"special"//trim(adjustl(file1))// &
+               base_extension
+
+          ! Open, write and close
+          open(unit=52,file=file1,form="unformatted",status="unknown")
+          write(52) mesh(1),mesh(2),mesh(3)
+          write(52) (((special(i,j,k),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(52)
+
+          ! Construct file name
+          write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"xfrac3dHe1_cold"// &
                trim(adjustl(file1))//base_extension
 
           ! Open, write and close
           open(unit=62,file=file1,form="unformatted",status="unknown")
           write(62) mesh(1),mesh(2),mesh(3)
-          write(62) (((xhe_cold(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
-               k=1,mesh(3))
-          close(62)
-
-          ! Construct file name
-          write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"xfrac3dHe1_hot"// &
-               trim(adjustl(file1))//base_extension
-
-          ! Open, write and close
-          open(unit=62,file=file1,form="unformatted",status="unknown")
-          write(62) mesh(1),mesh(2),mesh(3)
-          write(62) (((xhe_hot(i,j,k),i=1,mesh(1)),j=1,mesh(2)), &
+          write(62) (((xhe(i,j,k,1),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(62)
 
@@ -316,7 +322,7 @@ contains
           ! Open, write and close
           open(unit=72,file=file1,form="unformatted",status="unknown")
           write(72) mesh(1),mesh(2),mesh(3)
-          write(72) (((xhe_cold(i,j,k,2),i=1,mesh(1)),j=1,mesh(2)), &
+          write(72) (((xhe(i,j,k,2),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(72)
 
@@ -370,25 +376,128 @@ contains
           flush(logf)
 #endif 
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"IonRates3D_"// &
+          file1=trim(adjustl(results_dir))//"bb_H_IonRates3D_"// &
                trim(adjustl(file1))//base_extension
 
           open(unit=53,file=file1,form="unformatted",status="unknown")
           write(53) mesh(1),mesh(2),mesh(3)
-          write(53) (((real(phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+          write(53) (((real(bb_phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(53)
 
           write(file1,"(f6.3)") zred_now
-          file1=trim(adjustl(results_dir))//"HeatRates3D_"// &
+          file1=trim(adjustl(results_dir))//"bb_He0_IonRates3D_"// &
                trim(adjustl(file1))//base_extension
 
           open(unit=53,file=file1,form="unformatted",status="unknown")
           write(53) mesh(1),mesh(2),mesh(3)
-          write(53) (((real(phiheat(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+          write(53) (((real(bb_phihe_grid(i,j,k,0)),i=1,mesh(1)),j=1,mesh(2)), &
                k=1,mesh(3))
           close(53)
 
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"bb_He1_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(bb_phihe_grid(i,j,k,1)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"bb_HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(bb_phiheat_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+#ifdef QqUASARS
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"qpl_H_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(qpl_phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"qpl_He0_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(qpl_phihe_grid(i,j,k,0)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"qpl_He1_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(qpl_phihe_grid(i,j,k,1)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"qpl_HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(qpl_phiheat_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+#endif
+#ifdef PL
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"pl_H_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(pl_phih_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"pl_He0_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(pl_phihe_grid(i,j,k,0)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"pl_He1_IonRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(pl_phihe_grid(i,j,k,1)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+
+          write(file1,"(f6.3)") zred_now
+          file1=trim(adjustl(results_dir))//"pl_HeatRates3D_"// &
+               trim(adjustl(file1))//base_extension
+
+          open(unit=53,file=file1,form="unformatted",status="unknown")
+          write(53) mesh(1),mesh(2),mesh(3)
+          write(53) (((real(pl_phiheat_grid(i,j,k)),i=1,mesh(1)),j=1,mesh(2)), &
+               k=1,mesh(3))
+          close(53)
+#endif
+          
 #ifdef MPILOG     
           write(logf,*) 'output 3: IonRates3D'
           flush(logf)

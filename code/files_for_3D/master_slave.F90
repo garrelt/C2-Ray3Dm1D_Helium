@@ -245,13 +245,14 @@ contains
 
   !> The slave task in the master-slave setup for distributing
   !! the ray-tracing over the sources over the MPI processes.
-  subroutine do_grid_slave(dt,niter)
+  subroutine do_grid_slave(dt,niter,phase_type)
 
     ! The slave task in the master-slave setup for distributing
     ! the ray-tracing over the sources over the MPI processes.
 
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     integer,intent(in) :: niter !< interation counter, passed on to evolve0D
+    character(len=1),intent(in) :: phase_type
 
     integer :: local_count
     integer :: ns1
@@ -284,7 +285,7 @@ contains
           flush(logf)
 #endif
           ! Do the source at hand
-          call do_source(dt,ns1,niter)
+          call do_source(dt,ns1,niter,phase_type)
           
           ! Update local counter
           local_count=local_count+1

@@ -39,13 +39,13 @@ module material
   ! xh - ionization fractions for one cell
   real(kind=dp),dimension(:,:,:),allocatable :: ndens
   ! Hydrogen ionization fractions associated with the "neutral IGM"
-  real(kind=dp),dimension(:,:,:,:),allocatable :: xh_cold
+  real(kind=dp),dimension(:,:,:,:),allocatable :: xh
   ! Hydrogen ionization fraction associated with (BB) stars
   real(kind=dp),dimension(:,:,:),allocatable :: xh_hot
   ! Helium ionization fractions associated with the "neutral IGM"
-  real(kind=dp),dimension(:,:,:,:),allocatable :: xhe_cold
-  ! Helium ionization fraction associated with (BB) stars
-  real(kind=dp),dimension(:,:,:),allocatable :: xhe_bb
+  real(kind=dp),dimension(:,:,:,:),allocatable :: xhe
+  ! Array of special points
+  logical,dimension(:,:,:),allocatable :: special
   logical isothermal
   real,public :: clumping
   real,dimension(:,:,:),allocatable :: clumping_grid
@@ -209,21 +209,21 @@ contains
  
        
        ! Allocate ionization fraction arrays
-       allocate(xh_cold(mesh(1),mesh(2),mesh(3),0:1))
+       allocate(xh(mesh(1),mesh(2),mesh(3),0:1))
        allocate(xh_hot(mesh(1),mesh(2),mesh(3)))
-       allocate(xhe_cold(mesh(1),mesh(2),mesh(3),0:2))
-       allocate(xhe_hot(mesh(1),mesh(2),mesh(3)))
+       allocate(xhe(mesh(1),mesh(2),mesh(3),0:2))
+       allocate(special(mesh(1),mesh(2),mesh(3)))
        ! Assign ionization fractions. For z = 40 - 20 RECFAST gives 
        ! an average ionization fraction of about 2e-4 for H and
        ! 1e-15 for He. We use this here.
        ! In case of a restart this will be overwritten in xfrac_ini
-       xh_cold(:,:,:,1)=2e-4
-       xh_cold(:,:,:,0)=1.0_dp-xh_cold(:,:,:,1)
-       xhe_cold(:,:,:,1)=1e-15_dp
-       xhe_cold(:,:,:,0)=1.0_dp-xhe_cold(:,:,:,1)
-       xhe_cold(:,:,:,2)=0.0
-       xh_hot(:,:,:)=xh_cold(:,:,:,1)
-       xhe_hot(:,:,:)=xhe_cold(:,:,:,1)
+       xh(:,:,:,1)=2e-4
+       xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
+       xhe(:,:,:,1)=1e-15_dp
+       xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)
+       xhe(:,:,:,2)=0.0
+       xh_hot(:,:,:)=0.0
+       special(:,:,:)=.false.
        ! Initialize LLS parametets
        call LLS_init ()       
     endif
@@ -408,11 +408,11 @@ contains
 !       xfrac_file= "./xfrac3d_"//trim(adjustl(zred_str))//".bin"
        xfrac_file= trim(adjustl(results_dir))// &
             !"Ifront3_"//trim(adjustl(zred_str))//".bin"
-            "xfrac3d_cold"//trim(adjustl(zred_str))//".bin"
+            "xfrac3d"//trim(adjustl(zred_str))//".bin"
        xfrac_file_He1= trim(adjustl(results_dir))// &
-            "xfrac3dHe1_cold"//trim(adjustl(zred_str))//".bin"   
+            "xfrac3dHe1"//trim(adjustl(zred_str))//".bin"   
        xfrac_file_He2= trim(adjustl(results_dir))// &
-            "xfrac3dHe2_cold"//trim(adjustl(zred_str))//".bin"
+            "xfrac3dHe2"//trim(adjustl(zred_str))//".bin"
 
        write(unit=logf,fmt="(2A)") "Reading ionization fractions from ", &
             trim(xfrac_file), "and", trim(xfrac_file_He1), "and",  trim(xfrac_file_He2)
@@ -427,9 +427,9 @@ contains
        else
           read(20) xfrac_real
           ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xh_cold(:,:,:,1)=xfrac_real(:,:,:)
+          xh(:,:,:,1)=xfrac_real(:,:,:)
           !xh(:,:,:,1)=real(xh1_real(:,:,:),dp)
-          xh_cold(:,:,:,0)=1.0_dp-xh_cold(:,:,:,1)
+          xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
        endif
        ! close file
        close(20)
@@ -445,7 +445,7 @@ contains
        else
           read(20) xfrac_real
           ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xhe_cold(:,:,:,1)=xfrac_real(:,:,:)
+          xhe(:,:,:,1)=xfrac_real(:,:,:)
        endif
        ! close file
        close(20)
@@ -461,8 +461,8 @@ contains
        else
           read(20) xfrac_real
           ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xhe_cold(:,:,:,2)=xfrac_real(:,:,:)
-          xhe_cold(:,:,:,0)=1.0_dp-xhe_cold(:,:,:,1)-xhe_cold(:,:,:,2)
+          xhe(:,:,:,2)=xfrac_real(:,:,:)
+          xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)-xhe(:,:,:,2)
        endif
        ! close file
        close(20)
@@ -471,13 +471,13 @@ contains
 
 #ifdef MPI       
     ! Distribute the input parameters to the other nodes
-    call MPI_BCAST(xh_cold,mesh(1)*mesh(2)*mesh(3)*2,MPI_DOUBLE_PRECISION,0,&
+    call MPI_BCAST(xh,mesh(1)*mesh(2)*mesh(3)*2,MPI_DOUBLE_PRECISION,0,&
          MPI_COMM_NEW,mympierror)
-    call MPI_BCAST(xhe_cold,mesh(1)*mesh(2)*mesh(3)*3,MPI_DOUBLE_PRECISION,0,&
+    call MPI_BCAST(xhe,mesh(1)*mesh(2)*mesh(3)*3,MPI_DOUBLE_PRECISION,0,&
          MPI_COMM_NEW,mympierror)
 #endif
     
-  end subroutine xfrac_ini
+  end subroutine xfrac_ini_cold
 
   ! ===========================================================================
 
@@ -505,13 +505,9 @@ contains
        write(zred_str,"(f6.3)") zred_now
        xfrac_file= trim(adjustl(results_dir))// &
             "xfrac3d_hot"//trim(adjustl(zred_str))//".bin"
-       xfrac_file_He1= trim(adjustl(results_dir))// &
-            "xfrac3dHe1_hot"//trim(adjustl(zred_str))//".bin"   
-       xfrac_file_He2= trim(adjustl(results_dir))// &
-            "xfrac3dHe2_hot"//trim(adjustl(zred_str))//".bin"
 
-       write(unit=logf,fmt="(2A)") "Reading ionization fractions from ", &
-            trim(xfrac_file), "and", trim(xfrac_file_He1), "and",  trim(xfrac_file_He2)
+       write(unit=logf,fmt="(2A)") "Reading hot ionization fractions from ", &
+            trim(xfrac_file)
        ! Open ionization fractions file
        open(unit=20,file=xfrac_file,form="unformatted",status="old")
        
@@ -528,24 +524,6 @@ contains
        ! close file
        close(20)
 
-!**** He1
-       ! Open ionization fractions file
-       open(unit=20,file=xfrac_file_He1,form="unformatted",status="old")       
-       ! Read in data
-       read(20) m1,m2,m3
-       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
-          write(logf,*) "Warning: file with ionization fractions unusable"
-          write(logf,*) "mesh found in file: ",m1,m2,m3
-       else
-          read(20) xfrac_real
-          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-          xhe_hot(:,:,:)=xfrac_real(:,:,:)
-       endif
-       ! close file
-       close(20)
-
-       ! He2+ is assumed to be zero in the hot phase?
-       
        deallocate(xfrac_real)
     endif
 
@@ -553,11 +531,9 @@ contains
     ! Distribute the input parameters to the other nodes
     call MPI_BCAST(xh_hot,mesh(1)*mesh(2)*mesh(3),MPI_DOUBLE_PRECISION,0,&
          MPI_COMM_NEW,mympierror)
-    call MPI_BCAST(xhe_hot,mesh(1)*mesh(2)*mesh(3),MPI_DOUBLE_PRECISION,0,&
-         MPI_COMM_NEW,mympierror)
 #endif
     
-  end subroutine xfrac_ini
+  end subroutine xfrac_ini_hot
 
   ! ===========================================================================
   

@@ -37,37 +37,39 @@ module evolve_data
   ! Grid variables
 
   !> H Photo-ionization rate on the entire grid
-  real(kind=dp),dimension(:,:,:),allocatable :: phih_grid
-  !> He Photo-ionization rate on the entire grid
-  real(kind=dp),dimension(:,:,:,:),allocatable :: phihe_grid
-  !> Heating  rate on the entire grid
-  real(kind=dp),dimension(:,:,:),allocatable :: phiheat
-#if defined(PL) || defined(QUASARS)
-  !> H Photo-ionization rate on the entire grid
   real(kind=dp),dimension(:,:,:),allocatable :: bb_phih_grid
+  !> He Photo-ionization rate on the entire grid
+  real(kind=dp),dimension(:,:,:,:),allocatable :: bb_phihe_grid
   !> Heating  rate on the entire grid
-  real(kind=dp),dimension(:,:,:),allocatable :: bb_phiheat
-#endif
+  real(kind=dp),dimension(:,:,:),allocatable :: bb_phiheat_grid
 #ifdef PL
   !> H Photo-ionization rate on the entire grid
   real(kind=dp),dimension(:,:,:),allocatable :: pl_phih_grid
+  !> He Photo-ionization rate on the entire grid
+  real(kind=dp),dimension(:,:,:,:),allocatable :: pl_phihe_grid
   !> Heating  rate on the entire grid
-  real(kind=dp),dimension(:,:,:),allocatable :: pl_phiheat
+  real(kind=dp),dimension(:,:,:),allocatable :: pl_phiheat_grid
 #endif
 
 #ifdef QUASARS
   !> H Photo-ionization rate on the entire grid
   real(kind=dp),dimension(:,:,:),allocatable :: qpl_phih_grid
+  !> He Photo-ionization rate on the entire grid
+  real(kind=dp),dimension(:,:,:,:),allocatable :: qpl_phihe_grid
   !> Heating  rate on the entire grid
-  real(kind=dp),dimension(:,:,:),allocatable :: qpl_phiheat
+  real(kind=dp),dimension(:,:,:),allocatable :: qpl_phiheat_grid
 #endif
   
   !> Time-averaged H ionization fraction
   real(kind=dp),dimension(:,:,:,:),allocatable :: xh_av
+  !> Time-averaged fraction of cell which is hot and ionized
+  real(kind=dp),dimension(:,:,:),allocatable,target :: xh_hot_av
   !> Time-averaged He ionization fraction
   real(kind=dp),dimension(:,:,:,:),allocatable :: xhe_av
   !> Intermediate result for H ionization fraction
   real(kind=dp),dimension(:,:,:,:),allocatable :: xh_intermed
+  !> Intermediate result for fraction of cell which is hot and ionized
+  real(kind=dp),dimension(:,:,:),allocatable :: xh_hot_intermed
   !> Intermediate result for He ionization fraction
   real(kind=dp),dimension(:,:,:,:),allocatable :: xhe_intermed
   !> H0 Column density (outgoing)
@@ -92,36 +94,37 @@ contains
   !> Allocate the arrays needed for evolve
   subroutine evolve_ini ()
     
-    allocate(phih_grid(mesh(1),mesh(2),mesh(3)))
-    phih_grid=0.0 ! Needs value for initial output
-    allocate(phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
-    allocate(phiheat(mesh(1),mesh(2),mesh(3)))
-    phiheat=0.0 ! Needs value for initial output
-#if defined(PL) || defined(QUASARS)
     allocate(bb_phih_grid(mesh(1),mesh(2),mesh(3)))
     bb_phih_grid=0.0 ! Needs value for initial output
-    allocate(bb_phiheat(mesh(1),mesh(2),mesh(3)))
-    bb_phiheat=0.0 ! Needs value for initial output
-#endif
+    allocate(bb_phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
+    bb_phihe_grid=0.0 ! Needs value for initial output
+    allocate(bb_phiheat_grid(mesh(1),mesh(2),mesh(3)))
+    bb_phiheat_grid=0.0 ! Needs value for initial output
 
 #ifdef PL
     allocate(pl_phih_grid(mesh(1),mesh(2),mesh(3)))
     pl_phih_grid=0.0 ! Needs value for initial output
-    allocate(pl_phiheat(mesh(1),mesh(2),mesh(3)))
-    pl_phiheat=0.0 ! Needs value for initial output
+    allocate(pl_phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
+    pl_phihe_grid=0.0 ! Needs value for initial output
+    allocate(pl_phiheat_grid(mesh(1),mesh(2),mesh(3)))
+    pl_phiheat_grid=0.0 ! Needs value for initial output
 #endif
 
 #ifdef QUASARS
     allocate(qpl_phih_grid(mesh(1),mesh(2),mesh(3)))
     qpl_phih_grid=0.0 ! Needs value for initial output
-    allocate(qpl_phiheat(mesh(1),mesh(2),mesh(3)))
-    qpl_phiheat=0.0 ! Needs value for initial output
+    allocate(qpl_phihe_grid(mesh(1),mesh(2),mesh(3),0:1))
+    qpl_phihe_grid=0.0 ! Needs value for initial output
+    allocate(qpl_phiheat_grid(mesh(1),mesh(2),mesh(3)))
+    qpl_phiheat_grid=0.0 ! Needs value for initial output
 #endif
     
     allocate(xh_av(mesh(1),mesh(2),mesh(3),0:1))
+    allocate(xh_hot_av(mesh(1),mesh(2),mesh(3)))
     allocate(xhe_av(mesh(1),mesh(2),mesh(3),0:2))
 
     allocate(xh_intermed(mesh(1),mesh(2),mesh(3),0:1))
+    allocate(xh_hot_intermed(mesh(1),mesh(2),mesh(3)))
     allocate(xhe_intermed(mesh(1),mesh(2),mesh(3),0:2))
 
     allocate(coldensh_out(mesh(1),mesh(2),mesh(3)))
