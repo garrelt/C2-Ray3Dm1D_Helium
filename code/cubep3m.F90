@@ -54,7 +54,7 @@ module nbody
   !integer,parameter :: n_box=6144  !< cells/side (in N-body,fine grid)
 
   !> Path to directory containing directory with density files:
-  character(len=*),parameter,private :: dir_dens_path = "../" 
+  character(len=*),parameter,private :: dir_dens_path = "./" 
   !> Name of directory with density files
   !character(len=180),parameter,private :: dir_dens_name= "coarser_densities/"
   character(len=*),parameter,private :: dir_dens_name= "coarser_densities/halos_removed/"

@@ -370,11 +370,11 @@ contains
 #endif 
           endif
 
-#ifdef MPILOG
-          write(logf,*) allocated(phih_grid)
-          write(logf,*) 'shape phih_grid: ',shape(phih_grid)
-          flush(logf)
-#endif 
+!#ifdef MPILOG
+!          write(logf,*) allocated(phih_grid)
+!          write(logf,*) 'shape phih_grid: ',shape(phih_grid)
+!          flush(logf)
+!#endif 
           write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"bb_H_IonRates3D_"// &
                trim(adjustl(file1))//base_extension

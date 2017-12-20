@@ -27,9 +27,10 @@ module sizes
 
 
   !for test problem
-  !integer,dimension(Ndim),parameter,public :: mesh=(/ 10, 10, 10 /)
-  integer,dimension(Ndim),parameter,public :: mesh=(/ 100, 100, 100 /)
+  integer,dimension(Ndim),parameter,public :: mesh=(/ 20, 20, 20 /)
+!  integer,dimension(Ndim),parameter,public :: mesh=(/ 100, 100, 100 /)
   !integer,dimension(Ndim),parameter,public :: mesh=(/ 150, 150, 150 /)
+!  integer,dimension(Ndim),parameter,public :: mesh=(/ 250, 250, 250 /)
   !for 3072^3 particles, 6144^3 grid, 114/h Mpc box
   !integer,dimension(Ndim),parameter,public :: mesh=(/ 256, 256, 256 /)
   !integer,dimension(Ndim),parameter,public :: mesh=(/ 384, 384, 384 /)

@@ -614,7 +614,7 @@ end subroutine report_on_seds
             S_star_band2, " s^-1"
        write(logf,'(A,A,(ES12.5),A//)') source_string," luminosity in band 2: ", &
             L_star_band2, " erg s^-1"
-       write(logf,'(A,A,A(ES12.5),A//)') " Number of ",source_string," photons in band 3: ", &
+       write(logf,'(A,A,A,(ES12.5),A//)') " Number of ",source_string," photons in band 3: ", &
             S_star_band3, " s^-1"
        write(logf,'(A,A,(ES12.5),A//)') source_string," luminosity in band 3: ", &
             S_star_band3, " erg s^-1"

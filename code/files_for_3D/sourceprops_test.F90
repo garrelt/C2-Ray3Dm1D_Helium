@@ -36,6 +36,8 @@ module sourceprops
        sourcelistfile_base="test_sources.dat"
 
   integer :: NumSrc=0 !< Number of sources 
+  integer :: NumPLSrc=0 !< Number of sources 
+  integer :: NumQSrc=0 !< Number of sources 
   integer,dimension(:,:),allocatable :: srcpos
   real(kind=dp),dimension(:),allocatable :: NormFlux !< normalized ionizing flux of sources
 #ifdef PL
@@ -114,14 +116,15 @@ contains
 
        ! Establish number of sources
        read(sourcefile,*) NumSrc
-
-   
+    NumQSrc=NumSrc
+    NumPLSrc=NumSrc 
 
     endif ! end of rank 0 test
     
 #ifdef MPI
     ! Distribute source number to all other nodes
     call MPI_BCAST(NumSrc,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
+    call MPI_BCAST(QNumSrc,1,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
 
 #ifdef MPILOG

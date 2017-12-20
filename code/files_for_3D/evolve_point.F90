@@ -629,7 +629,7 @@ contains
        phi%photo_cell_HI=phi%photo_cell_HI+pl_phi%photo_cell_HI
        phi%photo_cell_HeI=phi%photo_cell_HeI+pl_phi%photo_cell_HeI
        phi%photo_cell_HeII=phi%photo_cell_HeII+pl_phi%photo_cell_HeII
-       phi%heat=phi%heat+qpl_phi%heat
+       phi%heat=phi%heat+pl_phi%heat
 #endif
        special(pos(1),pos(2),pos(3))=.false.
     endif
