@@ -243,7 +243,8 @@ contains
 
           ! Report
           if (rank == 0) then
-             write(logf,*) "Multiple sources convergence reached"
+             write(logf,"(2A)") "Multiple sources convergence reached for phase ", &
+                  phase_type
              write(logf,*) "Test 1 values: ",conv_flag, conv_criterion
              !write(logf,*) "Test 2 values: ",rel_change_sum_xh, &
              !     convergence_fraction
