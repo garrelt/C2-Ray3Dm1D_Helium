@@ -415,7 +415,7 @@ contains
                k=1,mesh(3))
           close(53)
 
-#ifdef QqUASARS
+#ifdef QUASARS
           write(file1,"(f6.3)") zred_now
           file1=trim(adjustl(results_dir))//"qpl_H_IonRates3D_"// &
                trim(adjustl(file1))//base_extension
