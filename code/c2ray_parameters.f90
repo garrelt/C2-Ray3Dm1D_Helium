@@ -91,7 +91,7 @@ module c2ray_parameters
   !> Source properties: Number of different stellar source types 
   integer,parameter :: Number_Sourcetypes=2
   !> Source properties: Photon per atom for different source types (high to low mass)
-  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 /)
+  real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 8.2, 2.0 /)
   !real,dimension(Number_Sourcetypes),parameter :: phot_per_atom= (/ 10.0, 150.0 , 0.0 /)
   !> Source properties: X-ray photons per baryon. Mesinger et al. (2012) use
   !! 0.02 as their nominal value. Note that this depends on your integration
