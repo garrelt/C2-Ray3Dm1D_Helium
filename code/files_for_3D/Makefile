@@ -183,7 +183,7 @@ GADGET2= clocks.o gadget.o grid.o tped.o mat_ini_Gadget.o sourceprops_gadget.o
 #--------TEST----------------------------------------------------------------
 
 C2Ray_3D_test_kyl_periodic: F90=$(FC)
-C2Ray_3D_test_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DPL -DQUASARS
+C2Ray_3D_test_kyl_periodic: F90FLAGS = $(F90FLAGS1) -DPL
 C2Ray_3D_test_kyl_periodic: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TEST) $(GENERAL1) sourceprops_test.o $(EVOLVE1) output.o C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2) sourceprops_test.o $(EVOLVE2) output.o C2Ray.o
 
@@ -193,7 +193,7 @@ C2Ray_3D_test_kyl_periodic_omp: $(UTILS1) sizes.o $(CONSTANTS1) ../no_mpi.o $(TE
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) no_mpi.o $(TEST_2) $(GENERAL2) sourceprops_test.o $(EVOLVE2) output.o C2Ray.o
 
 C2Ray_3D_test_kyl_periodic_omp_mpi: F90=$(MPIFC)
-C2Ray_3D_test_kyl_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)  $(MPI_FLAGS)
+C2Ray_3D_test_kyl_periodic_omp_mpi: F90FLAGS = $(F90FLAGS1) $(OPENMP_FLAGS)  $(MPI_FLAGS) 
 C2Ray_3D_test_kyl_periodic_omp_mpi: $(UTILS1) sizes.o $(CONSTANTS1) ../mpi.o $(TEST) $(GENERAL1) sourceprops_test.o $(EVOLVE1) output.o C2Ray.o
 	$(F90) $(OPTIONS) -o $@ $(UTILS2) sizes.o $(CONSTANTS2) mpi.o $(TEST_2) $(GENERAL2) sourceprops_test.o $(EVOLVE2) output.o C2Ray.o
 
