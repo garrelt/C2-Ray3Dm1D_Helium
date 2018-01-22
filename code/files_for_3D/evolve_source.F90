@@ -153,6 +153,7 @@ contains
     if (phase_type /= "H" .and. NormFlux_XRay /= 0.0) then
        last_r(:)=lastpos_r(:)
        last_l(:)=lastpos_l(:)
+       write(logf,*) "Trace whole mesh for source ",ns," with XRay ", NormFlux_XRay
     else
        ! If not we set it to srcpos
        last_r(:)=srcpos(:,ns) ! to pass the first while test
@@ -173,6 +174,8 @@ contains
        !last_r(:)=min(srcpos(:,ns)+subboxsize*nbox,lastpos_r(:))
        !last_l(:)=max(srcpos(:,ns)-subboxsize*nbox,lastpos_l(:))
 
+       write(logf,*) ns,"Loss: ",photon_loss_src, 1e-10*total_source_flux
+       
        ! OpenMP: if we have multiple OpenMP threads (nthreads > 1) we 
        ! parallelize over the threads by doing independent parts of
        ! the mesh.
