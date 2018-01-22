@@ -44,7 +44,7 @@ module nbody
 
   character(len=10),parameter :: nbody_type="test" !< ID of Nbody type
 
-  real(kind=dp),parameter :: boxsize=20.0 !0.021!0.0105  !< Box size in Mpc/h comoving
+  real(kind=dp),parameter :: boxsize=100.0 !0.021!0.0105  !< Box size in Mpc/h comoving
 
   ! redshift sequence information
   integer, public :: NumZred               !< number of redshifts
