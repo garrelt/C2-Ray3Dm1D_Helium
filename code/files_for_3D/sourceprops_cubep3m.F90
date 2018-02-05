@@ -362,7 +362,6 @@ contains
        do ns0=1,NumSrc0
           read(50,*) srclist(1:ncolumns_srcfile)
           srcpos0(1:3)=int(srclist(1:3))
-
           ! Process the source list entry through the suppression
           ! algorithm
           if (xh(srcpos0(1),srcpos0(2),srcpos0(3),1) < StillNeutral) then
@@ -437,7 +436,7 @@ contains
             trim(adjustl(sourcelistfilesuppress))
 #ifdef QUASARS
        read(49,*) NumSrc, qpl
-       if (qpl/=qpl_index_nominal-1) then
+       if (qpl/=qpl_index-1) then
           write(logf,*) "Warning: wrong power law index for quasars"
           stop 
        endif

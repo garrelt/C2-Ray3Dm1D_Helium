@@ -147,7 +147,6 @@ contains
 
     ! Initialize the photon_loss_src variable to the entire source flux
     photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
-
     ! If X-ray sources are active (and being used, so in "H" phase),
     ! we trace the entire grid so we set last_* to lastpos_*
     if (phase_type /= "H" .and. NormFlux_XRay /= 0.0) then
@@ -164,6 +163,8 @@ contains
     ! NOTE: make this limit on the photon_loss a fraction of
     ! a source flux loss_fraction*NormFlux(ns)*S_star)
     do while (photon_loss_src > 1e-10*total_source_flux)
+         !.and. last_r(3) < lastpos_r(3) &
+         !.and. last_l(3) > lastpos_l(3))
        nbox=nbox+1 ! increase subbox counter
        photon_loss_src = 0.0 ! reset photon_loss_src to zero
        photon_loss_src_thread(:) = 0.0 ! reset photon_loss_src to zero
@@ -174,7 +175,7 @@ contains
        !last_r(:)=min(srcpos(:,ns)+subboxsize*nbox,lastpos_r(:))
        !last_l(:)=max(srcpos(:,ns)-subboxsize*nbox,lastpos_l(:))
 
-       write(logf,*) ns,"Loss: ",photon_loss_src, 1e-10*total_source_flux
+       !write(logf,*) ns,"Loss: ",photon_loss_src, 1e-10*total_source_flux
        
        ! OpenMP: if we have multiple OpenMP threads (nthreads > 1) we 
        ! parallelize over the threads by doing independent parts of
@@ -270,6 +271,7 @@ contains
     photon_loss(1)=photon_loss(1) + photon_loss_src
 
     ! Sum the total number of subboxes used for reporting later
+    !write(*,*) NormFlux_XRay
     if (phase_type /= "H" .and. NormFlux_XRay /= 0.0) then
        ! Estimate the equivalent number of subboxes if we trace
        ! the entire traceable mesh (lastpos). 
