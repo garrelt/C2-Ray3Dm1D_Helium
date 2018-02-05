@@ -102,7 +102,7 @@ contains
   ! ===========================================================================
 
   !> Evolve the entire grid over a time step dt
-  subroutine evolve3D (time,dt,restart)
+  subroutine evolve3D (time,dt,iter_restart)
 
     ! Calculates the evolution of the hydrogen ionization state
      
@@ -128,7 +128,7 @@ contains
     ! The time step
     real(kind=dp),intent(in) :: time !< time 
     real(kind=dp),intent(in) :: dt !< time step
-    integer,intent(in) :: restart !< restart flag
+    integer,intent(in) :: iter_restart !< iteration restart flag
 
     ! Loop variables
     integer :: niter  ! iteration counter
@@ -155,12 +155,12 @@ contains
     if (rank == 0) write(timefile,"(A,F8.1)") &
          "Time before starting iteration: ", timestamp_wallclock ()
 
-    !if (restart /= 0) check_dump_for_sourcetype(restart,niter,source_type)
+    !if (iter_restart /= 0) check_dump_for_sourcetype(iter_restart,niter,source_type)
     ! 
     ! Iterate to reach convergence for multiple sources
     ! Process different groups of sources separately
     ! initialize average and intermediate results to initial values
-    if (restart == 0) then
+    if (iter_restart == 0) then
        do k=1,mesh(3)
           do j=1,mesh(2)
              do i=1,mesh(1)
@@ -193,7 +193,7 @@ contains
        phase_type="H"
     else
        ! Reload xh_av,xh_intermed,photon_loss,niter
-       call start_from_dump(restart,niter,phase_type)
+       call start_from_dump(iter_restart,niter,phase_type)
        call global_pass (conv_flag,dt,phase_type)
     endif
 
@@ -371,17 +371,17 @@ contains
 
   ! ===========================================================================
 
-  subroutine start_from_dump(restart,niter,phase_type)
+  subroutine start_from_dump(iter_restart,niter,phase_type)
 
     use material, only: temperature_grid
 
-    integer,intent(in) :: restart  ! restart flag
+    integer,intent(in) :: iter_restart  ! restart flag
     integer,intent(out) :: niter  ! iteration counter
     character(len=1),intent(out) :: phase_type
 
     character(len=20) :: iterfile
 
-    if (restart == 0) then
+    if (iter_restart == 0) then
        if (rank == 0) &
             write(logf,*) "Warning: start_from_dump called incorrectly"
     else
@@ -392,7 +392,7 @@ contains
                "Time before reading iterdump: ", timestamp_wallclock ()
 
           ! Set file to read (depending on restart flag)
-          select case (restart)
+          select case (iter_restart)
           case (1) 
              iterfile="iterdump1.bin"
           case (2) 
