@@ -408,11 +408,11 @@ contains
 !       xfrac_file= "./xfrac3d_"//trim(adjustl(zred_str))//".bin"
        xfrac_file= trim(adjustl(results_dir))// &
             !"Ifront3_"//trim(adjustl(zred_str))//".bin"
-            "xfrac3d"//trim(adjustl(zred_str))//".bin"
+            "xfrac3d_cold"//trim(adjustl(zred_str))//".bin"
        xfrac_file_He1= trim(adjustl(results_dir))// &
-            "xfrac3dHe1"//trim(adjustl(zred_str))//".bin"   
+            "xfrac3dHe1_cold"//trim(adjustl(zred_str))//".bin"   
        xfrac_file_He2= trim(adjustl(results_dir))// &
-            "xfrac3dHe2"//trim(adjustl(zred_str))//".bin"
+            "xfrac3dHe2_cold"//trim(adjustl(zred_str))//".bin"
 
        write(unit=logf,fmt="(2A)") "Reading ionization fractions from ", &
             trim(xfrac_file), "and", trim(xfrac_file_He1), "and",  trim(xfrac_file_He2)
