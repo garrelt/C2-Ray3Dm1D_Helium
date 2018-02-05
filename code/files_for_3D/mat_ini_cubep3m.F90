@@ -483,7 +483,8 @@ contains
 
   subroutine xfrac_ini_hot (zred_now)
 
-    ! Initializes "hot" ionization fractions on the grid (at redshift zred_now).
+    ! Initializes "hot" ionization fractions and the special flag
+    ! on the grid (at redshift zred_now)
 
     ! Author: Garrelt Mellema
 
@@ -492,8 +493,7 @@ contains
     real(kind=dp),intent(in) :: zred_now
     
     character(len=512) :: xfrac_file
-    character(len=512) :: xfrac_file_He1
-    character(len=512) :: xfrac_file_He2
+    character(len=512) :: special_file
     character(len=6) :: zred_str
     integer :: m1,m2,m3
     ! Array needed to read in 4B reals
@@ -505,9 +505,11 @@ contains
        write(zred_str,"(f6.3)") zred_now
        xfrac_file= trim(adjustl(results_dir))// &
             "xfrac3d_hot"//trim(adjustl(zred_str))//".bin"
+       special_file = trim(adjustl(results_dir))// &
+            "special"//trim(adjustl(zred_str))//".bin"
 
        write(unit=logf,fmt="(2A)") "Reading hot ionization fractions from ", &
-            trim(xfrac_file)
+            trim(xfrac_file), " and ",trim(special_file)
        ! Open ionization fractions file
        open(unit=20,file=xfrac_file,form="unformatted",status="old")
        
@@ -525,11 +527,27 @@ contains
        close(20)
 
        deallocate(xfrac_real)
+
+       ! Open special flag file
+       open(unit=20,file=special_file,form="unformatted",status="old")
+       
+       ! Read in data
+       read(20) m1,m2,m3
+       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
+          write(logf,*) "Warning: file with special flags unusable"
+          write(logf,*) "mesh found in file: ",m1,m2,m3
+       else
+          read(20) special
+       endif
+       ! close file
+       close(20)
     endif
 
 #ifdef MPI       
     ! Distribute the input parameters to the other nodes
     call MPI_BCAST(xh_hot,mesh(1)*mesh(2)*mesh(3),MPI_DOUBLE_PRECISION,0,&
+         MPI_COMM_NEW,mympierror)
+    call MPI_BCAST(special,mesh(1)*mesh(2)*mesh(3),MPI_LOGICAL,0,&
          MPI_COMM_NEW,mympierror)
 #endif
     

@@ -166,7 +166,12 @@ contains
              do i=1,mesh(1)
                 if (special(i,j,k)) then
                    xh_av(i,j,k,0)=(1.0_dp-xh_hot(i,j,k))*xh(i,j,k,0)
-                   xhe_av(i,j,k,1)=xh_hot(i,j,k)*xhe(i,j,k,1)
+                   ! We assume that in the partially ionized cells, the
+                   ! He2+ fraction is the same over the entire cell.
+                   ! The He+ fraction is 1 in the hot part and taken
+                   ! from the cold value in the cold part.
+                   xhe_av(i,j,k,1)=(1.0-xhe(:,:,:,2))*(xh_hot(i,j,k)+ &
+                        (1.0-xh_hot(i,j,k))*xhe(i,j,k,1)
                 else
                    xh_av(i,j,k,0)=xh(i,j,k,0)
                    xhe_av(i,j,k,1)=xhe(i,j,k,1)
@@ -174,17 +179,12 @@ contains
              enddo
           enddo
        enddo
-       !where(special == .true.)
-       !   xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh(:,:,:,0)
-       !   xhe_av(:,:,:,1)=xh_hot(:,:,:)*xhe(:,:,:,1)
-       !elsewhere
-       !   xh_av(:,:,:,0)=xh(:,:,:,0)
-       !   xhe_av(:,:,:,1)=xhe(:,:,:,1)
-       !endwhere
        xh_hot_av(:,:,:)=xh_hot(:,:,:)
        xh_hot_intermed(:,:,:)=xh_hot(:,:,:)
        xh_av(:,:,:,1)=xh_hot(:,:,:)*xh(:,:,:,1)
        xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
+       ! The He2+ fraction is assumed to be the same in the hot and cold
+       ! phaes
        xhe_av(:,:,:,2)=xhe(:,:,:,2)
        xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
        xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
