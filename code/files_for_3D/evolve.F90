@@ -170,8 +170,8 @@ contains
                    ! He2+ fraction is the same over the entire cell.
                    ! The He+ fraction is 1 in the hot part and taken
                    ! from the cold value in the cold part.
-                   xhe_av(i,j,k,1)=(1.0-xhe(:,:,:,2))*(xh_hot(i,j,k)+ &
-                        (1.0-xh_hot(i,j,k))*xhe(i,j,k,1)
+                   xhe_av(i,j,k,1)=(1.0-xhe(i,j,k,2))*(xh_hot(i,j,k)+ &
+                        (1.0-xh_hot(i,j,k))*xhe(i,j,k,1))
                 else
                    xh_av(i,j,k,0)=xh(i,j,k,0)
                    xhe_av(i,j,k,1)=xhe(i,j,k,1)

@@ -437,7 +437,7 @@ contains
             trim(adjustl(sourcelistfilesuppress))
 #ifdef QUASARS
        read(49,*) NumSrc, qpl
-       if (qpl/=qpl_index_nominal-1) then
+       if (qpl/=qpl_index-1) then
           write(logf,*) "Warning: wrong power law index for quasars"
           stop 
        endif
