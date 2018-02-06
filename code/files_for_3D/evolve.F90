@@ -192,7 +192,6 @@ contains
        ! phaes
        xhe_av(:,:,:,2)=xhe(:,:,:,2)
        xhe_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
-       xh_av(:,:,:,1)=1.0_dp-xh_av(:,:,:,0)
        xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
        niter=0 ! iteration starts at zero
        conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence
