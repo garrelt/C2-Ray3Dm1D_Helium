@@ -166,7 +166,7 @@ contains
     ! Process different groups of sources separately
     ! initialize average and intermediate results to initial values
     if (iter_restart == 0) then
-       xh_av(:,:,:,:)=xh(:,:,:,;)
+       xh_av(:,:,:,:)=xh(:,:,:,:)
        xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
        xh_hot_av(:,:,:)=xh_hot(:,:,:)
        xh_hot_intermed(:,:,:)=xh_hot(:,:,:)
@@ -643,9 +643,12 @@ contains
     endif
     
     ! Report on photon conservation
-    call calculate_photon_statistics(dt,xh_intermed,xh_av,xhe_intermed,xhe_av) 
-    call report_photonstatistics (dt)
+    if (phase_type == "C") then
+       call calculate_photon_statistics(dt,xh_intermed,xh_av,xhe_intermed,xhe_av) 
+       call report_photonstatistics (dt)
 
+    endif
+    
   end subroutine global_pass
 
   ! ===========================================================================
