@@ -502,26 +502,26 @@ contains
        
        ! Content depends on what sources are being used
 #if defined(QUASARS) && defined(PL)
-       format_str = "(3i4,2f10.3,1es15.3)"!,1e10.3)"
+       format_str = "(3i4,2f15.3,1es15.3)"!,1e10.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(3))
        temparray(1) = SrcMass(ns0,0)
        temparray(2) = NormFluxPL(ns0)
        temparray(3) = NormFluxQPL(ns0)
 #elif defined(QUASARS)
-       format_str = "(3i4,1f10.3,1es15.3)"
+       format_str = "(3i4,1f15.3,1es15.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(2))   
        temparray(1) = SrcMass(ns0,0)
        temparray(2) = NormFluxQPL(ns0)
 #elif defined(PL)
-       format_str = "(3i4,2f10.3)"
+       format_str = "(3i4,2f15.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(2))
        temparray(1) = SrcMass(ns0,0)
        temparray(2) = NormFluxPL(ns0)
 #else
-       format_str = "(3i4,1f10.3)"
+       format_str = "(3i4,1f15.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(1))
        temparray(1) = SrcMass(ns0,0)
