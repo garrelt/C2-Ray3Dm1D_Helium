@@ -46,6 +46,14 @@ module sourceprops
   integer,parameter :: QSO=6
   !> number of columns in source list with quasars
   integer,parameter,private :: ncolumns_srcfile=6
+  !> number of columns in saved source list
+#if defined(QUASARS) && defined(PL)
+  integer,parameter,private :: ncolumns_savedsrcfile=6
+#elif defined(QUASARS) || defined(PL)
+  integer,parameter,private :: ncolumns_savedsrcfile=5
+#else
+  integer,parameter,private :: ncolumns_savedsrcfile=4
+#endif
 
   !> base name of source list files
   character(len=100),parameter,private :: &
@@ -397,6 +405,9 @@ contains
           endif
 
        enddo
+
+       ! Close source file
+       close(50)
        
        ! Collect total source mass (weigthed with efficiency factor
        ! in case of the Iliev et al source model).
@@ -426,36 +437,21 @@ contains
 
        ! Data in saved source list depends on what sources were
        ! recorded / are being used.
-#if defined(QUASARS) && defined(PL)
-         if (allocated(temparray)) deallocate(temparray)
-          allocate(temparray(3))
-#elif defined(QUASARS)
-          if (allocated(temparray)) deallocate(temparray)
-          allocate(temparray(2))   
-#elif defined(PL)
-          if (allocated(temparray)) deallocate(temparray)
-          allocate(temparray(2))
-#else
-          if (allocated(temparray)) deallocate(temparray)
-          allocate(temparray(1))
-#endif
 
        do ns0=1,NumSrc
+          read(49,*) srclist(1:ncolumns_savedsrcfile)
+          srcpos0(1:3)=int(srclist(1:3))
           
-          read(49,*) srcpos(1,ns0),srcpos(2,ns0),srcpos(3,ns0),&
-               temparray
-          
-          SrcMass(ns0,0) = temparray(1)
+          SrcMass(ns0,0) = srclist(4)
 #if defined(QUASARS) && defined(PL)
-          NormFluxPL(ns0) = temparray(2)
-          NormFluxQPL(ns0) = temparray(3)
+          NormFluxPL(ns0) = srclist(5)
+          NormFluxQPL(ns0) = srclist(6)
 #elif defined(QUASARS)
-          NormFluxQPL(ns0) = temparray(2)
+          NormFluxQPL(ns0) = srclist(5)
 #elif defined(PL)
-          NormFluxPL(ns0) = temparray(2)
+          NormFluxPL(ns0) = srclist(5)
 #endif
        enddo
-       deallocate(temparray)
        close(49)
     endif ! of restart test
     
