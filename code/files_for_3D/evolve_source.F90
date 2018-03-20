@@ -83,6 +83,9 @@ contains
     ! Total ionizing photon rate of all contributions to the source
     real(kind=dp) :: total_source_flux
 
+    ! Sum of Xray flux of the source 
+    real(kind=dp) :: NormFlux_Xray
+
     ! Mesh position of the cell being treated
     integer,dimension(Ndim) :: rtpos
       
@@ -128,24 +131,52 @@ contains
 #ifdef QUASARS
     if (phase_type /= "H") &
          total_source_flux=total_source_flux+NormFluxQPL(ns)*qpl_S_star 
-#endif     
-    photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
-    last_r(:)=srcpos(:,ns) ! to pass the first while test
-    last_l(:)=srcpos(:,ns) ! to pass the first while test
+#endif
 
+    ! Define the X-ray flux for use below. We want to trace the entire
+    ! volume if an Xray source is active
+#if defined(QUASARS) && defined(PL)
+    NormFlux_Xray=NormFluxPL(ns)+NormFluxQPL(ns)
+#elif defined(QUASARS)
+    NormFlux_Xray=NormFluxQPL(ns)
+#elif defined(PL)
+    NormFlux_Xray=NormFluxPL(ns)
+#else
+    NormFlux_Xray=0.0
+#endif
+
+    ! Initialize the photon_loss_src variable to the entire source flux
+    photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
+    ! If X-ray sources are active (and being used, so in "H" phase),
+    ! we trace the entire grid so we set last_* to lastpos_*
+    if (phase_type /= "H" .and. NormFlux_XRay /= 0.0) then
+       last_r(:)=lastpos_r(:)
+       last_l(:)=lastpos_l(:)
+       write(logf,*) "Trace whole mesh for source ",ns," with XRay ", NormFlux_XRay
+    else
+       ! If not we set it to srcpos
+       last_r(:)=srcpos(:,ns) ! to pass the first while test
+       last_l(:)=srcpos(:,ns) ! to pass the first while test
+    endif
+    
     ! Loop through boxes of increasing size
     ! NOTE: make this limit on the photon_loss a fraction of
     ! a source flux loss_fraction*NormFlux(ns)*S_star)
-    do while (photon_loss_src > 1e-10*total_source_flux &
-    !do while (all(photon_loss_src(:) /= 0.0) &
-         .and. last_r(3) < lastpos_r(3) &
-         .and. last_l(3) > lastpos_l(3))
+    do while (photon_loss_src > 1e-10*total_source_flux)
+         !.and. last_r(3) < lastpos_r(3) &
+         !.and. last_l(3) > lastpos_l(3))
        nbox=nbox+1 ! increase subbox counter
        photon_loss_src = 0.0 ! reset photon_loss_src to zero
        photon_loss_src_thread(:) = 0.0 ! reset photon_loss_src to zero
-       last_r(:)=min(srcpos(:,ns)+subboxsize*nbox,lastpos_r(:))
-       last_l(:)=max(srcpos(:,ns)-subboxsize*nbox,lastpos_l(:))
 
+       ! Increase the subbox incrementally
+       last_r(:)=min(last_r(:)+subboxsize,lastpos_r(:))
+       last_l(:)=max(last_l(:)-subboxsize,lastpos_l(:))
+       !last_r(:)=min(srcpos(:,ns)+subboxsize*nbox,lastpos_r(:))
+       !last_l(:)=max(srcpos(:,ns)-subboxsize*nbox,lastpos_l(:))
+
+       !write(logf,*) ns,"Loss: ",photon_loss_src, 1e-10*total_source_flux
+       
        ! OpenMP: if we have multiple OpenMP threads (nthreads > 1) we 
        ! parallelize over the threads by doing independent parts of
        ! the mesh.
@@ -218,7 +249,11 @@ contains
           ! led to memory errors...)
           photon_loss_src=photon_loss_src_thread(1)
 
-       endif
+          ! If we have now reached the end of the grid we want to trace,
+          ! exit.
+          if (last_r(3) == lastpos_r(3) .and. last_l(3)== lastpos_l(3)) exit
+
+      endif
 
        ! Report photon losses from subbox (diagnostic)
        !logf1=logf+rank
@@ -236,7 +271,16 @@ contains
     photon_loss(1)=photon_loss(1) + photon_loss_src
 
     ! Sum the total number of subboxes used for reporting later
-    sum_nbox=sum_nbox+nbox
+    !write(*,*) NormFlux_XRay
+    if (phase_type /= "H" .and. NormFlux_XRay /= 0.0) then
+       ! Estimate the equivalent number of subboxes if we trace
+       ! the entire traceable mesh (lastpos). 
+       sum_nbox=sum_nbox + nint(real(max( &
+            maxval(lastpos_r(:)-srcpos(:,ns)), &
+            maxval(srcpos(:,ns)-lastpos_l(:)) )) / real(subboxsize))
+    else
+       sum_nbox=sum_nbox+nbox
+    endif
 
   end subroutine do_source
 

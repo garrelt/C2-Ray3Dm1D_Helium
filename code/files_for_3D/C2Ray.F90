@@ -9,10 +9,12 @@ Program C2Ray
 
   ! Authors: Garrelt Mellema, Ilian Iliev
 
-  ! Date: 22-May-2008 (06-Mar-2008 (30-Jan-2008 (8-Dec-2007 (23-Sep-2006))
+  ! Date: 22-May-2008 (06-Mar-2008 (30-Jan-2008 (8-Dec-2007
+  ! (23-Sep-2006))
 
   ! Goal:
-  ! Cosmological reionization simulation using precomputed density fields
+  ! Cosmological reionization simulation using precomputed density
+  ! fields
   ! and source lists.
   
   ! Does not include hydrodynamics
@@ -54,7 +56,7 @@ Program C2Ray
   use material, only: mat_ini, xfrac_ini, temper_ini, dens_ini, set_clumping, &
        set_LLS
   use times, only: time_ini, set_timesteps
-  use sourceprops, only: source_properties_ini, source_properties, NumSrc
+  use sourceprops, only: source_properties_ini, source_properties,NumSrc
   !use evolve, only: evolve_ini,evolve3D
   use evolve_data, only: evolve_ini
   use evolve, only: evolve3D
@@ -127,7 +129,7 @@ Program C2Ray
   call grid_ini ()
 
   if (rank == 0) &
-       write(timefile,"(A,F8.1)") "Time after grid_ini: ",timestamp_wallclock ()
+       write(timefile,"(A,F8.1)") "Time after grid_ini:",timestamp_wallclock ()
 
 #ifdef MPILOG
         write(logf,*) 'about to initialize rad'
@@ -136,7 +138,7 @@ Program C2Ray
   call rad_ini ( )
 
   if (rank == 0) &
-       write(timefile,"(A,F8.1)") "Time after rad_ini: ",timestamp_wallclock ()
+       write(timefile,"(A,F8.1)") "Time after rad_ini:",timestamp_wallclock ()
 
 #ifdef MPILOG
   write(logf,*) "Before mat_ini"
@@ -145,7 +147,7 @@ Program C2Ray
   call mat_ini (restart, nz0, ierror)
 
   if (rank == 0) &
-       write(timefile,"(A,F8.1)") "Time after mat_ini: ",timestamp_wallclock ()
+       write(timefile,"(A,F8.1)") "Time after mat_ini:",timestamp_wallclock ()
 
   ! Initialize cooling tables
   if (.not.isothermal) call setup_cool () ! moved here from radiation
@@ -294,7 +296,8 @@ Program C2Ray
      write(logf,*) 'First output'
 #endif 
      ! If start of simulation output (and not a restart)
-     !if (NumSrc > 0 .and. sim_time == 0.0) call output(time2zred(sim_time),sim_time,dt, &
+     !if (NumSrc > 0 .and. sim_time == 0.0) call
+     !output(time2zred(sim_time),sim_time,dt, &
      !     photcons_flag)
      if (sim_time == 0.0 .and. restart == 0) &
           call output(time2zred(sim_time),sim_time,dt,photcons_flag)
@@ -343,7 +346,8 @@ Program C2Ray
             
         ! Write output
         if (abs(sim_time-next_output_time) <= 1e-6*sim_time) then
-           !if (NumSrc > 0) call output(time2zred(sim_time),sim_time,actual_dt, &
+           !if (NumSrc > 0) call
+           !output(time2zred(sim_time),sim_time,actual_dt, &
            !photcons_flag)
            call output(time2zred(sim_time),sim_time,actual_dt, &
                 photcons_flag)
@@ -351,8 +355,10 @@ Program C2Ray
            if (photcons_flag /= 0 .and. stop_on_photon_violation) then
               if (rank == 0) write(logf,*) &
                 "Exiting because of photon conservation violation"
-           ! GM (110131): Forgot to check here whether we care about photon
-           ! conservations violations; if the code jumps out of the evolution
+           ! GM (110131): Forgot to check here whether we care about
+           ! photon
+           ! conservations violations; if the code jumps out of the
+           ! evolution
            ! here funny things happen to the time step!
               exit ! photon conservation violated
            endif
@@ -369,7 +375,7 @@ Program C2Ray
      ! Get out: photon conservation violated
      if (stop_on_photon_violation .and. photcons_flag /= 0 .and. rank == 0) &
           write(logf,*) "Exiting because of photon conservation violation"
-     if (stop_on_photon_violation .and. photcons_flag /= 0) exit ! photon conservation violated
+     if (stop_on_photon_violation .and. photcons_flag /= 0) exit !photon conservation violated
 
      ! Scale to the current redshift
      call redshift_evol(sim_time)
@@ -377,7 +383,8 @@ Program C2Ray
         call cosmo_evol()
      endif
 
-     ! Update clock counters (cpu + wall, to avoid overflowing the counter)
+     ! Update clock counters (cpu + wall, to avoid overflowing the
+     ! counter)
      call update_clocks ()
 
   enddo

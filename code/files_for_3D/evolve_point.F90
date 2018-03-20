@@ -559,7 +559,10 @@ contains
 
     ! Initialize conv_flag_check to zero
     conv_flag_check=0
-    
+
+    ! Initialize ionization rate phi to zero
+    call set_photrates_to_zero (phi)
+
     ! Initialize local ionization states to global ones
     do nx=0,1
        ion%h(nx)=max(epsilon,xh_intermed(pos(1),pos(2),pos(3),nx))
@@ -599,7 +602,24 @@ contains
 #endif    
 
     ! Construct phi taking into account the hot phase
-    ! First test if there are stellar photons and also check whether
+
+    ! All cells will be exposed to the quasar and power law rates
+#ifdef QUASARS
+    !phi=phi+qpl_phi
+    phi%photo_cell_HI=phi%photo_cell_HI+qpl_phi%photo_cell_HI
+    phi%photo_cell_HeI=phi%photo_cell_HeI+qpl_phi%photo_cell_HeI
+    phi%photo_cell_HeII=phi%photo_cell_HeII+qpl_phi%photo_cell_HeII
+    phi%heat=phi%heat+qpl_phi%heat
+#endif
+#ifdef PL
+    !phi=phi+pl_phi
+    phi%photo_cell_HI=phi%photo_cell_HI+pl_phi%photo_cell_HI
+    phi%photo_cell_HeI=phi%photo_cell_HeI+pl_phi%photo_cell_HeI
+    phi%photo_cell_HeII=phi%photo_cell_HeII+pl_phi%photo_cell_HeII
+    phi%heat=phi%heat+pl_phi%heat
+#endif
+
+    ! Test if there are stellar photons and also check whether
     ! the fraction of the cell which is a stellar HII region ("hot") is small
     if (bb_phi%photo_cell_HI > epsilon_dx/dt .and. &
          xh_hot(pos(1),pos(2),pos(3)) <= limit_partial_cells) then
@@ -607,30 +627,14 @@ contains
        ! The bb photons have already been used to make the hot HII region,
        ! here we only process the "cold" phase which is affected by x-rays
        special(pos(1),pos(2),pos(3))=.true.
-#ifdef QUASARS
-       phi=qpl_phi
-#endif
-#ifdef PL
-       phi=pl_phi
-#endif
     else
        ! Other cells are either not received by stellar photons, or are
-       ! fully ionized, or are recombining...
-       phi=bb_phi
-#ifdef QUASARS
-       !phi=phi+qpl_phi
-       phi%photo_cell_HI=phi%photo_cell_HI+qpl_phi%photo_cell_HI
-       phi%photo_cell_HeI=phi%photo_cell_HeI+qpl_phi%photo_cell_HeI
-       phi%photo_cell_HeII=phi%photo_cell_HeII+qpl_phi%photo_cell_HeII
-       phi%heat=phi%heat+qpl_phi%heat
-#endif
-#ifdef PL
-       !phi=phi+pl_phi
-       phi%photo_cell_HI=phi%photo_cell_HI+pl_phi%photo_cell_HI
-       phi%photo_cell_HeI=phi%photo_cell_HeI+pl_phi%photo_cell_HeI
-       phi%photo_cell_HeII=phi%photo_cell_HeII+pl_phi%photo_cell_HeII
-       phi%heat=phi%heat+pl_phi%heat
-#endif
+       ! fully ionized, or are recombining... here we add bb rates
+       !phi=phi+bb_phi
+       phi%photo_cell_HI=phi%photo_cell_HI+bb_phi%photo_cell_HI
+       phi%photo_cell_HeI=phi%photo_cell_HeI+bb_phi%photo_cell_HeI
+       phi%photo_cell_HeII=phi%photo_cell_HeII+bb_phi%photo_cell_HeII
+       phi%heat=phi%heat+bb_phi%heat
        special(pos(1),pos(2),pos(3))=.false.
     endif
     

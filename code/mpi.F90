@@ -109,12 +109,14 @@ contains
     !$omp end parallel
 
     ! Report OpenMP usage
-#ifdef MY_OPENMP
     if (rank == 0) then
+#ifdef MY_OPENMP
        write(logf,*) " Running in OpenMP mode"
        write(logf,*) ' Number of OpenMP threads on MPI rank 0 is ',nthreads
-    endif
+#else
+       write(logf,*) ' WARNING: The code was NOT compiled for OpenMP'
 #endif
+    endif
 
 #ifdef MPILOG
     ! Open processor dependent log file

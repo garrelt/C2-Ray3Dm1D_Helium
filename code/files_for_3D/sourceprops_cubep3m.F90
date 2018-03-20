@@ -43,9 +43,9 @@ module sourceprops
   integer,parameter :: LMACH=5
 
 #ifdef QUASARS
-  integer,parameter :: QSO=6
+  integer,parameter :: QSO=7
   !> number of columns in source list with quasars
-  integer,parameter,private :: ncolumns_srcfile=6
+  integer,parameter,private :: ncolumns_srcfile=7
   !> number of columns in saved source list
 #if defined(QUASARS) && defined(PL)
   integer,parameter,private :: ncolumns_savedsrcfile=6
@@ -54,6 +54,7 @@ module sourceprops
 #else
   integer,parameter,private :: ncolumns_savedsrcfile=4
 #endif
+  real(kind=dp) :: qpl ! quasar power law as written in the source list
 
   !> base name of source list files
   character(len=100),parameter,private :: &
@@ -271,7 +272,11 @@ contains
     if (restart == 0 .or. restart == 1) then
        open(unit=50,file=sourcelistfile,status='old')
        ! Number of sources
+#ifdef QUASARS
+       read(50,*) NumSrc0, qpl
+#else
        read(50,*) NumSrc0
+#endif
        
        ! Report
        write(logf,*) "Total number of source locations, no suppression: ", &
@@ -283,6 +288,10 @@ contains
        NumMassiveSrc = 0
        NumSupprbleSrc = 0
        NumSupprsdSrc = 0
+#ifdef QUASARS
+       NumQsrc = 0
+#endif
+       
        do ns0=1,NumSrc0
           ! If you change the following lines, also change it below in
           ! read_in_sources
@@ -331,7 +340,11 @@ contains
        ! calculated suppressed source list
        open(unit=49,file=sourcelistfilesuppress,status='unknown')
        ! Number of sources
+#ifdef QUASARS
+       read(49,*) NumSrc, qpl
+#else
        read(49,*) NumSrc
+#endif
        close(49)
     endif
     write(logf,*) "Number of sources, with suppression: ",NumSrc
@@ -357,7 +370,6 @@ contains
        do ns0=1,NumSrc0
           read(50,*) srclist(1:ncolumns_srcfile)
           srcpos0(1:3)=int(srclist(1:3))
-
           ! Process the source list entry through the suppression
           ! algorithm
           if (xh(srcpos0(1),srcpos0(2),srcpos0(3),1) < StillNeutral) then
@@ -433,7 +445,15 @@ contains
        open(unit=49,file=sourcelistfilesuppress,status="old")
        write(logf,*) "Reading ",NumSrc," sources from ", &
             trim(adjustl(sourcelistfilesuppress))
+#ifdef QUASARS
+       read(49,*) NumSrc, qpl
+       if (qpl/=qpl_index-1) then
+          write(logf,*) "Warning: wrong power law index for quasars"
+          stop 
+       endif
+#else
        read(49,*) NumSrc
+#endif
 
        ! Data in saved source list depends on what sources were
        ! recorded / are being used.
@@ -467,33 +487,37 @@ contains
     ! Open the processed source list file
     open(unit=49,file=sourcelistfilesuppress,status='unknown')
     ! Write number of active sources positions
+#ifdef QUASARS
+    write(49,*) NumSrc, qpl
+#else
     write(49,*) NumSrc
+#endif
 
     ! Write out the source information
     do ns0=1,NumSrc
        
        ! Content depends on what sources are being used
 #if defined(QUASARS) && defined(PL)
-       format_str = "(3i4,2f10.3,1es15.3)"!,1e10.3)"
+       format_str = "(3i4,2f15.3,1es15.3)"!,1e10.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(3))
        temparray(1) = SrcMass(ns0,0)
        temparray(2) = NormFluxPL(ns0)
        temparray(3) = NormFluxQPL(ns0)
 #elif defined(QUASARS)
-       format_str = "(3i4,1f10.3,1es15.3)"
+       format_str = "(3i4,1f15.3,1es15.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(2))   
        temparray(1) = SrcMass(ns0,0)
        temparray(2) = NormFluxQPL(ns0)
 #elif defined(PL)
-       format_str = "(3i4,2f10.3)"
+       format_str = "(3i4,2f15.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(2))
        temparray(1) = SrcMass(ns0,0)
        temparray(2) = NormFluxPL(ns0)
 #else
-       format_str = "(3i4,1f10.3)"
+       format_str = "(3i4,1f15.3)"
        if (allocated(temparray)) deallocate(temparray)
        allocate(temparray(1))
        temparray(1) = SrcMass(ns0,0)

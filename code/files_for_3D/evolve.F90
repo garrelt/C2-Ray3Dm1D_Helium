@@ -1,5 +1,6 @@
 !>
-!! \brief This module contains routines for calculating the ionization and temperature evolution of the entire grid (3D).
+!! \brief This module contains routines for calculating the ionization
+!and temperature evolution of the entire grid (3D).
 !!
 !! Module for Capreole / C2-Ray (f90)
 !!
@@ -23,7 +24,8 @@ module evolve
   ! - evolve0D_global: update entire grid
 
   ! Needs:
-  ! doric : ionization calculation for one point + photo-ionization rates
+  ! doric : ionization calculation for one point + photo-ionization
+  ! rates
   ! tped : temperature,pressure,electron density calculation
 
   use precision, only: dp
@@ -102,7 +104,7 @@ contains
   ! ===========================================================================
 
   !> Evolve the entire grid over a time step dt
-  subroutine evolve3D (time,dt,restart)
+  subroutine evolve3D (time,dt,iter_restart)
 
     ! Calculates the evolution of the hydrogen ionization state
      
@@ -120,7 +122,8 @@ contains
     !  3-Jan-2005 (GM) : reintegrated with updated Ifront3D
     ! 20-May-2005 (GM) : split original eveolve0D into two routines
     ! 13-Jun-2005 (HM) : OpenMP version : Hugh Merz
-    ! 21-Aug-2006 (GM) : MPI parallelization over the sources (static model).
+    ! 21-Aug-2006 (GM) : MPI parallelization over the sources (static
+    ! model).
     ! 28-Feb-2008 (GM) : Added master-slave model for distributing
     !                    over the processes. The program decides which
     !                    model to use.
@@ -128,7 +131,7 @@ contains
     ! The time step
     real(kind=dp),intent(in) :: time !< time 
     real(kind=dp),intent(in) :: dt !< time step
-    integer,intent(in) :: restart !< restart flag
+    integer,intent(in) :: iter_restart !< iteration restart flag
 
     ! Loop variables
     integer :: niter  ! iteration counter
@@ -148,52 +151,33 @@ contains
     ! Set the conv_criterion, if there are few sources we should make
     ! sure that things are converged around these sources.
 
-   ! conv_criterion=min(int(convergence_fraction*mesh(1)*mesh(2)*mesh(3)),(NumSrc-1)/3 )
+   ! conv_criterion=min(int(convergence_fraction*mesh(1)*mesh(2)*mesh(3)),(NumSrc-1)/3
+   ! )
     conv_criterion=min(int(convergence_fraction*mesh(1)*mesh(2)*mesh(3)),NumSrc)   
     
     ! Report time
     if (rank == 0) write(timefile,"(A,F8.1)") &
          "Time before starting iteration: ", timestamp_wallclock ()
 
-    !if (restart /= 0) check_dump_for_sourcetype(restart,niter,source_type)
+    !if (iter_restart /= 0)
+    !check_dump_for_sourcetype(iter_restart,niter,source_type)
     ! 
     ! Iterate to reach convergence for multiple sources
     ! Process different groups of sources separately
     ! initialize average and intermediate results to initial values
-    if (restart == 0) then
-       do k=1,mesh(3)
-          do j=1,mesh(2)
-             do i=1,mesh(1)
-                if (special(i,j,k)) then
-                   xh_av(i,j,k,0)=(1.0_dp-xh_hot(i,j,k))*xh(i,j,k,0)
-                   xhe_av(i,j,k,1)=xh_hot(i,j,k)*xhe(i,j,k,1)
-                else
-                   xh_av(i,j,k,0)=xh(i,j,k,0)
-                   xhe_av(i,j,k,1)=xhe(i,j,k,1)
-                endif
-             enddo
-          enddo
-       enddo
-       !where(special == .true.)
-       !   xh_av(:,:,:,0)=(1.0_dp-xh_hot(:,:,:))*xh(:,:,:,0)
-       !   xhe_av(:,:,:,1)=xh_hot(:,:,:)*xhe(:,:,:,1)
-       !elsewhere
-       !   xh_av(:,:,:,0)=xh(:,:,:,0)
-       !   xhe_av(:,:,:,1)=xhe(:,:,:,1)
-       !endwhere
+    if (iter_restart == 0) then
+       xh_av(:,:,:,:)=xh(:,:,:,:)
+       xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
        xh_hot_av(:,:,:)=xh_hot(:,:,:)
        xh_hot_intermed(:,:,:)=xh_hot(:,:,:)
-       xh_av(:,:,:,1)=xh_hot(:,:,:)*xh(:,:,:,1)
-       xh_intermed(:,:,:,:)=xh_av(:,:,:,:)
-       xhe_av(:,:,:,2)=xhe(:,:,:,2)
-       xh_av(:,:,:,0)=1.0_dp-(xhe_av(:,:,:,1)+xhe_av(:,:,:,2))
+       xhe_av(:,:,:,:)=xhe(:,:,:,:)
        xhe_intermed(:,:,:,:)=xhe_av(:,:,:,:)
        niter=0 ! iteration starts at zero
        conv_flag=mesh(1)*mesh(2)*mesh(3) ! initialize non-convergence
        phase_type="H"
     else
        ! Reload xh_av,xh_intermed,photon_loss,niter
-       call start_from_dump(restart,niter,phase_type)
+       call start_from_dump(iter_restart,niter,phase_type)
        call global_pass (conv_flag,dt,phase_type)
     endif
 
@@ -220,7 +204,7 @@ contains
 
     integer,intent(inout) :: niter  ! iteration counter
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
-    character(len=1),intent(in) :: phase_type !< type of phase ("hot" or "cold")
+    character(len=1),intent(in) :: phase_type !< type of phase ("hot" or"cold")
     
     ! Iterate to reach convergence for multiple sources
     do
@@ -229,7 +213,8 @@ contains
        ! n sources will affect at least n cells on the first pass.
        ! We need to give them another iteration to allow them to
        ! work together.
-       ! GM/130819: We additionally force to do at least two iterations by
+       ! GM/130819: We additionally force to do at least two iterations
+       ! by
        ! testing for niter.
        
        if (conv_flag < conv_criterion .and. niter > 1) then
@@ -243,7 +228,8 @@ contains
 
           ! Report
           if (rank == 0) then
-             write(logf,*) "Multiple sources convergence reached"
+             write(logf,"(2A)") "Multiple sources convergence reached for phase ", &
+                  phase_type
              write(logf,*) "Test 1 values: ",conv_flag, conv_criterion
              !write(logf,*) "Test 2 values: ",rel_change_sum_xh, &
              !     convergence_fraction
@@ -324,8 +310,8 @@ contains
        iterfile="iterdump1.bin"
     endif
 
-    open(unit=iterdump,file=trim(adjustl(dump_dir))//iterfile,form="unformatted", &
-         status="unknown")
+    open(unit=iterdump,file=trim(adjustl(dump_dir))//iterfile,form="unformatted",&
+    status="unknown")
 
     write(iterdump) niter
     write(iterdump) phase_type
@@ -370,17 +356,17 @@ contains
 
   ! ===========================================================================
 
-  subroutine start_from_dump(restart,niter,phase_type)
+  subroutine start_from_dump(iter_restart,niter,phase_type)
 
     use material, only: temperature_grid
 
-    integer,intent(in) :: restart  ! restart flag
+    integer,intent(in) :: iter_restart  ! restart flag
     integer,intent(out) :: niter  ! iteration counter
     character(len=1),intent(out) :: phase_type
 
     character(len=20) :: iterfile
 
-    if (restart == 0) then
+    if (iter_restart == 0) then
        if (rank == 0) &
             write(logf,*) "Warning: start_from_dump called incorrectly"
     else
@@ -391,7 +377,7 @@ contains
                "Time before reading iterdump: ", timestamp_wallclock ()
 
           ! Set file to read (depending on restart flag)
-          select case (restart)
+          select case (iter_restart)
           case (1) 
              iterfile="iterdump1.bin"
           case (2) 
@@ -441,8 +427,8 @@ contains
           write(logf,*) "Read iteration ",niter," from dump file"
           write(logf,*) 'photon loss counter: ',photon_loss_all
           write(logf,*) "Intermediate result for mean ionization fraction: ", &
-               sum(xh_intermed(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3)), &
-               sum(xhe_intermed(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3)), &
+               sum(xh_intermed(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3)),&
+               sum(xhe_intermed(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3)),&
                sum(xhe_intermed(:,:,:,2))/real(mesh(1)*mesh(2)*mesh(3))
        endif
        
@@ -561,7 +547,8 @@ contains
 #ifdef MPI
     ! Distribute the source list to the other nodes
     ! disabled / GM110512
-    !call MPI_BCAST(SrcSeries,NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
+    !call
+    !MPI_BCAST(SrcSeries,NumSrc,MPI_INTEGER,0,MPI_COMM_NEW,mympierror)
 #endif
     
     ! Ray trace the whole grid for all sources.
@@ -602,13 +589,16 @@ contains
     integer,dimension(Ndim) :: pos
 
     ! Report photon losses over grid boundary 
-    ! if (rank == 0) write(logf,*) 'photon loss counter: ',photon_loss_all(:) 
+    ! if (rank == 0) write(logf,*) 'photon loss counter:
+    ! ',photon_loss_all(:) 
     
-    ! Turn total photon loss into a mean per cell (used in evolve0d_global)
+    ! Turn total photon loss into a mean per cell (used in
+    ! evolve0d_global)
     ! GM/110225: Possibly this should be 
     ! photon_loss_all(:)/(real(mesh(1))*real(mesh(2))
     ! Since this is the correct answer for an optically thin volume
-    ! Compromise: photon_loss_all(:)/(real(mesh(1))**3)*sum(xh_av(:,:,:,1))
+    ! Compromise:
+    ! photon_loss_all(:)/(real(mesh(1))**3)*sum(xh_av(:,:,:,1))
     ! then if the box is fully ionized the optically thin 1/N^2 is used
     ! and if the box is more neutral something close to 1/N^3 is used.
     ! Not sure    
@@ -647,15 +637,18 @@ contains
        write(logf,*) "Intermediate result for mean H ionization fraction: ", &
             sum(xh_intermed(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3))
        write(logf,*) &
-            "Intermediate result for mean He(+,++) ionization fraction: ", &
+            "Intermediate result for mean He(+,++) ionization fraction:", &
             sum(xhe_intermed(:,:,:,1))/real(mesh(1)*mesh(2)*mesh(3)), &
             sum(xhe_intermed(:,:,:,2))/real(mesh(1)*mesh(2)*mesh(3))
     endif
     
     ! Report on photon conservation
-    call calculate_photon_statistics (dt,xh_intermed,xh_av,xhe_intermed,xhe_av) 
-    call report_photonstatistics (dt)
+    if (phase_type == "C") then
+       call calculate_photon_statistics(dt,xh_intermed,xh_av,xhe_intermed,xhe_av) 
+       call report_photonstatistics (dt)
 
+    endif
+    
   end subroutine global_pass
 
   ! ===========================================================================
@@ -690,39 +683,39 @@ contains
     bb_phih_grid(:,:,:)=buffer(:,:,:)
 
     if (phase_type /= "H") then
-       call MPI_ALLREDUCE(bb_phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(bb_phihe_grid(:,:,:,0), buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
        ! Overwrite the processor local values with the accumulated value
        bb_phihe_grid(:,:,:,0)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(bb_phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(bb_phihe_grid(:,:,:,1), buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
        ! Overwrite the processor local values with the accumulated value
        bb_phihe_grid(:,:,:,1)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(bb_phiheat_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(bb_phiheat_grid, buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
        ! Overwrite the processor local values with the accumulated value
        bb_phiheat_grid(:,:,:)=buffer(:,:,:)    
        
 #ifdef QUASARS
        ! accumulate (sum) the MPI distributed phih_grid
-       call MPI_ALLREDUCE(qpl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(qpl_phih_grid, buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
        ! Overwrite the processor local values with the accumulated value
        qpl_phih_grid(:,:,:)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(qpl_phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(qpl_phihe_grid(:,:,:,0), buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
        ! Overwrite the processor local values with the accumulated value
        qpl_phihe_grid(:,:,:,0)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(qpl_phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(qpl_phihe_grid(:,:,:,1), buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
        ! Overwrite the processor local values with the accumulated value
        qpl_phihe_grid(:,:,:,1)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(qpl_phiheat_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(qpl_phiheat_grid, buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
        ! Overwrite the processor local values with the accumulated value
        qpl_phiheat_grid(:,:,:)=buffer(:,:,:)    
@@ -730,22 +723,22 @@ contains
        
 #ifdef PL
        ! accumulate (sum) the MPI distributed phih_grid
-       call MPI_ALLREDUCE(pl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(pl_phih_grid, buffer, mesh(1)*mesh(2)*mesh(3),&
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
        ! Overwrite the processor local values with the accumulated value
        pl_phih_grid(:,:,:)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(pl_phihe_grid(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(pl_phihe_grid(:,:,:,0), buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
        ! Overwrite the processor local values with the accumulated value
        pl_phihe_grid(:,:,:,0)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(pl_phihe_grid(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(pl_phihe_grid(:,:,:,1), buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)    
        ! Overwrite the processor local values with the accumulated value
        pl_phihe_grid(:,:,:,1)=buffer(:,:,:)
        
-       call MPI_ALLREDUCE(pl_phiheat_grid, buffer, mesh(1)*mesh(2)*mesh(3), &
+       call MPI_ALLREDUCE(pl_phiheat_grid, buffer,mesh(1)*mesh(2)*mesh(3), &
             MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_NEW, mympierror)
        ! Overwrite the processor local values with the accumulated value
        pl_phiheat_grid(:,:,:)=buffer(:,:,:)    
@@ -762,23 +755,24 @@ contains
 
 #ifdef MPI
     ! accumulate (max) MPI distributed xh_av
-    call MPI_ALLREDUCE(xh_av(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3), &
+    call MPI_ALLREDUCE(xh_av(:,:,:,1), buffer, mesh(1)*mesh(2)*mesh(3),&
          MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_NEW, mympierror)
     ! Overwrite the processor local values with the accumulated value
     xh_av(:,:,:,1) = buffer(:,:,:)
     
-    call MPI_ALLREDUCE(xhe_av(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3), &
+    call MPI_ALLREDUCE(xhe_av(:,:,:,0), buffer, mesh(1)*mesh(2)*mesh(3),&
          MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_NEW, mympierror)      
     ! Overwrite the processor local values with the accumulated value
     xhe_av(:,:,:,0) = buffer(:,:,:)
     
-    call MPI_ALLREDUCE(xhe_av(:,:,:,2), buffer, mesh(1)*mesh(2)*mesh(3), &
+    call MPI_ALLREDUCE(xhe_av(:,:,:,2), buffer, mesh(1)*mesh(2)*mesh(3),&
          MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_NEW, mympierror)   
     ! Overwrite the processor local values with the accumulated value
     xhe_av(:,:,:,2) = buffer(:,:,:)
     
     !xh_av(:,:,:,0) = max(0.0_dp,min(1.0_dp,1.0-xh_av(:,:,:,1)))
-    !xhe_av(:,:,:,1) = max(0.0_dp,min(1.0_dp,1.0-xhe_av(:,:,:,0)-xhe_av(:,:,:,2)))    
+    !xhe_av(:,:,:,1) =
+    !max(0.0_dp,min(1.0_dp,1.0-xhe_av(:,:,:,0)-xhe_av(:,:,:,2)))    
     xh_av(:,:,:,0) = 1.0-xh_av(:,:,:,1)
     xhe_av(:,:,:,1) = 1.0-xhe_av(:,:,:,0)-xhe_av(:,:,:,2)
     
