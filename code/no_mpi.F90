@@ -79,6 +79,7 @@ contains
             position="append")
     endif
     write(unit=logf,fmt="(A)") "Log file for C2-Ray run"
+    write(unit=logf,fmt=*) " WARNING: The code was NOT compiled for MPI"
 
     nthreads=1
     ! Figure out hostname
@@ -99,6 +100,8 @@ contains
 #ifdef MY_OPENMP
     write(logf,*) ' The code was compiled for OpenMP'
     write(logf,*) ' Number of OpenMP threads used is ',nthreads
+#else
+    write(logf,*) ' WARNING: The code was NOT compiled for OpenMP'
 #endif
 
     ! Let OpenMP threads report
