@@ -112,6 +112,10 @@ module radiation_photoionrates
   real(kind=dp), dimension(1:NumFreqBnd) :: tau_cell_HeI
   real(kind=dp), dimension(1:NumFreqBnd) :: tau_cell_HeII
 
+  !$OMP THREADPRIVATE(tau_pos_in, tau_pos_out, tau_in_all, tau_out_all)
+  !$OMP THREADPRIVATE(scaling_HI, scaling_HeI, scaling_HeII)
+  !$OMP THREADPRIVATE(tau_cell_HI, tau_cell_HeI, tau_cell_HeII)
+  
 #ifdef MPI       
     integer,private :: mympierror
 #endif
@@ -182,6 +186,8 @@ contains
             tau_in_all,tau_out_all, &
             Normalized_Flux,source_type,vol, &
             scaling_HI,scaling_HeI,scaling_HeII)
+
+       if (phi%photo_cell_HI < 0.0) write(*,*) phi%photo_cell_HI
        
        ! Find the heating rates rates by looking up the values in
        ! the (appropriate) photo-ionization tables and using the
@@ -324,7 +330,12 @@ contains
          ( table(table_position%ipos_p1(i_subband),i_subband2)- &
          table(table_position%ipos(i_subband),i_subband2) ) * &
          table_position%residual(i_subband)
-    
+    if (read_table < 0.0) then
+       write(*,*) "RT1 ",table_position%ipos(i_subband),table_position%ipos_p1(i_subband),table_position%residual(i_subband)
+       write(*,*) "RT2 ",table(table_position%ipos(i_subband),i_subband2), &
+            table(table_position%ipos_p1(i_subband),i_subband2)
+    endif
+       
   end function read_table
 
   !---------------------------------------------------------------------------
@@ -408,7 +419,14 @@ contains
                read_table(photo_thick_table,NumFreqBnd, &
                tau_pos_out,i_subband,i_subband)
           phi_photo_all = phi_photo_in_all-phi_photo_out_all
-          
+
+          if (phi_photo_all < 0.0) then
+             write(*,*) '1 ',phi_photo_all,phi_photo_in_all, phi_photo_out_all, i_subband
+             write(*,*) '2 ',tau_out_all(i_subband),tau_in_all(i_subband)
+             write(*,*) '3 ',tau_pos_in%tau(i_subband),tau_pos_in%odpos(i_subband),tau_pos_in%residual(i_subband),tau_pos_in%ipos(i_subband),tau_pos_in%ipos_p1(i_subband)
+             write(*,*) '4 ',tau_pos_out%tau(i_subband),tau_pos_out%odpos(i_subband),tau_pos_out%residual(i_subband),tau_pos_out%ipos(i_subband),tau_pos_out%ipos_p1(i_subband)
+          endif
+
        else
           
           ! When current cell is optically thin
@@ -417,6 +435,13 @@ contains
                read_table(photo_thin_table,NumFreqBnd, &
                tau_pos_in,i_subband,i_subband)
           phi_photo_out_all = phi_photo_in_all-phi_photo_all
+
+          if (phi_photo_all < 0.0) then
+             write(*,*) 'T1 ',phi_photo_all,phi_photo_in_all, phi_photo_out_all, i_subband
+             write(*,*) 'T2 ',tau_out_all(i_subband),tau_in_all(i_subband)
+             write(*,*) 'T3 ',tau_pos_in%tau(i_subband),tau_pos_in%odpos(i_subband),tau_pos_in%residual(i_subband),tau_pos_in%ipos(i_subband),tau_pos_in%ipos_p1(i_subband)
+             write(*,*) 'T4 ',tau_pos_out%tau(i_subband),tau_pos_out%odpos(i_subband),tau_pos_out%residual(i_subband),tau_pos_out%ipos(i_subband),tau_pos_out%ipos_p1(i_subband)
+          endif
 
        endif
 
@@ -433,13 +458,14 @@ contains
           ! Assign to the HI photo-ionization rate
           photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
                phi_photo_all/vol
-          
+
           ! band 2
        case (NumBndin1+1:NumBndin1+NumBndin2)
           
           ! Assign to the HI photo-ionization rate
           photo_lookuptable%photo_cell_HI = photo_lookuptable%photo_cell_HI + &
                scaling_HI(i_subband)*phi_photo_all/vol 
+
           ! Assign to the HeI photo-ionization rate
           photo_lookuptable%photo_cell_HeI = photo_lookuptable%photo_cell_HeI + &
                scaling_HeI(i_subband)*phi_photo_all/vol
