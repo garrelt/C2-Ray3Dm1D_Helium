@@ -18,7 +18,7 @@ module sourceprops
   use astroconstants, only: M_SOLAR, YEAR
   use cosmology_parameters, only: Omega_B, Omega0
   use nbody, only: id_str, M_grid, dir_src, NumZred
-  use material, only: xh
+  use material, only: xh_hot
   use grid, only: x,y,z
   use c2ray_parameters, only: phot_per_atom, lifetime, &
        StillNeutral, Number_Sourcetypes
