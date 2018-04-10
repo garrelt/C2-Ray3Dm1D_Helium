@@ -40,6 +40,7 @@ module evolve
   use material, only: xh,xhe
   use material, only: isothermal
   use material, only: set_final_temperature_point
+  use material, only: temperature_grid
   use material, only: protect_ionization_fractions
   use material, only: special
   use sourceprops, only: NumSrc
@@ -66,6 +67,7 @@ module evolve
   use evolve_data, only: xh_av, xhe_av, xh_intermed, xhe_intermed
   use evolve_data, only: xh_hot_av, xh_hot_intermed
   use evolve_data, only: photon_loss_all
+  use evolve_data, only: limit_partial_cells
 #ifdef MPI
   use evolve_data, only: buffer
 #endif
@@ -205,6 +207,7 @@ contains
     integer,intent(inout) :: niter  ! iteration counter
     real(kind=dp),intent(in) :: dt  !< time step, passed on to evolve0D
     character(len=1),intent(in) :: phase_type !< type of phase ("hot" or"cold")
+    integer :: i,j,k
     
     ! Iterate to reach convergence for multiple sources
     do
@@ -224,8 +227,28 @@ contains
              xh(:,:,:,:)=xh_intermed(:,:,:,:)
              xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
              call set_final_temperature_point ()
-          endif
 
+             do k=1,mesh(3)
+                do j=1,mesh(2)
+                   do i=1,mesh(1)
+                      ! Find out which cells are special and if to change their status
+                      if (special(i,j,k) == 1 .and. xh_hot(i,j,k) > limit_partial_cells) then
+                         ! Special cells remain special until they become
+                         ! fully ionized.
+                         ! After that they become post-special ("2")
+                         special(i,j,k) = 2
+                         xh(i,j,k,1)=xh_hot(i,j,k)+(1.0-xh_hot(i,j,k))*xh(i,j,k,1)
+                         xh(i,j,k,0)=1.0d0-xh(i,j,k,1)
+                         xhe(i,j,k,1)=xh_hot(i,j,k)*(1.0d0-xhe(i,j,k,2))+ &
+                              (1.0-xh_hot(i,j,k))*xhe(i,j,k,1)
+                         xhe(i,j,k,0)=1.0d0-(xhe(i,j,k,1)+xhe(i,j,k,2))
+                         if (.not.isothermal) temperature_grid(i,j,k,2)=1e4
+                      endif
+                   enddo
+                enddo
+             enddo
+          endif
+          
           ! Report
           if (rank == 0) then
              write(logf,"(2A)") "Multiple sources convergence reached for phase ", &

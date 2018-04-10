@@ -34,6 +34,10 @@ module evolve_data
   ! it should be equal to 1. We initialize it to 1 here.
   integer :: tn=1 !< thread number
 
+  ! Parameters for multiphase
+  real(kind=dp),parameter :: epsilon_dx=1e-5 ! limit for considering special
+  real(kind=dp),parameter :: limit_partial_cells=0.99 ! limit for turning off special
+    
   ! Grid variables
 
   !> H Photo-ionization rate on the entire grid

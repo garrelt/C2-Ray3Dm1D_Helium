@@ -45,7 +45,7 @@ module material
   ! Helium ionization fractions associated with the "neutral IGM"
   real(kind=dp),dimension(:,:,:,:),allocatable :: xhe
   ! Array of special points
-  logical,dimension(:,:,:),allocatable :: special
+  integer,dimension(:,:,:),allocatable :: special
   logical isothermal
   real,public :: clumping
   real,dimension(:,:,:),allocatable :: clumping_grid
@@ -223,7 +223,7 @@ contains
        xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)
        xhe(:,:,:,2)=0.0
        xh_hot(:,:,:)=0.0
-       special(:,:,:)=.false.
+       special(:,:,:)=0
        ! Initialize LLS parametets
        call LLS_init ()       
     endif

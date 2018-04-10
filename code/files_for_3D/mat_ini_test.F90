@@ -34,7 +34,7 @@ module material
   real(kind=dp),dimension(:,:,:),allocatable :: xh_hot
   real(kind=dp),dimension(:,:,:,:),allocatable :: xhe !< ionization fraction He for one cell
   !Array of special points
-  logical,dimension(:,:,:), allocatable :: special
+  integer,dimension(:,:,:), allocatable :: special
   logical isothermal
   real,public :: clumping
   real,dimension(:,:,:),allocatable :: clumping_grid
@@ -211,7 +211,7 @@ contains
        xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)
        xhe(:,:,:,2)=0.0
        xh_hot(:,:,:)=0.0
-       special(:,:,:)=.false.
+       special(:,:,:)=0
        ! Initialize LLS parametets
 
 

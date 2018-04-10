@@ -67,7 +67,7 @@ module evolve_point
   use evolve_data, only: photon_loss_src_thread
   use evolve_data, only: last_l,last_r
   use evolve_data, only: tn
-
+  use evolve_data, only: epsilon_dx, limit_partial_cells
   use column_density, only: cinterp
 
   implicit none
@@ -79,9 +79,6 @@ module evolve_point
   ! Flag to know whether the do_chemistry routine was called with local option
   logical,public ::local_chemistry=.false.
 
-  real(kind=dp),parameter :: epsilon_dx=1e-5
-  real(kind=dp),parameter :: limit_partial_cells=0.999
-    
   public evolve0d, evolve0d_global
 
 contains
@@ -159,7 +156,7 @@ contains
                xh_hot_av(pos(1),pos(2),pos(3))
           ion%he_av(0)=ion%he_av(0)*(1.0-xh_hot_av(pos(1),pos(2),pos(3)))
           ion%he_av(1)=ion%he_av(1)*(1.0-xh_hot_av(pos(1),pos(2),pos(3))) + &
-               xh_hot_av(pos(1),pos(2),pos(3))
+               xh_hot_av(pos(1),pos(2),pos(3))*(1.0d0-ion%he_av(2))
        endif
       
        ! Initialize local density
@@ -453,12 +450,14 @@ contains
     ! and He is singly ionized. If needed we assume that T=10^4 K in this
     ! region.
 
+    use cgsconstants, only: bh00
+
     real(kind=dp),intent(in) :: dt ! time step
     integer,dimension(Ndim),intent(in) :: pos ! position on mesh
     integer,intent(inout) :: conv_flag ! convergence counter
 
     integer :: conv_flag_check=0
-    real(kind=dp) :: deltht, ee, avg_factor
+    real(kind=dp) :: delth, deltht, ee, avg_factor, ndens_p, eqxfh1
     real(kind=dp), pointer :: xh_hot_av_point
     real(kind=dp) :: xh_hot_av_old
     character(len=1),intent(in) :: phase
@@ -469,13 +468,18 @@ contains
     ! Store previously calculated value of xh_hot_av
     xh_hot_av_old = xh_hot_av(pos(1),pos(2),pos(3))
     xh_hot_av_point => xh_hot_av(pos(1),pos(2),pos(3))
+    ndens_p=ndens(pos(1),pos(2),pos(3))
     
     ! Grow the ionized region (partial volume) as if there were no
     ! recombinations
-    deltht=bb_phih_grid(pos(1),pos(2),pos(3))*dt
+    !deltht=bb_phih_grid(pos(1),pos(2),pos(3))*dt
+    ! We do use recombinations
+    delth=(bb_phih_grid(pos(1),pos(2),pos(3))+ndens_p*bh00)*dt
+    eqxfh1=bb_phih_grid(pos(1),pos(2),pos(3))/delth
+    deltht=delth*dt
     ee=exp(-deltht)
-    xh_hot_intermed(pos(1),pos(2),pos(3)) = 1.0 + &
-         (xh_hot(pos(1),pos(2),pos(3))-1.0) * ee
+    xh_hot_intermed(pos(1),pos(2),pos(3)) = eqxfh1 + &
+         (xh_hot(pos(1),pos(2),pos(3))-eqxfh1) * ee
 
     ! Determine average ionized region size (partial volume) over the time step
     ! Mind fp fluctuations. (1.0-ee)/deltht should go to 1.0 for
@@ -486,8 +490,10 @@ contains
     else
        avg_factor=(1.0-ee)/deltht
     endif
-    xh_hot_av(pos(1),pos(2),pos(3)) = 1.0 + &
-         (xh_hot(pos(1),pos(2),pos(3))-1.0) * avg_factor
+    xh_hot_av(pos(1),pos(2),pos(3)) = eqxfh1 + &
+         (xh_hot(pos(1),pos(2),pos(3))-eqxfh1) * avg_factor
+    !xh_hot_av(pos(1),pos(2),pos(3)) = 1.0 + &
+    !     (xh_hot(pos(1),pos(2),pos(3))-1.0) * avg_factor
 
     ! Check hydrogen ionized fraction for convergence
     if ( (abs((xh_hot_av_point-xh_hot_av_old)) > minimum_fractional_change &
@@ -619,15 +625,12 @@ contains
     phi%heat=phi%heat+pl_phi%heat
 #endif
 
-    ! Test if there are stellar photons and also check whether
-    ! the fraction of the cell which is a stellar HII region ("hot") is small
-    if (bb_phi%photo_cell_HI > epsilon_dx/dt .and. &
-         xh_hot(pos(1),pos(2),pos(3)) <= limit_partial_cells) then
-       ! This cell is partly "hot" and needs to be processed separately
-       ! The bb photons have already been used to make the hot HII region,
-       ! here we only process the "cold" phase which is affected by x-rays
-       special(pos(1),pos(2),pos(3))=.true.
-    else
+    ! Find out which cells are special and if to change their status
+    if (special(pos(1),pos(2),pos(3)) == 0 .and. &
+         bb_phi%photo_cell_HI > epsilon_dx/dt) &
+         special(pos(1),pos(2),pos(3)) = 1
+
+    if (special(pos(1),pos(2),pos(3)) /= 1) then
        ! Other cells are either not received by stellar photons, or are
        ! fully ionized, or are recombining... here we add bb rates
        !phi=phi+bb_phi
@@ -635,8 +638,27 @@ contains
        phi%photo_cell_HeI=phi%photo_cell_HeI+bb_phi%photo_cell_HeI
        phi%photo_cell_HeII=phi%photo_cell_HeII+bb_phi%photo_cell_HeII
        phi%heat=phi%heat+bb_phi%heat
-       special(pos(1),pos(2),pos(3))=.false.
     endif
+
+    ! Test if there are stellar photons and also check whether
+    ! the fraction of the cell which is a stellar HII region ("hot") is small
+    !if (bb_phi%photo_cell_HI > epsilon_dx/dt .and. &
+    !     xh_hot(pos(1),pos(2),pos(3)) <= limit_partial_cells) then
+       ! This cell is partly "hot" and needs to be processed separately
+       ! The bb photons have already been used to make the hot HII region,
+       ! here we only process the "cold" phase which is affected by x-rays
+       !special(pos(1),pos(2),pos(3))=.true.
+    !elseif (bb_phi%photo_cell_HI < epsilon_dx/dt .and. special(pos(1),pos(2),pos(3))=.true.)
+    !else
+       ! Other cells are either not received by stellar photons, or are
+       ! fully ionized, or are recombining... here we add bb rates
+       !phi=phi+bb_phi
+    !   phi%photo_cell_HI=phi%photo_cell_HI+bb_phi%photo_cell_HI
+    !   phi%photo_cell_HeI=phi%photo_cell_HeI+bb_phi%photo_cell_HeI
+    !   phi%photo_cell_HeII=phi%photo_cell_HeII+bb_phi%photo_cell_HeII
+    !   phi%heat=phi%heat+bb_phi%heat
+    !   special(pos(1),pos(2),pos(3))=.false.
+    !endif
     
     ! I think instead of calling here twice get_temp, it is perhaps better to pass t_new
     ! and t_old as arguments from/to do_chemistry. (?)
