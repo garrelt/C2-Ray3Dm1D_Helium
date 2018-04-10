@@ -307,7 +307,7 @@ contains
              NumSrc=NumSrc+1
           ! if the cell is still neutral, no suppression (if we use the Iliev
           ! et al source model)   
-          elseif (xh_hot(srcpos0(1),srcpos0(2),srcpos0(3),1) < StillNeutral .and. &
+          elseif (xh_hot(srcpos0(1),srcpos0(2),srcpos0(3)) < StillNeutral .and. &
                UV_Model == "Iliev et al") then
              NumSrc=NumSrc+1
           endif
@@ -320,7 +320,7 @@ contains
 #endif
           ! How many suppressed?
           if (srclist(LMACH) /= 0.0) then
-             if (xh_hot(srcpos0(1),srcpos0(2),srcpos0(3),1) > StillNeutral .or. &
+             if (xh_hot(srcpos0(1),srcpos0(2),srcpos0(3)) > StillNeutral .or. &
                UV_Model /= "Iliev et al") NumSupprsdSrc=NumSupprsdSrc+1
           endif
        enddo
@@ -372,7 +372,7 @@ contains
           srcpos0(1:3)=int(srclist(1:3))
           ! Process the source list entry through the suppression
           ! algorithm
-          if (xh_hot(srcpos0(1),srcpos0(2),srcpos0(3),1) < StillNeutral) then
+          if (xh_hot(srcpos0(1),srcpos0(2),srcpos0(3)) < StillNeutral) then
 #ifdef QUASARS
              if (UV_Model == "Iliev et al" .or. srclist(HMACH) > 0.0d0 .or. &
                  srclist(QSO) > 0.0d0) then
