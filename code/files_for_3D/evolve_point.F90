@@ -457,7 +457,8 @@ contains
     integer,intent(inout) :: conv_flag ! convergence counter
 
     integer :: conv_flag_check=0
-    real(kind=dp) :: delth, deltht, ee, avg_factor, ndens_p, eqxfh1
+    real(kind=dp) :: allrates, deltht, ee, avg_factor, ndens_p, eqxfh1
+    real(kind=dp) :: recombinations
     real(kind=dp), pointer :: xh_hot_av_point
     real(kind=dp) :: xh_hot_av_old
     character(len=1),intent(in) :: phase
@@ -474,9 +475,10 @@ contains
     ! recombinations
     !deltht=bb_phih_grid(pos(1),pos(2),pos(3))*dt
     ! We do use recombinations
-    delth=(bb_phih_grid(pos(1),pos(2),pos(3))+ndens_p*bh00)*dt
-    eqxfh1=bb_phih_grid(pos(1),pos(2),pos(3))/delth
-    deltht=delth*dt
+    recombinations=xh_hot_av_point*ndens_p*bh00
+    allrates=(bb_phih_grid(pos(1),pos(2),pos(3))+recombinations)
+    eqxfh1=bb_phih_grid(pos(1),pos(2),pos(3))/allrates
+    deltht=allrates*dt
     ee=exp(-deltht)
     xh_hot_intermed(pos(1),pos(2),pos(3)) = eqxfh1 + &
          (xh_hot(pos(1),pos(2),pos(3))-eqxfh1) * ee
