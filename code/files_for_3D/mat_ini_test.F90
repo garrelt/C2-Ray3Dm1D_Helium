@@ -284,12 +284,29 @@ contains
   subroutine xfrac_ini (zred_now)
 
     ! Initializes ionization fractions on the grid (at redshift zred_now).
-    ! They are read from an "Ifront3" file which should have been created
+    ! They are read from an "xfrac3d" file which should have been created
     ! by an earlier run. This file is read in restart mode.
 
     ! Author: Garrelt Mellema
 
-    ! Date: 19-May-2005
+    ! Date: 23-Nov-2017
+
+    real(kind=dp),intent(in) :: zred_now
+
+    call xfrac_ini_cold(zred_now)
+    call xfrac_ini_hot(zred_now)
+
+  end subroutine xfrac_ini
+
+  ! ===========================================================================
+
+  subroutine xfrac_ini_cold (zred_now)
+
+    ! Initializes "cold" ionization fractions on the grid (redshift zred_now).
+
+    ! Author: Garrelt Mellema
+
+    ! Date: 23-Nov-2017
 
     real(kind=dp),intent(in) :: zred_now
     
@@ -299,24 +316,20 @@ contains
     character(len=6) :: zred_str
     integer :: m1,m2,m3
     ! Array needed to read in 4B reals
-    real(kind=dp),dimension(:,:,:),allocatable :: xh1_real
-    real(kind=dp),dimension(:,:,:),allocatable :: xhe1_real
-    real(kind=dp),dimension(:,:,:),allocatable :: xhe2_real
-    !real(kind=si),dimension(:,:,:),allocatable :: xh1_real
+    real(kind=dp),dimension(:,:,:),allocatable :: xfrac_real
+    !real(kind=si),dimension(:,:,:),allocatable :: xfrac_real
 
     if (rank == 0) then
-       allocate(xh1_real(mesh(1),mesh(2),mesh(3)))
-       allocate(xhe1_real(mesh(1),mesh(2),mesh(3)))
-       allocate(xhe2_real(mesh(1),mesh(2),mesh(3)))
+       allocate(xfrac_real(mesh(1),mesh(2),mesh(3)))
        write(zred_str,"(f6.3)") zred_now
 !       xfrac_file= "./xfrac3d_"//trim(adjustl(zred_str))//".bin"
        xfrac_file= trim(adjustl(results_dir))// &
             !"Ifront3_"//trim(adjustl(zred_str))//".bin"
-            "xfrac3d_"//trim(adjustl(zred_str))//".bin"
-         xfrac_file_He1= trim(adjustl(results_dir))// &
-            "xfrac3dHe1_"//trim(adjustl(zred_str))//".bin"   
-         xfrac_file_He2= trim(adjustl(results_dir))// &
-            "xfrac3dHe2_"//trim(adjustl(zred_str))//".bin"
+            "xfrac3d_cold"//trim(adjustl(zred_str))//".bin"
+       xfrac_file_He1= trim(adjustl(results_dir))// &
+            "xfrac3dHe1_cold"//trim(adjustl(zred_str))//".bin"   
+       xfrac_file_He2= trim(adjustl(results_dir))// &
+            "xfrac3dHe2_cold"//trim(adjustl(zred_str))//".bin"
 
        write(unit=logf,fmt="(2A)") "Reading ionization fractions from ", &
             trim(xfrac_file), "and", trim(xfrac_file_He1), "and",  trim(xfrac_file_He2)
@@ -329,64 +342,133 @@ contains
           write(logf,*) "Warning: file with ionization fractions unusable"
           write(logf,*) "mesh found in file: ",m1,m2,m3
        else
-          read(20) xh1_real
-       !   ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-       !   xh(:,:,:,1)=xh1_real(:,:,:)
-       !   !xh(:,:,:,1)=real(xh1_real(:,:,:),dp)
-       !   xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
-           xh_hot(:,:,:)=xh1_real(:,:,:)
+          read(20) xfrac_real
+          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
+          xh(:,:,:,1)=xfrac_real(:,:,:)
+          !xh(:,:,:,1)=real(xh1_real(:,:,:),dp)
+          xh(:,:,:,0)=1.0_dp-xh(:,:,:,1)
        endif
        ! close file
        close(20)
-       deallocate(xh1_real)
 
-!!**** He1
-!       ! Open ionization fractions file
-!       open(unit=20,file=xfrac_file_He1,form="unformatted",status="old")       
-!       ! Read in data
-!       read(20) m1,m2,m3
-!       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
-!          write(logf,*) "Warning: file with ionization fractions unusable"
-!          write(logf,*) "mesh found in file: ",m1,m2,m3
-!       else
-!          read(20) xhe1_real
-!          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-!          xhe(:,:,:,1)=xhe1_real(:,:,:)
-!       endif
-!       ! close file
-!       close(20)
-!       deallocate(xhe1_real)
-!!**** He2
-!       ! Open ionization fractions file
-!       open(unit=20,file=xfrac_file_He2,form="unformatted",status="old")       
-!       ! Read in data
-!       read(20) m1,m2,m3
-!       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
-!          write(logf,*) "Warning: file with ionization fractions unusable"
-!          write(logf,*) "mesh found in file: ",m1,m2,m3
-!       else
-!          read(20) xhe2_real
-!          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
-!          xhe(:,:,:,2)=xhe2_real(:,:,:)
-!          xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)-xhe(:,:,:,2)
-!       endif
-!       ! close file
-!!       close(20)
-!       deallocate(xhe2_real)
+!**** He1
+       ! Open ionization fractions file
+       open(unit=20,file=xfrac_file_He1,form="unformatted",status="old")       
+       ! Read in data
+       read(20) m1,m2,m3
+       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
+          write(logf,*) "Warning: file with ionization fractions unusable"
+          write(logf,*) "mesh found in file: ",m1,m2,m3
+       else
+          read(20) xfrac_real
+          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
+          xhe(:,:,:,1)=xfrac_real(:,:,:)
+       endif
+       ! close file
+       close(20)
+       
+!**** He2
+       ! Open ionization fractions file
+       open(unit=20,file=xfrac_file_He2,form="unformatted",status="old")       
+       ! Read in data
+       read(20) m1,m2,m3
+       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
+          write(logf,*) "Warning: file with ionization fractions unusable"
+          write(logf,*) "mesh found in file: ",m1,m2,m3
+       else
+          read(20) xfrac_real
+          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
+          xhe(:,:,:,2)=xfrac_real(:,:,:)
+          xhe(:,:,:,0)=1.0_dp-xhe(:,:,:,1)-xhe(:,:,:,2)
+       endif
+       ! close file
+       close(20)
+       deallocate(xfrac_real)
     endif
 
 #ifdef MPI       
     ! Distribute the input parameters to the other nodes
-!    call MPI_BCAST(xh,mesh(1)*mesh(2)*mesh(3)*2,MPI_DOUBLE_PRECISION,0,&
- !        MPI_COMM_NEW,mympierror)
- !   call MPI_BCAST(xhe,mesh(1)*mesh(2)*mesh(3)*3,MPI_DOUBLE_PRECISION,0,&
- !        MPI_COMM_NEW,mympierror)
-    call MPI_BCAST(xh_hot,mesh(1)*mesh(2)*mesh(3),MPI_DOUBLE_PRECISION,0,&
+    call MPI_BCAST(xh,mesh(1)*mesh(2)*mesh(3)*2,MPI_DOUBLE_PRECISION,0,&
          MPI_COMM_NEW,mympierror)
-
+    call MPI_BCAST(xhe,mesh(1)*mesh(2)*mesh(3)*3,MPI_DOUBLE_PRECISION,0,&
+         MPI_COMM_NEW,mympierror)
 #endif
     
-  end subroutine xfrac_ini
+  end subroutine xfrac_ini_cold
+
+  ! ===========================================================================
+
+  subroutine xfrac_ini_hot (zred_now)
+
+    ! Initializes "hot" ionization fractions and the special flag
+    ! on the grid (at redshift zred_now)
+
+    ! Author: Garrelt Mellema
+
+    ! Date: 23-Nov-2005
+
+    real(kind=dp),intent(in) :: zred_now
+    
+    character(len=512) :: xfrac_file
+    character(len=512) :: special_file
+    character(len=6) :: zred_str
+    integer :: m1,m2,m3
+    ! Array needed to read in 4B reals
+    real(kind=dp),dimension(:,:,:),allocatable :: xfrac_real
+    !real(kind=si),dimension(:,:,:),allocatable :: xfrac_real
+
+    if (rank == 0) then
+       allocate(xfrac_real(mesh(1),mesh(2),mesh(3)))
+       write(zred_str,"(f6.3)") zred_now
+       xfrac_file= trim(adjustl(results_dir))// &
+            "xfrac3d_hot"//trim(adjustl(zred_str))//".bin"
+       special_file = trim(adjustl(results_dir))// &
+            "special"//trim(adjustl(zred_str))//".bin"
+
+       write(unit=logf,fmt="(2A)") "Reading hot ionization fractions from ", &
+            trim(xfrac_file), " and ",trim(special_file)
+       ! Open ionization fractions file
+       open(unit=20,file=xfrac_file,form="unformatted",status="old")
+       
+       ! Read in data
+       read(20) m1,m2,m3
+       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
+          write(logf,*) "Warning: file with ionization fractions unusable"
+          write(logf,*) "mesh found in file: ",m1,m2,m3
+       else
+          read(20) xfrac_real
+          ! To avoid xh(0)=0.0, we add a nominal ionization fraction of 10^-12
+          xh_hot(:,:,:)=xfrac_real(:,:,:)
+       endif
+       ! close file
+       close(20)
+
+       deallocate(xfrac_real)
+
+       ! Open special flag file
+       open(unit=20,file=special_file,form="unformatted",status="old")
+       
+       ! Read in data
+       read(20) m1,m2,m3
+       if (m1 /= mesh(1).or.m2 /= mesh(2).or.m3 /= mesh(3)) then
+          write(logf,*) "Warning: file with special flags unusable"
+          write(logf,*) "mesh found in file: ",m1,m2,m3
+       else
+          read(20) special
+       endif
+       ! close file
+       close(20)
+    endif
+
+#ifdef MPI       
+    ! Distribute the input parameters to the other nodes
+    call MPI_BCAST(xh_hot,mesh(1)*mesh(2)*mesh(3),MPI_DOUBLE_PRECISION,0,&
+         MPI_COMM_NEW,mympierror)
+    call MPI_BCAST(special,mesh(1)*mesh(2)*mesh(3),MPI_LOGICAL,0,&
+         MPI_COMM_NEW,mympierror)
+#endif
+    
+  end subroutine xfrac_ini_hot
 
   ! ===========================================================================
   
