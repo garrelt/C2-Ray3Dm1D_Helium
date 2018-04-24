@@ -221,9 +221,10 @@ contains
        ! testing for niter.
        
        if (conv_flag < conv_criterion .and. niter > 1) then
-          if (phase_type == "H" ) then
+          if (phase_type == "C" ) then
+             !if (phase_type == "H" ) then
+          !else
              xh_hot(:,:,:)=xh_hot_intermed(:,:,:)
-          else
              xh(:,:,:,:)=xh_intermed(:,:,:,:)
              xhe(:,:,:,:)=xhe_intermed(:,:,:,:)
              call set_final_temperature_point ()

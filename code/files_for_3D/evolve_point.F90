@@ -243,6 +243,10 @@ contains
              ! Find the photoionization rates
              bb_phi=photoion_rates(vol_ph,ns,ion%h_av(1),"B",simple_flag)
 
+             if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
+                write(*,*) phase, bb_phi%photo_cell_HI, coldensh_in, &
+                     coldensh_out(pos(1),pos(2),pos(3))
+             endif
              ! Divide the photo-ionization rates by the appropriate neutral
              ! density (part of the photon-conserving rate prescription)
              call divide_rate_by_density (bb_phi,ion,ndens_p)
@@ -292,6 +296,10 @@ contains
              ! photoion_rates the structure of rates (photo and heating)
              bb_phi=photoion_rates(vol_ph,ns,ion%h_av(1),"B",simple_flag)
 
+             if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
+                write(*,*) phase, bb_phi%photo_cell_HI, coldensh_in, &
+                     coldensh_out(pos(1),pos(2),pos(3))
+             endif
           else
              
              ! If the H0 column density is above the maximum, set rates to zero
@@ -299,6 +307,7 @@ contains
 
           endif
        
+
 #ifdef QUASARS
           ! photoion_rates the structure of rates (photo and heating)
           qpl_phi=photoion_rates(vol_ph,ns,ion%h_av(1),"Q",simple_flag)
@@ -311,6 +320,7 @@ contains
           ! Divide the photo-ionization rates by the appropriate neutral density
           ! (part of the photon-conserving rate prescription)
           call divide_rate_by_density (bb_phi,ion,ndens_p)
+
 #ifdef QUASARS
           call divide_rate_by_density (qpl_phi,ion,ndens_p)
 #endif
@@ -370,6 +380,11 @@ contains
                   )
           endif
        endif
+
+       if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
+          write(*,*) phase, bb_phi%photo_cell_HI, ion%h_av(0)
+       endif
+
     endif ! end of coldens test
     
   end subroutine evolve0D
@@ -450,7 +465,7 @@ contains
     ! and He is singly ionized. If needed we assume that T=10^4 K in this
     ! region.
 
-    use cgsconstants, only: bh00
+    use cgsconstants, only: bh00, colh0, temph0
 
     real(kind=dp),intent(in) :: dt ! time step
     integer,dimension(Ndim),intent(in) :: pos ! position on mesh
@@ -458,10 +473,11 @@ contains
 
     integer :: conv_flag_check=0
     real(kind=dp) :: allrates, deltht, ee, avg_factor, ndens_p, eqxfh1
-    real(kind=dp) :: recombinations
+    real(kind=dp) :: recombinations, ionizations, collisions=0.0
     real(kind=dp), pointer :: xh_hot_av_point
     real(kind=dp) :: xh_hot_av_old
     character(len=1),intent(in) :: phase
+    real(kind=dp) :: avg_temper, temper0, temper1,temper2,temper_inter
     
     ! Initialize conv_flag_check to zero
     conv_flag_check=0
@@ -470,19 +486,35 @@ contains
     xh_hot_av_old = xh_hot_av(pos(1),pos(2),pos(3))
     xh_hot_av_point => xh_hot_av(pos(1),pos(2),pos(3))
     ndens_p=ndens(pos(1),pos(2),pos(3))
-    
+    ! Initialize local temperature
+    call get_temperature_point (pos(1),pos(2),pos(3), &
+         temper_inter,avg_temper,temper1)
+
     ! Grow the ionized region (partial volume) as if there were no
     ! recombinations
     !deltht=bb_phih_grid(pos(1),pos(2),pos(3))*dt
     ! We do use recombinations
     recombinations=xh_hot_av_point*ndens_p*bh00
-    allrates=(bb_phih_grid(pos(1),pos(2),pos(3))+recombinations)
-    eqxfh1=bb_phih_grid(pos(1),pos(2),pos(3))/allrates
+    !collisions=colh0*sqrt(avg_temper)*exp(-temph0/avg_temper)
+    ionizations=bb_phih_grid(pos(1),pos(2),pos(3))+collisions
+    allrates=(ionizations+recombinations)
+    if (allrates <= 0.0d0) then
+       !write(*,*) pos(1),pos(2),pos(3), bb_phih_grid(pos(1),pos(2),pos(3)), &
+       !     collisions,recombinations,avg_temper
+       eqxfh1=0.0
+    else
+       eqxfh1=ionizations/allrates
+    endif
     deltht=allrates*dt
     ee=exp(-deltht)
     xh_hot_intermed(pos(1),pos(2),pos(3)) = eqxfh1 + &
          (xh_hot(pos(1),pos(2),pos(3))-eqxfh1) * ee
 
+    !if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
+    !   write(*,*) ionizations, dt
+    !   write(*,*) xh_hot_intermed(pos(1),pos(2),pos(3)),xh_hot(pos(1),pos(2),pos(3))
+    !   write(*,*) eqxfh1, ee, recombinations
+    !endif
     ! Determine average ionized region size (partial volume) over the time step
     ! Mind fp fluctuations. (1.0-ee)/deltht should go to 1.0 for
     ! small deltht, but finite precision leads to values slightly
