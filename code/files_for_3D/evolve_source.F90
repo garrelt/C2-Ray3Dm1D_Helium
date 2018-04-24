@@ -147,7 +147,7 @@ contains
 
     ! Initialize the photon_loss_src variable to the entire source flux
     photon_loss_src=total_source_flux !-1.0 ! to pass the first while test
-    ! If X-ray sources are active (and being used, so in "H" phase),
+    ! If X-ray sources are active (and being used, so in "C" phase),
     ! we trace the entire grid so we set last_* to lastpos_*
     if (phase_type /= "H" .and. NormFlux_XRay /= 0.0) then
        last_r(:)=lastpos_r(:)

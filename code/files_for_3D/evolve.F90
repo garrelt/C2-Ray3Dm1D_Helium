@@ -221,9 +221,13 @@ contains
        ! testing for niter.
        
        if (conv_flag < conv_criterion .and. niter > 1) then
+          ! Do not update anything if the phase is H. The results of
+          ! this phase remain intermediary. The final update of all
+          ! ionization fractions, etc. should be done in phase C.
+          ! This includes xh_hot which is the end result of phase H.
+          ! If this result is needed during phase C, you should use
+          ! xh_hot_intermed.
           if (phase_type == "C" ) then
-             !if (phase_type == "H" ) then
-          !else
              xh_hot(:,:,:)=xh_hot_intermed(:,:,:)
              xh(:,:,:,:)=xh_intermed(:,:,:,:)
              xhe(:,:,:,:)=xhe_intermed(:,:,:,:)

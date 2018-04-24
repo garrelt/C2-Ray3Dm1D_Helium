@@ -243,10 +243,6 @@ contains
              ! Find the photoionization rates
              bb_phi=photoion_rates(vol_ph,ns,ion%h_av(1),"B",simple_flag)
 
-             if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
-                write(*,*) phase, bb_phi%photo_cell_HI, coldensh_in, &
-                     coldensh_out(pos(1),pos(2),pos(3))
-             endif
              ! Divide the photo-ionization rates by the appropriate neutral
              ! density (part of the photon-conserving rate prescription)
              call divide_rate_by_density (bb_phi,ion,ndens_p)
@@ -296,10 +292,6 @@ contains
              ! photoion_rates the structure of rates (photo and heating)
              bb_phi=photoion_rates(vol_ph,ns,ion%h_av(1),"B",simple_flag)
 
-             if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
-                write(*,*) phase, bb_phi%photo_cell_HI, coldensh_in, &
-                     coldensh_out(pos(1),pos(2),pos(3))
-             endif
           else
              
              ! If the H0 column density is above the maximum, set rates to zero
@@ -379,10 +371,6 @@ contains
 #endif
                   )
           endif
-       endif
-
-       if (pos(1) == 49 .and. pos(2) == 50 .and. pos(3) == 50) then
-          write(*,*) phase, bb_phi%photo_cell_HI, ion%h_av(0)
        endif
 
     endif ! end of coldens test
