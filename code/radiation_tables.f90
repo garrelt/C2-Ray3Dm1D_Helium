@@ -318,8 +318,9 @@ contains
 #endif
        ! Make heating tables
        if (.not.isothermal) then
-          call make_heat_tables_HeII(i_subband*3-NumBndin2-4)
-          call make_heat_tables_HeII(i_subband*3-NumBndin2-3)
+          ! Note: before these lines had _HeII in all three below!!
+          call make_heat_tables_HI(i_subband*3-NumBndin2-4)
+          call make_heat_tables_HeI(i_subband*3-NumBndin2-3)
           call make_heat_tables_HeII(i_subband*3-NumBndin2-2)
        endif
        
